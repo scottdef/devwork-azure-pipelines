@@ -1,34 +1,81 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+# template and azure-pipeline simple
 
+# template file docker-build-push-template.yml
+
+parameters:
+  javaVersion: '11'
+  osType: 'RHEL 7'
+  dockerfilePath: 'Dockerfile'
+  dockerImageName: ''
+  nexusRepositoryUrl: ''
+  nexusUsername: ''
+  nexusPassword: ''
+
+jobs:
+- job: BuildAndPushDockerImage
+  displayName: 'Build and Push Docker Image'
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - checkout: self
+
+  - script: |
+      echo "Building Docker image with Java version: ${{ parameters.javaVersion }} and OS type: ${{ parameters.osType }}"
+      docker build --build-arg JDK_VERSION=${{ parameters.javaVersion }} -t ${{ parameters.dockerImageName }} -f ${{ parameters.dockerfilePath }} .
+    displayName: 'Build Docker image'
+
+  - script: |
+      echo "Logging into Nexus Repository Manager"
+      docker login -u ${{ parameters.nexusUsername }} -p ${{ parameters.nexusPassword }} ${{ parameters.nexusRepositoryUrl }}
+
+      echo "Pushing Docker image to Nexus Repository Manager"
+      docker push ${{ parameters.dockerImageName }}
+    displayName: 'Push Docker image to Nexus Repository Manager'
+
+
+
+#
+# azure-pipelines.yml
 trigger:
-- {{ branch }}
+  branches:
+    include:
+    - '*'
 
-pool:
-  vmImage: 'windows-latest'
+resources:
+  repositories:
+  - repository: ado-seed-pipelines
+    type: git
+    name: '<your-organization>/<your-project>/ado-seed-pipelines'
+    ref: refs/heads/main
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
+  javaVersion: '11'
+  osType: 'RHEL 7'
+  dockerImageName: 'your-docker-image-name'
+  nexusRepositoryUrl: 'https://your-nexus-url/repository/your-docker-repo/'
+  nexusUsername: 'your-nexus-username'
+  nexusPassword: 'your-nexus-password'
 
-steps:
-- task: NuGetToolInstaller@1
+jobs:
+- template: docker-build-push-template.yml@ado-seed-pipelines
+  parameters:
+    javaVersion: $(javaVersion)
+    osType: $(osType)
+    dockerImageName: $(dockerImageName)
+    nexusRepositoryUrl: $(nexusRepositoryUrl)
+    nexusUsername: $(nexusUsername)
+    nexusPassword: $(nexusPassword)
 
-- task: NuGetCommand@2
-  inputs:
-    restoreSolution: '$(solution)'
+- job: RunShellScript
+  displayName: 'Run Shell Script'
+  pool:
+    vmImage: 'ubuntu-latest'
+  steps:
+  - checkout: self
 
-- task: VSBuild@1
-  inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+  - script: |
+      echo "Running shell script"
+      chmod +x your-shell-script.sh
+      ./your-shell-script.sh
+    displayName: 'Run shell script'
 
-- task: VSTest@2
-  inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
