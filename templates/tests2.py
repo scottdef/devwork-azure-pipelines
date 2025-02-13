@@ -1,7 +1,6 @@
 import unittest
 import os
 import logging
-from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 
@@ -30,7 +29,7 @@ class TestDynatraceIntegration(unittest.TestCase):
             version_url=self.test_url
         )
 
-    def verify_url_accessibility(self) -> bool:
+    def verify_url_accessibility(self):
         """Helper method to verify if test URL is accessible"""
         try:
             response = requests.head(self.test_url, timeout=5)
@@ -85,13 +84,15 @@ class TestDynatraceIntegration(unittest.TestCase):
         except Exception as e:
             self.fail(f"Failed to parse HTML: {str(e)}")
 
-    def test_cli_integration(self):
-        """Test CLI command integration"""
+    def test_cli_basic_integration(self):
+        """Test basic CLI command integration with default values"""
         runner = CliRunner()
-        result = runner.invoke(get_oneagent_nginx_version, ['--raw-version', '1.297'])
+        result = runner.invoke(get_oneagent_nginx_version)
         
-        self.assertEqual(result.exit_code, 0, 
-                        f"CLI command failed with: {result.output}")
+        self.assertEqual(
+            result.exit_code, 0,
+            f"CLI command with defaults failed with: {result.output}"
+        )
         
         # Verify output contains version number
         version_pattern = r'\d+\.\d+\.\d+'
@@ -100,6 +101,79 @@ class TestDynatraceIntegration(unittest.TestCase):
             version_pattern,
             "CLI output should contain version number"
         )
+
+    def test_cli_custom_version(self):
+        """Test CLI with custom version parameter"""
+        runner = CliRunner()
+        test_cases = [
+            ('1.297', 0),  # Valid version, expect success
+            ('agent-1.297', 0),  # Valid version with prefix, expect success
+            ('invalid', 1),  # Invalid version, expect failure
+            ('', 1)  # Empty version, expect failure
+        ]
+        
+        for version, expected_exit_code in test_cases:
+            with self.subTest(version=version):
+                result = runner.invoke(get_oneagent_nginx_version, ['--raw-version', version])
+                self.assertEqual(
+                    result.exit_code, 
+                    expected_exit_code,
+                    f"CLI command with version {version} failed: {result.output}"
+                )
+
+    def test_cli_custom_url(self):
+        """Test CLI with custom URL parameter"""
+        runner = CliRunner()
+        test_cases = [
+            (self.test_url, 0),  # Valid URL, expect success
+            ('https://invalid.url.com', 1),  # Invalid URL, expect failure
+            ('not-a-url', 1),  # Malformed URL, expect failure
+        ]
+        
+        for url, expected_exit_code in test_cases:
+            with self.subTest(url=url):
+                result = runner.invoke(get_oneagent_nginx_version, [
+                    '--raw-version', '1.297',
+                    '--version-url', url
+                ])
+                self.assertEqual(
+                    result.exit_code,
+                    expected_exit_code,
+                    f"CLI command with URL {url} failed: {result.output}"
+                )
+
+    def test_cli_combined_parameters(self):
+        """Test CLI with multiple parameters combined"""
+        runner = CliRunner()
+        test_cases = [
+            # (version, url, expected_exit_code)
+            ('1.297', self.test_url, 0),  # All valid
+            ('agent-1.297', self.test_url, 0),  # Valid with prefix
+            ('1.297', 'invalid-url', 1),  # Invalid URL
+            ('invalid', self.test_url, 1),  # Invalid version
+        ]
+        
+        for version, url, expected_exit_code in test_cases:
+            with self.subTest(version=version, url=url):
+                result = runner.invoke(get_oneagent_nginx_version, [
+                    '--raw-version', version,
+                    '--version-url', url
+                ])
+                self.assertEqual(
+                    result.exit_code,
+                    expected_exit_code,
+                    f"CLI command with version {version} and URL {url} failed: {result.output}"
+                )
+
+    def test_cli_help_output(self):
+        """Test CLI help command output"""
+        runner = CliRunner()
+        result = runner.invoke(get_oneagent_nginx_version, ['--help'])
+        
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn('--raw-version', result.output)
+        self.assertIn('--version-url', result.output)
+        self.assertIn('help', result.output.lower())
 
     def test_error_handling_integration(self):
         """Test error handling with invalid inputs"""
