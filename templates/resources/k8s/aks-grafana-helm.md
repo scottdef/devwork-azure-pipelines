@@ -9,7 +9,354 @@
 - Access to private repository (Azure DevOps or GitHub)
 - Git client installed
 
-## 1. Connect to AKS Cluster
+## 1. Prepare Grafana Helm Chart for Private Repository
+
+### Download Official Grafana Helm Chart
+
+```bash
+# Create working directory
+mkdir -p ~/grafana-chart-setup
+cd ~/grafana-chart-setup
+
+# Add official Grafana Helm repository
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+
+# Download the specific Grafana chart version
+helm pull grafana/grafana --version 8.0.0 --untar
+
+# Verify chart contents
+ls -la grafana/
+cat grafana/Chart.yaml
+```
+
+### Customize Chart for Your Environment (Optional)
+
+```bash
+# Navigate to chart directory
+cd grafana/
+
+# Backup original files
+cp Chart.yaml Chart.yaml.backup
+cp values.yaml values.yaml.backup
+
+# Optional: Modify Chart.yaml to reflect your organization
+cat > Chart.yaml << 'EOF'
+apiVersion: v2
+name: grafana
+description: The leading tool for querying and visualizing time series and logs
+type: application
+version: 8.0.0
+appVersion: "12.0.0"
+home: https://grafana.net
+icon: https://raw.githubusercontent.com/grafana/grafana/master/public/img/logo_transparent_400x.png
+sources:
+  - https://github.com/grafana/grafana
+maintainers:
+  - name: Your Organization
+    email: devops@yourorg.com
+keywords:
+  - analytics
+  - monitoring
+  - metrics
+  - logs
+EOF
+
+# Optional: Create custom default values
+cat > values-defaults.yaml << 'EOF'
+# Custom default values for your organization
+image:
+  repository: grafana/grafana-oss
+  tag: "12.0.0"
+  pullPolicy: IfNotPresent
+
+# Default admin credentials (override in deployment)
+adminUser: admin
+adminPassword: "ChangeMe123!"
+
+# Default persistence settings
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: managed-csi
+
+# Default plugins for your organization
+env:
+  GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource,grafana-resourcesexporter-app"
+
+# Security defaults
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  fsGroup: 472
+EOF
+```
+
+### Copy Chart to Private Azure DevOps Repository
+
+```bash
+# Set up Azure DevOps repository details
+export AZURE_DEVOPS_ORG="your-organization"
+export AZURE_DEVOPS_PROJECT="your-project"
+export AZURE_DEVOPS_REPO="grafana-helm-charts"
+export AZURE_DEVOPS_PAT="your-personal-access-token"
+
+# Clone or create the private repository
+cd ~/grafana-chart-setup
+
+# Option A: Clone existing repository
+git clone https://${AZURE_DEVOPS_PAT}@dev.azure.com/${AZURE_DEVOPS_ORG}/${AZURE_DEVOPS_PROJECT}/_git/${AZURE_DEVOPS_REPO}
+cd ${AZURE_DEVOPS_REPO}
+
+# Option B: Initialize new repository
+mkdir -p ${AZURE_DEVOPS_REPO}
+cd ${AZURE_DEVOPS_REPO}
+git init
+git remote add origin https://${AZURE_DEVOPS_PAT}@dev.azure.com/${AZURE_DEVOPS_ORG}/${AZURE_DEVOPS_PROJECT}/_git/${AZURE_DEVOPS_REPO}
+
+# Create proper directory structure
+mkdir -p charts
+mkdir -p environments/{dev,staging,prod}
+mkdir -p docs
+
+# Copy Grafana chart to repository
+cp -r ../grafana charts/
+
+# Create repository structure and documentation
+cat > README.md << 'EOF'
+# Grafana Helm Charts Repository
+
+This repository contains Grafana Helm charts for deployment across different environments.
+
+## Structure
+
+```
+├── charts/
+│   └── grafana/           # Main Grafana chart
+├── environments/
+│   ├── dev/              # Development environment values
+│   ├── staging/          # Staging environment values
+│   └── prod/             # Production environment values
+└── docs/                 # Documentation
+```
+
+## Usage
+
+### Install from this repository:
+```bash
+git clone <this-repo>
+cd grafana-helm-charts
+helm install grafana ./charts/grafana -f environments/dev/values.yaml
+```
+EOF
+
+# Create environment-specific values files
+cat > environments/dev/values.yaml << 'EOF'
+# Development Environment Values
+image:
+  tag: "12.0.0"
+
+adminPassword: "DevPassword123!"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: false  # Use ephemeral storage for dev
+EOF
+
+cat > environments/staging/values.yaml << 'EOF'
+# Staging Environment Values
+image:
+  tag: "12.0.0"
+
+adminPassword: "StagingPassword123!"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 800m
+    memory: 1Gi
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  size: 5Gi
+EOF
+
+cat > environments/prod/values.yaml << 'EOF'
+# Production Environment Values
+image:
+  tag: "12.0.0"
+
+adminPassword: "SecureProductionPassword123!"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+service:
+  type: LoadBalancer
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+# Production plugins
+env:
+  GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource,grafana-resourcesexporter-app"
+
+# Security hardening for production
+grafana.ini:
+  security:
+    cookie_secure: true
+    cookie_samesite: strict
+  server:
+    protocol: https
+EOF
+
+# Commit and push to Azure DevOps
+git add .
+git commit -m "Initial Grafana Helm chart setup with multi-environment support"
+git branch -M main
+git push -u origin main
+```
+
+### Copy Chart to Private GitHub Repository
+
+```bash
+# Set up GitHub repository details
+export GITHUB_ORG="your-github-org"
+export GITHUB_REPO="grafana-helm-charts"
+export GITHUB_PAT="your-github-personal-access-token"
+
+# Clone or create the private GitHub repository
+cd ~/grafana-chart-setup
+
+# Option A: Clone existing repository
+git clone https://${GITHUB_PAT}@github.com/${GITHUB_ORG}/${GITHUB_REPO}.git
+cd ${GITHUB_REPO}
+
+# Option B: Create new repository (create on GitHub first, then clone)
+mkdir -p ${GITHUB_REPO}
+cd ${GITHUB_REPO}
+git init
+git remote add origin https://${GITHUB_PAT}@github.com/${GITHUB_ORG}/${GITHUB_REPO}.git
+
+# Create the same directory structure as Azure DevOps example above
+mkdir -p charts environments/{dev,staging,prod} docs
+
+# Copy Grafana chart
+cp -r ../grafana charts/
+
+# Create GitHub-specific files
+cat > .github/workflows/helm-lint.yml << 'EOF'
+name: Helm Chart Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.x'
+    
+    - name: Lint Helm Chart
+      run: |
+        helm lint charts/grafana
+        helm template test charts/grafana --values environments/dev/values.yaml
+EOF
+
+# Create .gitignore
+cat > .gitignore << 'EOF'
+# Helm
+*.tgz
+.helm/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+EOF
+
+# Copy environment files (same as Azure DevOps example)
+# ... (same environment files as above)
+
+# Commit and push to GitHub
+git add .
+git commit -m "Initial Grafana Helm chart setup with CI/CD pipeline"
+git branch -M main
+git push -u origin main
+```
+
+### Create Helm Repository Index (Optional)
+
+```bash
+# If you want to use the repo as a proper Helm repository
+cd ~/grafana-chart-setup/${AZURE_DEVOPS_REPO}  # or ${GITHUB_REPO}
+
+# Package the chart
+helm package charts/grafana
+
+# Create index.yaml for Helm repository
+helm repo index . --url https://your-domain.com/helm-charts
+
+# Add and commit the packaged chart and index
+git add *.tgz index.yaml
+git commit -m "Add packaged Grafana chart and Helm repo index"
+git push origin main
+```
+
+### Verify Chart in Private Repository
+
+```bash
+# Test chart from private repository
+cd ~/grafana-chart-setup/${AZURE_DEVOPS_REPO}  # or ${GITHUB_REPO}
+
+# Validate chart syntax
+helm lint charts/grafana
+
+# Test template rendering
+helm template grafana charts/grafana --values environments/dev/values.yaml
+
+# Verify all files are present
+find charts/grafana -name "*.yaml" -o -name "*.yml" | head -10
+```
+
+## 2. Connect to AKS Cluster
 
 ```bash
 # Login to Azure (if not already logged in)
@@ -23,7 +370,7 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-## 2. Setup Private Repository Access
+## 3. Setup Private Repository Access
 
 ### Option A: Azure DevOps Private Repository
 
@@ -137,7 +484,7 @@ helm pull oci://${ACR_NAME}.azurecr.io/helm/grafana --version ${CHART_VERSION} -
 cd grafana/
 ```
 
-## 3. Create Namespace
+## 4. Create Namespace
 
 ```bash
 # Create dedicated namespace for Grafana
@@ -147,7 +494,7 @@ kubectl create namespace grafana
 kubectl config set-context --current --namespace=grafana
 ```
 
-## 4. Create Custom Values File
+## 5. Create Custom Values File
 
 ```bash
 # Create custom values for private repository installation
@@ -298,7 +645,7 @@ extraVolumeMounts: []
 EOF
 ```
 
-## 5. Install from Private Repository
+## 6. Install from Private Repository
 
 ### Option A: Install from Local Clone (Azure DevOps)
 
@@ -307,15 +654,15 @@ EOF
 cd ${AZURE_DEVOPS_REPO}
 
 # Install from local chart directory
-helm install grafana ./grafana \
+helm install grafana ./charts/grafana \
   --namespace grafana \
   --values values-private-repo.yaml \
   --create-namespace
 
-# Alternative: Install from specific chart subdirectory
+# Alternative: Install with environment-specific values
 helm install grafana ./charts/grafana \
   --namespace grafana \
-  --values values-private-repo.yaml \
+  --values ./environments/dev/values.yaml \
   --create-namespace
 ```
 
@@ -326,7 +673,7 @@ helm install grafana ./charts/grafana \
 cd ${GITHUB_REPO}
 
 # Install from local chart directory
-helm install grafana ./grafana \
+helm install grafana ./charts/grafana \
   --namespace grafana \
   --values values-private-repo.yaml \
   --create-namespace
@@ -353,7 +700,7 @@ helm install grafana private-github/grafana \
   --create-namespace
 ```
 
-## 6. Verify Installation
+## 7. Verify Installation
 
 ```bash
 # Check all resources in grafana namespace
@@ -375,7 +722,7 @@ kubectl get svc -n grafana
 helm get values grafana -n grafana
 ```
 
-## 7. Remote Access Setup - Port Forwarding
+## 8. Remote Access Setup - Port Forwarding
 
 ### Method 1: Basic Port Forward (Local Access Only)
 
@@ -475,7 +822,7 @@ screen -r grafana-portforward
 screen -ls
 ```
 
-## 8. Firewall and Security Configuration
+## 9. Firewall and Security Configuration
 
 ### Configure Firewall for Remote Access
 
@@ -546,7 +893,7 @@ chmod +x secure-grafana-access.sh
 ./secure-grafana-access.sh
 ```
 
-## 9. Testing Remote Web Interface Access
+## 10. Testing Remote Web Interface Access
 
 ### Automated Connectivity Test
 
@@ -642,7 +989,7 @@ chmod +x test-remote-grafana.sh
 5. **Test Dashboard**: Try creating a simple dashboard
 6. **Test Data Source**: Add TestData DB data source
 
-## 10. Repository Updates and Continuous Deployment
+## 11. Repository Updates and Continuous Deployment
 
 ### Update Chart from Private Repository
 
@@ -653,8 +1000,8 @@ cd ${AZURE_DEVOPS_REPO}  # or ${GITHUB_REPO}
 # Pull latest changes
 git pull origin main
 
-# Upgrade Grafana installation
-helm upgrade grafana ./grafana \
+# Upgrade Grafana installation with updated chart
+helm upgrade grafana ./charts/grafana \
   --namespace grafana \
   --values values-private-repo.yaml
 
@@ -682,12 +1029,12 @@ REMOTE_COMMIT=$(git rev-parse origin/main)
 if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
     echo "📥 New changes detected, updating..."
     git pull origin main
-
+    
     # Upgrade Grafana with new chart
-    helm upgrade grafana ./grafana \
+    helm upgrade grafana ./charts/grafana \
       --namespace grafana \
       --values values-private-repo.yaml
-
+    
     echo "✅ Grafana updated to latest chart version"
 else
     echo "✅ Repository is up to date"
@@ -700,7 +1047,7 @@ chmod +x sync-private-repo.sh
 ./sync-private-repo.sh
 ```
 
-## 11. Uninstall Grafana
+## 12. Uninstall Grafana
 
 ### Complete Uninstall
 
@@ -724,7 +1071,7 @@ rm -rf ${AZURE_DEVOPS_REPO} ${GITHUB_REPO}
 rm -f ~/.git-credentials
 ```
 
-## 12. Troubleshooting Private Repository Access
+## 13. Troubleshooting Private Repository Access
 
 ### Repository Access Issues
 
