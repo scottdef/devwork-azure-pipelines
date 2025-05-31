@@ -1,0 +1,357 @@
+# Network Testing Commands for Grafana on AKS (PowerShell)
+# Tests DNS resolution, internal connectivity, and external access
+
+param(
+    [string]$Command = "help"
+)
+
+# Set error action preference
+$ErrorActionPreference = "Stop"
+
+# Function to print colored output
+function Write-Status {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor Green
+}
+
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "[WARNING] $Message" -ForegroundColor Yellow
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+}
+
+function Write-Step {
+    param([string]$Message)
+    Write-Host "[STEP] $Message" -ForegroundColor Blue
+}
+
+# Test DNS resolution within cluster
+function Test-DnsResolution {
+    Write-Step "Testing DNS resolution within AKS cluster..."
+    
+    Write-Status "Testing Kubernetes internal DNS..."
+    kubectl run dns-test --image=busybox --rm -it --restart=Never -- nslookup kubernetes.default.svc.cluster.local
+    
+    Write-Status "Testing Grafana service DNS..."
+    kubectl run dns-test-grafana --image=busybox --rm -it --restart=Never -- nslookup grafana.grafana.svc.cluster.local
+    
+    Write-Status "Testing external DNS..."
+    kubectl run dns-test-external --image=busybox --rm -it --restart=Never -- nslookup google.com
+    
+    Write-Status "DNS resolution tests completed"
+}
+
+# Test internal cluster connectivity
+function Test-InternalConnectivity {
+    Write-Step "Testing internal cluster connectivity..."
+    
+    Write-Status "Testing Grafana HTTP endpoint from within cluster..."
+    kubectl run curl-test-internal --image=curlimages/curl --rm -it --restart=Never -- curl -v -I http://grafana.grafana.svc.cluster.local/api/health
+    
+    Write-Status "Testing Grafana HTTP endpoint with timeout..."
+    kubectl run curl-test-timeout --image=curlimages/curl --rm -it --restart=Never -- curl --connect-timeout 10 -I http://grafana.grafana.svc.cluster.local/login
+    
+    Write-Status "Internal connectivity tests completed"
+}
+
+# Test Grafana API endpoints
+function Test-GrafanaApi {
+    Write-Step "Testing Grafana API endpoints..."
+    
+    Write-Status "Testing health endpoint..."
+    kubectl run api-test-health --image=curlimages/curl --rm -it --restart=Never -- curl -s http://grafana.grafana.svc.cluster.local/api/health
+    
+    Write-Status "Testing metrics endpoint..."
+    kubectl run api-test-metrics --image=curlimages/curl --rm -it --restart=Never -- curl -s http://grafana.grafana.svc.cluster.local/metrics
+    
+    Write-Status "Testing login page..."
+    kubectl run api-test-login --image=curlimages/curl --rm -it --restart=Never -- curl -s -o /dev/null -w "HTTP Status: %{http_code}`nTotal Time: %{time_total}s`n" http://grafana.grafana.svc.cluster.local/login
+    
+    Write-Status "API endpoint tests completed"
+}
+
+# Comprehensive network test with detailed output
+function Test-ComprehensiveNetwork {
+    Write-Step "Running comprehensive network test..."
+    
+    $testScript = @"
+echo '===================='
+echo 'Comprehensive Network Test for Grafana'
+echo '===================='
+echo
+echo 'DNS Resolution Tests:'
+nslookup kubernetes.default.svc.cluster.local
+echo
+nslookup grafana.grafana.svc.cluster.local
+echo
+nslookup google.com
+echo
+echo 'HTTP Connectivity Tests:'
+curl -I http://grafana.grafana.svc.cluster.local/api/health
+echo
+curl -I http://grafana.grafana.svc.cluster.local/login
+echo
+echo 'Network Interface Info:'
+ip addr show eth0
+echo
+echo 'Routing Table:'
+ip route
+echo
+echo 'Port Connectivity Test:'
+nc -zv grafana.grafana.svc.cluster.local 80 2>&1 || echo 'Port test failed'
+echo
+echo 'Service Endpoints:'
+nslookup grafana.grafana.svc.cluster.local
+echo '===================='
+"@
+    
+    kubectl run network-test --image=nicolaka/netshoot --rm -it --restart=Never -- sh -c $testScript
+    
+    Write-Status "Comprehensive network test completed"
+}
+
+# Test external connectivity (internet access)
+function Test-ExternalConnectivity {
+    Write-Step "Testing external connectivity from AKS cluster..."
+    
+    Write-Status "Testing connectivity to GitHub (for plugins)..."
+    kubectl run external-test-github --image=curlimages/curl --rm -it --restart=Never -- curl -I https://github.com
+    
+    Write-Status "Testing connectivity to Grafana.com..."
+    kubectl run external-test-grafana --image=curlimages/curl --rm -it --restart=Never -- curl -I https://grafana.com
+    
+    Write-Status "Testing connectivity to Docker Hub..."
+    kubectl run external-test-docker --image=curlimages/curl --rm -it --restart=Never -- curl -I https://hub.docker.com
+    
+    Write-Status "External connectivity tests completed"
+}
+
+# Test port forwarding connectivity
+function Test-PortForwardConnectivity {
+    Write-Step "Testing port-forward connectivity..."
+    
+    # Check if port-forward is already running
+    $portForwardJobs = Get-Job | Where-Object { $_.Command -like "*port-forward*" -and $_.State -eq "Running" }
+    
+    if ($portForwardJobs) {
+        Write-Status "Port-forward already running"
+        
+        Write-Status "Testing local port-forward connectivity..."
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:3000/api/health" -Method Head -TimeoutSec 10
+            Write-Status "Local connectivity test successful (Status: $($response.StatusCode))"
+        }
+        catch {
+            Write-Warning "Local connectivity test failed: $($_.Exception.Message)"
+        }
+    }
+    else {
+        Write-Warning "No port-forward detected. Start with:"
+        Write-Host "kubectl port-forward -n grafana svc/grafana 3000:80" -ForegroundColor Yellow
+    }
+}
+
+# Test from different namespaces
+function Test-CrossNamespaceConnectivity {
+    Write-Step "Testing cross-namespace connectivity..."
+    
+    Write-Status "Testing from default namespace..."
+    kubectl run test-default --image=curlimages/curl --rm --restart=Never -- curl -I http://grafana.grafana.svc.cluster.local/api/health
+    
+    Write-Status "Testing from kube-system namespace..."
+    kubectl run test-system -n kube-system --image=curlimages/curl --rm --restart=Never -- curl -I http://grafana.grafana.svc.cluster.local/api/health
+    
+    Write-Status "Cross-namespace connectivity tests completed"
+}
+
+# Troubleshooting network issues
+function Invoke-NetworkTroubleshooting {
+    Write-Step "Network troubleshooting for Grafana..."
+    
+    Write-Status "Checking Grafana service endpoints..."
+    kubectl get endpoints grafana -n grafana
+    
+    Write-Status "Checking Grafana service details..."
+    kubectl describe svc grafana -n grafana
+    
+    Write-Status "Checking pod network details..."
+    kubectl get pods -n grafana -o wide
+    
+    Write-Status "Checking for network policies..."
+    kubectl get networkpolicies -n grafana
+    
+    Write-Status "Checking DNS configuration..."
+    kubectl get configmap coredns -n kube-system -o yaml | Select-String -Pattern ".:53" -Context 5,10
+    
+    Write-Status "Testing DNS from within a pod..."
+    try {
+        $podName = kubectl get pods -n grafana -l app=grafana -o jsonpath='{.items[0].metadata.name}' 2>$null
+        if ($podName) {
+            Write-Status "DNS test from Grafana pod: $podName"
+            kubectl exec -n grafana $podName -- nslookup kubernetes.default.svc.cluster.local 2>$null
+            kubectl exec -n grafana $podName -- nslookup grafana.grafana.svc.cluster.local 2>$null
+        }
+    }
+    catch {
+        Write-Warning "Could not test DNS from Grafana pod"
+    }
+    
+    Write-Status "Network troubleshooting completed"
+}
+
+# Clean up test pods
+function Remove-TestPods {
+    Write-Step "Cleaning up test pods..."
+    
+    # Clean up failed and succeeded pods
+    try {
+        kubectl delete pods --field-selector=status.phase=Failed 2>$null
+        kubectl delete pods --field-selector=status.phase=Succeeded 2>$null
+    }
+    catch {
+        # Ignore errors if no pods found
+    }
+    
+    # Clean up specific test pods if they exist
+    $testPods = @(
+        "dns-test", "dns-test-grafana", "dns-test-external", "curl-test-internal", "curl-test-timeout",
+        "api-test-health", "api-test-metrics", "api-test-login", "network-test",
+        "external-test-github", "external-test-grafana", "external-test-docker",
+        "test-default", "test-system"
+    )
+    
+    foreach ($pod in $testPods) {
+        try {
+            kubectl delete pod $pod 2>$null
+            kubectl delete pod $pod -n kube-system 2>$null
+        }
+        catch {
+            # Ignore errors if pod doesn't exist
+        }
+    }
+    
+    Write-Status "Test pod cleanup completed"
+}
+
+# Show network information
+function Show-NetworkInfo {
+    Write-Step "AKS Cluster Network Information"
+    
+    Write-Host ""
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host "   Network Information" -ForegroundColor Cyan
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    Write-Status "Cluster Info:"
+    kubectl cluster-info
+    Write-Host ""
+    
+    Write-Status "Nodes:"
+    kubectl get nodes -o wide
+    Write-Host ""
+    
+    Write-Status "Grafana Services:"
+    kubectl get svc -n grafana -o wide
+    Write-Host ""
+    
+    Write-Status "Grafana Pods:"
+    kubectl get pods -n grafana -o wide
+    Write-Host ""
+    
+    Write-Status "Service Endpoints:"
+    kubectl get endpoints -n grafana
+    Write-Host ""
+    
+    Write-Status "Network Policies:"
+    kubectl get networkpolicies -A
+    Write-Host ""
+    
+    Write-Host "======================================" -ForegroundColor Cyan
+}
+
+# Main function
+function Main {
+    param([string]$Command)
+    
+    Write-Host ""
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host "  Network Testing for Grafana on AKS" -ForegroundColor Cyan
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    switch ($Command.ToLower()) {
+        "dns" {
+            Test-DnsResolution
+        }
+        "internal" {
+            Test-InternalConnectivity
+        }
+        "api" {
+            Test-GrafanaApi
+        }
+        "external" {
+            Test-ExternalConnectivity
+        }
+        "port-forward" {
+            Test-PortForwardConnectivity
+        }
+        "cross-namespace" {
+            Test-CrossNamespaceConnectivity
+        }
+        "comprehensive" {
+            Test-ComprehensiveNetwork
+        }
+        "troubleshoot" {
+            Invoke-NetworkTroubleshooting
+        }
+        "cleanup" {
+            Remove-TestPods
+        }
+        "info" {
+            Show-NetworkInfo
+        }
+        "all" {
+            Test-DnsResolution
+            Test-InternalConnectivity
+            Test-GrafanaApi
+            Test-ExternalConnectivity
+            Test-PortForwardConnectivity
+            Remove-TestPods
+        }
+        "help" {
+            Write-Host "Usage: .\test-network.ps1 [command]" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Commands:" -ForegroundColor Green
+            Write-Host "  dns              - Test DNS resolution"
+            Write-Host "  internal         - Test internal cluster connectivity"
+            Write-Host "  api              - Test Grafana API endpoints"
+            Write-Host "  external         - Test external internet connectivity"
+            Write-Host "  port-forward     - Test port-forward connectivity"
+            Write-Host "  cross-namespace  - Test cross-namespace connectivity"
+            Write-Host "  comprehensive    - Run comprehensive network test"
+            Write-Host "  troubleshoot     - Network troubleshooting"
+            Write-Host "  cleanup          - Clean up test pods"
+            Write-Host "  info             - Show network information"
+            Write-Host "  all              - Run all tests"
+            Write-Host "  help             - Show this help message"
+            Write-Host ""
+            Write-Host "Examples:" -ForegroundColor Yellow
+            Write-Host "  .\test-network.ps1 dns           # Test DNS resolution"
+            Write-Host "  .\test-network.ps1 comprehensive # Run comprehensive test"
+            Write-Host "  .\test-network.ps1 all           # Run all connectivity tests"
+        }
+        default {
+            Write-Error "Unknown command: $Command"
+            Write-Host "Run '.\test-network.ps1 help' for usage information" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+}
+
+# Run main function
+Main -Command $Command
