@@ -1,0 +1,471 @@
+# Grafana OSS v12 Deployment for AKS - kubectl only
+# AKS Cluster: supercool-aks-cluster
+# Grafana Version: 12.0.0
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grafana
+  labels:
+    name: grafana
+    app: grafana
+
+---
+# ConfigMap for Grafana configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: grafana
+  labels:
+    app: grafana
+data:
+  grafana.ini: |
+    [analytics]
+    check_for_updates = false
+    reporting_enabled = false
+    
+    [security]
+    admin_user = admin
+    admin_password = $__env{GF_SECURITY_ADMIN_PASSWORD}
+    allow_embedding = false
+    cookie_secure = false
+    cookie_samesite = lax
+    
+    [server]
+    domain = localhost
+    http_port = 3000
+    protocol = http
+    root_url = http://localhost:3000/
+    serve_from_sub_path = false
+    enable_gzip = true
+    
+    [database]
+    type = sqlite3
+    path = /var/lib/grafana/grafana.db
+    
+    [session]
+    provider = file
+    provider_config = sessions
+    
+    [dataproxy]
+    logging = false
+    timeout = 30
+    send_user_header = false
+    
+    [snapshots]
+    external_enabled = true
+    external_snapshot_url = https://snapshots-origin.raintank.io
+    external_snapshot_name = Publish to snapshot.raintank.io
+    
+    [dashboards]
+    versions_to_keep = 20
+    min_refresh_interval = 5s
+    default_home_dashboard_path = ""
+    
+    [users]
+    allow_sign_up = false
+    allow_org_create = false
+    auto_assign_org = true
+    auto_assign_org_id = 1
+    auto_assign_org_role = Viewer
+    verify_email_enabled = false
+    login_hint = email or username
+    password_hint = password
+    default_theme = dark
+    
+    [auth]
+    login_cookie_name = grafana_session
+    login_maximum_inactive_lifetime_duration = 7d
+    login_maximum_lifetime_duration = 30d
+    token_rotation_interval_minutes = 10
+    disable_login_form = false
+    disable_signout_menu = false
+    signout_redirect_url = ""
+    oauth_auto_login = false
+    
+    [auth.anonymous]
+    enabled = false
+    
+    [auth.github]
+    enabled = false
+    
+    [auth.google]
+    enabled = false
+    
+    [log]
+    mode = console
+    level = info
+    filters = rendering:debug
+    
+    [log.console]
+    level = info
+    format = console
+    
+    [alerting]
+    enabled = true
+    execute_alerts = true
+    error_or_timeout = alerting
+    nodata_or_nullvalues = no_data
+    concurrent_render_limit = 5
+    evaluation_timeout_seconds = 30
+    notification_timeout_seconds = 30
+    max_attempts = 3
+    min_interval_seconds = 1
+    
+    [metrics]
+    enabled = true
+    interval_seconds = 10
+    
+    [metrics.graphite]
+    address = ""
+    prefix = prod.grafana.%(instance_name)s.
+    
+    [tracing.jaeger]
+    address = ""
+    always_included_tag = ""
+    sampler_type = ""
+    sampler_param = 1
+    
+    [grafana_net]
+    url = https://grafana.net
+    
+    [external_image_storage]
+    provider = ""
+    
+    [panels]
+    enable_alpha = true
+    disable_sanitize_html = false
+    
+    [plugins]
+    enable_alpha = true
+    app_tls_skip_verify_insecure = false
+    allow_loading_unsigned_plugins = ""
+    
+    [enterprise]
+    license_path = ""
+    
+    [feature_toggles]
+    enable = ""
+    
+    [date_formats]
+    full_date = YYYY-MM-DD HH:mm:ss
+    interval_second = HH:mm:ss
+    interval_minute = HH:mm
+    interval_hour = MM/DD HH:mm
+    interval_day = MM/DD
+    interval_month = YYYY-MM
+    interval_year = YYYY
+    use_browser_locale = false
+    default_timezone = browser
+
+---
+# Secret for admin password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin-secret
+  namespace: grafana
+  labels:
+    app: grafana
+type: Opaque
+data:
+  # admin-password = "GrafanaAdmin123!" (base64 encoded)
+  admin-password: R3JhZmFuYUFkbWluMTIzIQ==
+
+---
+# PersistentVolumeClaim for Grafana data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: grafana
+  labels:
+    app: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi  # Azure managed disk
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: grafana
+  labels:
+    app: grafana
+automountServiceAccountToken: false
+
+---
+# Security Context Constraints / Pod Security Policy equivalent
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-security-config
+  namespace: grafana
+  labels:
+    app: grafana
+data:
+  security-notes: |
+    Grafana runs as non-root user (UID 472)
+    Security context enforces non-root execution
+    File system group set to 472 for proper permissions
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: grafana
+  labels:
+    app: grafana
+    version: v12.0.0
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        version: v12.0.0
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+      - name: grafana
+        image: grafana/grafana-oss:12.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-secret
+              key: admin-password
+        - name: GF_PATHS_DATA
+          value: /var/lib/grafana
+        - name: GF_PATHS_LOGS
+          value: /var/log/grafana
+        - name: GF_PATHS_PLUGINS
+          value: /var/lib/grafana/plugins
+        - name: GF_PATHS_PROVISIONING
+          value: /etc/grafana/provisioning
+        - name: GF_SERVER_HTTP_PORT
+          value: "3000"
+        - name: GF_SERVER_PROTOCOL
+          value: "http"
+        - name: GF_SERVER_DOMAIN
+          value: "localhost"
+        - name: GF_SERVER_ROOT_URL
+          value: "http://localhost:3000/"
+        - name: GF_DATABASE_TYPE
+          value: "sqlite3"
+        - name: GF_DATABASE_PATH
+          value: "/var/lib/grafana/grafana.db"
+        - name: GF_ANALYTICS_REPORTING_ENABLED
+          value: "false"
+        - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+          value: "false"
+        - name: GF_LOG_MODE
+          value: "console"
+        - name: GF_LOG_LEVEL
+          value: "info"
+        - name: GF_SECURITY_ALLOW_EMBEDDING
+          value: "false"
+        - name: GF_SECURITY_COOKIE_SECURE
+          value: "false"
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_USERS_ALLOW_ORG_CREATE
+          value: "false"
+        - name: GF_PLUGINS_ENABLE_ALPHA
+          value: "true"
+        - name: GF_PANELS_ENABLE_ALPHA
+          value: "true"
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        - name: grafana-config
+          mountPath: /etc/grafana/grafana.ini
+          subPath: grafana.ini
+          readOnly: true
+        - name: grafana-logs
+          mountPath: /var/log/grafana
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 472
+          runAsGroup: 472
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+            ephemeral-storage: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          timeoutSeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 10
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: grafana-pvc
+      - name: grafana-config
+        configMap:
+          name: grafana-config
+          defaultMode: 0644
+      - name: grafana-logs
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      automountServiceAccountToken: false
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: grafana
+  labels:
+    app: grafana
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: grafana
+  sessionAffinity: None
+
+---
+# Headless Service for StatefulSet-like behavior (if needed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-headless
+  namespace: grafana
+  labels:
+    app: grafana
+spec:
+  clusterIP: None
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: grafana
+
+---
+# NetworkPolicy for security (optional)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-network-policy
+  namespace: grafana
+  labels:
+    app: grafana
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - {}  # Allow all egress traffic
+
+---
+# ServiceMonitor for Prometheus (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grafana
+  namespace: grafana
+  labels:
+    app: grafana
+spec:
+  selector:
+    matchLabels:
+      app: grafana
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
