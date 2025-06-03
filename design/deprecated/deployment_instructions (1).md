@@ -1,483 +1,558 @@
-# Grafana OSS v12 Deployment on AKS - Complete Instructions (PowerShell)
+# Grafana OSS v12 PowerShell Deployment Guide for AKS
 
-## Overview
-This guide provides step-by-step instructions to deploy Grafana OSS v12 on Azure Kubernetes Service (AKS) using only kubectl (no Helm required) with PowerShell scripts.
+Complete PowerShell commands to deploy Grafana OSS v12 on Azure Kubernetes Service (AKS) using Helm.
 
-**Target Environment:**
-- AKS Cluster: `supercool-aks-cluster`
-- Grafana Version: OSS v12.0.0
-- kubectl Version: 1.30
-- Deployment Method: kubectl with YAML manifests
-- Platform: Windows with PowerShell
+## Environment Setup
 
-## Prerequisites
+- **AKS Cluster**: `supercool-aks-cluster`
+- **Grafana Version**: OSS v12.0.0
+- **kubectl Version**: 1.30
+- **Helm Binary**: `C:\Users\user01\kube-bin\helm.exe`
+- **Values File**: `C:\Users\user01\kube-bin\my-values\custom-values.yaml`
+- **Platform**: Windows 11 with PowerShell
 
-### Local Machine Requirements
-- Windows 10/11 or Windows Server
-- PowerShell 5.1 or PowerShell 7+
-- Azure CLI installed and configured
-- kubectl v1.30 installed
-- Access to Azure subscription with AKS cluster
-- Web browser for accessing Grafana
+## Prerequisites Commands
 
-### AKS Cluster Requirements
-- Running AKS cluster named `supercool-aks-cluster`
-- Cluster admin permissions
-- Default storage class configured (managed-csi)
+### Connect to AKS Cluster
 
-## Step 1: Prepare Your Environment
-
-### 1.1 Verify Prerequisites
 ```powershell
-# Check Azure CLI
-az --version
-
-# Check kubectl version
-kubectl version --client
-
-# Verify you have the required kubectl version (1.30.x)
-kubectl version --client -o yaml | Select-String "gitVersion"
-
-# Check PowerShell version
-$PSVersionTable.PSVersion
-```
-
-### 1.2 Connect to AKS Cluster
-```powershell
-# Login to Azure
-az login
-
-# Set your subscription (if you have multiple)
-az account set --subscription "your-subscription-id"
-
-# Get AKS credentials
+# Connect to AKS cluster (adjust resource group name)
 az aks get-credentials --resource-group <your-resource-group> --name supercool-aks-cluster --overwrite-existing
 
 # Verify connection
 kubectl cluster-info
 kubectl get nodes
+
+# Check current context
+kubectl config current-context
 ```
 
-### 1.3 Verify Cluster Permissions
+## Helm Installation Commands
+
+### 1. Add Grafana Helm Repository
+
 ```powershell
-# Test cluster admin permissions
-kubectl auth can-i create namespace
-kubectl auth can-i create persistentvolumeclaim
-kubectl auth can-i create deployment
-kubectl auth can-i create service
+# Add the official Grafana Helm repository
+& "C:\Users\user01\kube-bin\helm.exe" repo add grafana https://grafana.github.io/helm-charts
+
+# Update repository information
+& "C:\Users\user01\kube-bin\helm.exe" repo update
+
+# Verify repository was added
+& "C:\Users\user01\kube-bin\helm.exe" repo list
+
+# Search for available Grafana chart versions
+& "C:\Users\user01\kube-bin\helm.exe" search repo grafana/grafana --versions
 ```
 
-## Step 2: Prepare Deployment Files
+### 2. Create Namespace
 
-### 2.1 Create Deployment Directory
 ```powershell
-# Create a directory for Grafana deployment
-New-Item -ItemType Directory -Path "$env:USERPROFILE\grafana-aks-deployment" -Force
-Set-Location "$env:USERPROFILE\grafana-aks-deployment"
+# Create dedicated namespace for Grafana
+kubectl create namespace grafana
+
+# Alternatively, create namespace declaratively
+kubectl create namespace grafana --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### 2.2 Save the Kubernetes Manifests
-Save the provided `grafana-manifests.yaml` file to your deployment directory. This file contains all necessary Kubernetes resources:
-- Namespace
-- ConfigMap for Grafana configuration
-- Secret for admin credentials
-- PersistentVolumeClaim for data storage
-- ServiceAccount
-- Deployment
-- Services
-- NetworkPolicy
-- ServiceMonitor (for Prometheus)
+### 3. Install Grafana OSS v12
 
-### 2.3 Save the Deployment Script
-Save the provided `deploy-grafana.ps1` script:
 ```powershell
-# Make sure the script can be executed
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# Install Grafana using your custom values file
+& "C:\Users\user01\kube-bin\helm.exe" install grafana grafana/grafana `
+  --namespace grafana `
+  --values "C:\Users\user01\kube-bin\my-values\custom-values.yaml" `
+  --version 8.0.0 `
+  --create-namespace
+
+# Alternative: Install with specific timeout
+& "C:\Users\user01\kube-bin\helm.exe" install grafana grafana/grafana `
+  --namespace grafana `
+  --values "C:\Users\user01\kube-bin\my-values\custom-values.yaml" `
+  --version 8.0.0 `
+  --timeout 10m `
+  --wait
 ```
 
-### 2.4 Save the Network Testing Script
-Save the provided `test-network.ps1` script.
+### 4. Verify Installation
 
-## Step 3: Deploy Grafana
-
-### 3.1 Run the Deployment Script
 ```powershell
-# Deploy Grafana with all verification steps
-.\deploy-grafana.ps1 deploy
-```
+# Check Helm release status
+& "C:\Users\user01\kube-bin\helm.exe" status grafana -n grafana
 
-This script will:
-- Check prerequisites
-- Deploy all Kubernetes resources
-- Wait for resources to be ready
-- Verify the deployment
-- Test connectivity
-- Display access information
+# List Helm releases
+& "C:\Users\user01\kube-bin\helm.exe" list -n grafana
 
-### 3.2 Manual Deployment (Alternative)
-If you prefer to deploy manually:
-```powershell
-# Apply all manifests
-kubectl apply -f grafana-manifests.yaml
+# Check all Kubernetes resources
+kubectl get all -n grafana
 
-# Wait for namespace
-kubectl wait --for=condition=Ready namespace/grafana --timeout=60s
+# Check specific resources
+kubectl get pods -n grafana -o wide
+kubectl get svc -n grafana
+kubectl get pvc -n grafana
 
-# Wait for PVC to be bound
-kubectl wait --for=condition=Bound pvc/grafana-pvc -n grafana --timeout=300s
+# Check pod logs
+kubectl logs deployment/grafana -n grafana --tail=20
 
 # Wait for deployment to be ready
 kubectl wait --for=condition=Available deployment/grafana -n grafana --timeout=600s
 
 # Wait for pods to be ready
-kubectl wait --for=condition=Ready pod -l app=grafana -n grafana --timeout=300s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n grafana --timeout=300s
 ```
 
-## Step 4: Verify Deployment
+## Access Grafana
 
-### 4.1 Check All Resources
+### Set up Port Forwarding
+
 ```powershell
-# Check all resources in the grafana namespace
-kubectl get all -n grafana
-
-# Check persistent storage
-kubectl get pvc -n grafana
-
-# Check configuration
-kubectl get configmap,secret -n grafana
-```
-
-### 4.2 Check Pod Status and Logs
-```powershell
-# Check pod status
-kubectl get pods -n grafana -o wide
-
-# Check pod logs
-kubectl logs deployment/grafana -n grafana --tail=20
-
-# Follow logs in real-time
-kubectl logs deployment/grafana -n grafana -f
-```
-
-### 4.3 Run Network Tests
-```powershell
-# Test DNS resolution
-.\test-network.ps1 dns
-
-# Test internal connectivity
-.\test-network.ps1 internal
-
-# Test Grafana API endpoints
-.\test-network.ps1 api
-
-# Run comprehensive test
-.\test-network.ps1 comprehensive
-```
-
-## Step 5: Access Grafana
-
-### 5.1 Setup Port Forwarding
-```powershell
-# Start port-forward to access Grafana locally
+# Start port-forward for local access
 kubectl port-forward -n grafana svc/grafana 3000:80
 
-# Or for remote access (binds to all interfaces)
+# For remote access (binds to all interfaces)
 kubectl port-forward -n grafana --address 0.0.0.0 svc/grafana 3000:80
-
-# Or use the PowerShell script
-.\deploy-grafana.ps1 port-forward
 ```
 
-### 5.2 Access via Web Browser
-1. Open your web browser
-2. Navigate to: `http://localhost:3000`
-3. Login with:
-   - **Username:** `admin`
-   - **Password:** `GrafanaAdmin123!`
+### Start Port Forward as Background Job
 
-### 5.3 Verify Grafana Installation
-1. Confirm the dashboard loads successfully
-2. Check the version in the bottom left corner (should show v12.x.x)
-3. Navigate to Configuration → Data Sources
-4. Add a TestData DB data source to verify functionality
-5. Create a simple test dashboard
-
-## Step 6: Configure Grafana (Optional)
-
-### 6.1 Install Additional Plugins
 ```powershell
-# Connect to the Grafana pod
-$podName = kubectl get pods -n grafana -l app=grafana -o jsonpath='{.items[0].metadata.name}'
-kubectl exec -it -n grafana $podName -- /bin/bash
+# Start port-forward as background job
+$job = Start-Job -ScriptBlock {
+    kubectl port-forward -n grafana --address 0.0.0.0 svc/grafana 3000:80
+}
 
-# Inside the pod, install plugins
-grafana-cli plugins install grafana-clock-panel
-grafana-cli plugins install grafana-simple-json-datasource
+Write-Host "Port-forward started as background job (ID: $($job.Id))" -ForegroundColor Green
+Write-Host "Grafana will be accessible at: http://localhost:3000" -ForegroundColor Yellow
 
-# Exit the pod and restart Grafana to load new plugins
-exit
-kubectl rollout restart deployment/grafana -n grafana
+# Check job status
+Get-Job -Id $job.Id
+
+# To stop the port-forward later:
+# Stop-Job -Id $job.Id; Remove-Job -Id $job.Id
 ```
 
-### 6.2 Update Configuration
-To modify Grafana configuration:
+### Get Admin Password
+
 ```powershell
-# Edit the ConfigMap
-kubectl edit configmap grafana-config -n grafana
+# Retrieve and decode admin password from secret
+$adminPasswordBase64 = kubectl get secret grafana-admin-secret -n grafana -o jsonpath='{.data.admin-password}'
+$adminPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($adminPasswordBase64))
+Write-Host "Admin Username: admin" -ForegroundColor Green
+Write-Host "Admin Password: $adminPassword" -ForegroundColor Green
 
-# After editing, restart the deployment
-kubectl rollout restart deployment/grafana -n grafana
+# Alternative: One-liner to get password
+$pwd = kubectl get secret grafana-admin-secret -n grafana -o jsonpath='{.data.admin-password}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($pwd))
 ```
 
-### 6.3 Change Admin Password
+## Comprehensive Deployment Script
+
 ```powershell
-# Update the secret
-$newPassword = "YourNewPassword"
-$encodedPassword = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($newPassword))
-kubectl patch secret grafana-admin-secret -n grafana -p "{`"data`":{`"admin-password`":`"$encodedPassword`"}}"
+# Grafana OSS v12 Deployment Script
+Write-Host "Starting Grafana OSS v12 deployment..." -ForegroundColor Cyan
 
-# Restart the deployment
-kubectl rollout restart deployment/grafana -n grafana
+# Set variables
+$helmPath = "C:\Users\user01\kube-bin\helm.exe"
+$valuesFile = "C:\Users\user01\kube-bin\my-values\custom-values.yaml"
+
+try {
+    # Step 1: Add Helm repository
+    Write-Host "Adding Grafana Helm repository..." -ForegroundColor Yellow
+    & $helmPath repo add grafana https://grafana.github.io/helm-charts
+    & $helmPath repo update
+
+    # Step 2: Create namespace
+    Write-Host "Creating grafana namespace..." -ForegroundColor Yellow
+    kubectl create namespace grafana --dry-run=client -o yaml | kubectl apply -f -
+
+    # Step 3: Install Grafana
+    Write-Host "Installing Grafana OSS v12..." -ForegroundColor Yellow
+    & $helmPath install grafana grafana/grafana `
+      --namespace grafana `
+      --values $valuesFile `
+      --version 8.0.0 `
+      --create-namespace
+
+    # Step 4: Wait for deployment
+    Write-Host "Waiting for Grafana to be ready..." -ForegroundColor Yellow
+    kubectl wait --for=condition=Available deployment/grafana -n grafana --timeout=600s
+
+    # Step 5: Get admin password
+    Write-Host "Retrieving admin credentials..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10  # Wait for secret to be created
+    $adminPasswordBase64 = kubectl get secret grafana-admin-secret -n grafana -o jsonpath='{.data.admin-password}' 2>$null
+    
+    if ($adminPasswordBase64) {
+        $adminPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($adminPasswordBase64))
+        Write-Host "✅ Grafana deployed successfully!" -ForegroundColor Green
+        Write-Host "Username: admin" -ForegroundColor White
+        Write-Host "Password: $adminPassword" -ForegroundColor White
+    } else {
+        Write-Host "⚠️ Deployment completed but could not retrieve password" -ForegroundColor Yellow
+    }
+
+    # Step 6: Show access information
+    Write-Host "`n📋 Access Information:" -ForegroundColor Cyan
+    Write-Host "Local URL: http://localhost:3000" -ForegroundColor White
+    Write-Host "Port-forward command: kubectl port-forward -n grafana svc/grafana 3000:80" -ForegroundColor Gray
+    
+    # Step 7: Start port-forward
+    $startPortForward = Read-Host "`nStart port-forward now? (y/N)"
+    if ($startPortForward -eq 'y' -or $startPortForward -eq 'Y') {
+        Write-Host "Starting port-forward..." -ForegroundColor Yellow
+        kubectl port-forward -n grafana svc/grafana 3000:80
+    }
+    
+} catch {
+    Write-Host "❌ Deployment failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
 ```
 
-## Step 7: Production Considerations
+## Upgrade Commands
 
-### 7.1 Setup Ingress (For Production Access)
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana-ingress
-  namespace: grafana
-  annotations:
-    kubernetes.io/ingress.class: azure/application-gateway
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - grafana.yourdomain.com
-    secretName: grafana-tls
-  rules:
-  - host: grafana.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 80
-```
-
-### 7.2 Setup Persistent Storage Backup
 ```powershell
-# Create a backup job for Grafana data
-kubectl create job grafana-backup --from=cronjob/grafana-backup -n grafana
+# Update repository
+& "C:\Users\user01\kube-bin\helm.exe" repo update
+
+# Upgrade Grafana
+& "C:\Users\user01\kube-bin\helm.exe" upgrade grafana grafana/grafana `
+  --namespace grafana `
+  --values "C:\Users\user01\kube-bin\my-values\custom-values.yaml" `
+  --version 8.0.0
+
+# Check upgrade status
+& "C:\Users\user01\kube-bin\helm.exe" history grafana -n grafana
+
+# Monitor rollout
+kubectl rollout status deployment/grafana -n grafana
+
+# Rollback if needed
+& "C:\Users\user01\kube-bin\helm.exe" rollback grafana 1 -n grafana
 ```
 
-### 7.3 Monitor Grafana with Prometheus
-The provided manifests include a ServiceMonitor for Prometheus integration. Ensure you have Prometheus Operator installed:
+## Troubleshooting Commands
+
+### Helm-Related Troubleshooting
+
 ```powershell
-# Check if Prometheus Operator is available
-kubectl get crd servicemonitors.monitoring.coreos.com
+# Check Helm release details
+& "C:\Users\user01\kube-bin\helm.exe" status grafana -n grafana
+& "C:\Users\user01\kube-bin\helm.exe" get values grafana -n grafana
+& "C:\Users\user01\kube-bin\helm.exe" get manifest grafana -n grafana
+
+# Debug Helm installation
+& "C:\Users\user01\kube-bin\helm.exe" install grafana grafana/grafana `
+  --namespace grafana `
+  --values "C:\Users\user01\kube-bin\my-values\custom-values.yaml" `
+  --version 8.0.0 `
+  --dry-run --debug
 ```
 
-## Step 8: Troubleshooting
+### Kubernetes Troubleshooting
 
-### 8.1 Common Issues and Solutions
-
-**Pod Not Starting:**
 ```powershell
-# Check pod events
-kubectl describe pod -l app=grafana -n grafana
+# Check pod status and logs
+kubectl get pods -n grafana -o wide
+kubectl describe pod -l app.kubernetes.io/name=grafana -n grafana
+kubectl logs deployment/grafana -n grafana --tail=50
+kubectl logs deployment/grafana -n grafana --previous
 
-# Check resource constraints
-kubectl top pod -n grafana
-kubectl describe node
-```
-
-**Storage Issues:**
-```powershell
-# Check PVC status
-kubectl describe pvc grafana-pvc -n grafana
-
-# Check storage class
-kubectl get storageclass
-```
-
-**Network Connectivity:**
-```powershell
-# Run network diagnostics
-.\test-network.ps1 troubleshoot
+# Check events
+kubectl get events -n grafana --sort-by='.lastTimestamp'
 
 # Check service endpoints
 kubectl get endpoints grafana -n grafana
+kubectl describe svc grafana -n grafana
+
+# Check persistent volumes
+kubectl get pv,pvc -n grafana
+kubectl describe pvc -n grafana
+
+# Test connectivity
+kubectl run test-grafana --image=curlimages/curl --rm -it --restart=Never -- curl -I http://grafana.grafana.svc.cluster.local/api/health
 ```
 
-### 8.2 View Logs and Events
+### Network Testing
+
 ```powershell
-# View recent events
-kubectl get events -n grafana --sort-by='.lastTimestamp'
+# Test DNS resolution
+kubectl run dns-test --image=busybox --rm -it --restart=Never -- nslookup grafana.grafana.svc.cluster.local
 
-# View Grafana logs with timestamps
-kubectl logs deployment/grafana -n grafana --timestamps=true
+# Test internal connectivity
+kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- curl -v http://grafana.grafana.svc.cluster.local/api/health
 
-# View logs from previous container restart
-kubectl logs deployment/grafana -n grafana --previous
+# Comprehensive network test
+kubectl run network-test --image=nicolaka/netshoot --rm -it --restart=Never -- /bin/bash
 ```
 
-### 8.3 Debug Network Issues
+## Port Forward Management
+
 ```powershell
-# Test from within the cluster
-kubectl run debug --image=nicolaka/netshoot --rm -it --restart=Never
+# List running port-forward jobs
+Get-Job | Where-Object { $_.Command -like "*port-forward*" }
 
-# Inside the debug pod:
-nslookup grafana.grafana.svc.cluster.local
-curl -v http://grafana.grafana.svc.cluster.local/api/health
-```
-
-## Step 9: Maintenance
-
-### 9.1 Update Grafana
-```powershell
-# Update the image version in the deployment
-kubectl set image deployment/grafana grafana=grafana/grafana-oss:12.1.0 -n grafana
-
-# Monitor the rollout
-kubectl rollout status deployment/grafana -n grafana
-```
-
-### 9.2 Backup Configuration
-```powershell
-# Backup ConfigMaps and Secrets
-kubectl get configmap grafana-config -n grafana -o yaml | Out-File -FilePath "grafana-config-backup.yaml"
-kubectl get secret grafana-admin-secret -n grafana -o yaml | Out-File -FilePath "grafana-secret-backup.yaml"
-
-# Backup persistent data
-kubectl exec deployment/grafana -n grafana -- tar czf - /var/lib/grafana | Set-Content -Path "grafana-data-backup.tar.gz" -AsByteStream
-```
-
-### 9.3 Scale Grafana (If Needed)
-```powershell
-# Note: Grafana OSS doesn't support horizontal scaling
-# You can only scale vertically by updating resource limits
-
-# Update resource limits
-$patchData = @{
-    spec = @{
-        template = @{
-            spec = @{
-                containers = @(
-                    @{
-                        name = "grafana"
-                        resources = @{
-                            limits = @{
-                                cpu = "2000m"
-                                memory = "2Gi"
-                            }
-                        }
-                    }
-                )
-            }
-        }
-    }
-} | ConvertTo-Json -Depth 10
-
-kubectl patch deployment grafana -n grafana --type merge -p $patchData
-```
-
-## Step 10: Uninstall
-
-### 10.1 Complete Removal
-```powershell
-# Stop port-forward if running
+# Stop all port-forward jobs
 Get-Job | Where-Object { $_.Command -like "*port-forward*" } | Stop-Job
 Get-Job | Where-Object { $_.Command -like "*port-forward*" } | Remove-Job
 
-# Delete all Grafana resources
-kubectl delete -f grafana-manifests.yaml
+# Start new port-forward with status monitoring
+$portForwardJob = Start-Job -ScriptBlock {
+    kubectl port-forward -n grafana svc/grafana 3000:80
+}
 
-# Verify removal
-kubectl get all -n grafana
+# Monitor job status
+if ($portForwardJob.State -eq "Running") {
+    Write-Host "✅ Port-forward active - Access Grafana at http://localhost:3000" -ForegroundColor Green
+} else {
+    Write-Host "❌ Port-forward failed to start" -ForegroundColor Red
+    Receive-Job -Job $portForwardJob
+}
+
+# Check if port is available locally
+Test-NetConnection -ComputerName localhost -Port 3000
 ```
 
-### 10.2 Clean Up Storage (Optional)
+## Maintenance Commands
+
+### Backup and Restore
+
 ```powershell
-# If you want to remove persistent data
-kubectl delete pvc grafana-pvc -n grafana
+# Backup Helm values
+& "C:\Users\user01\kube-bin\helm.exe" get values grafana -n grafana > grafana-values-backup.yaml
+
+# Backup Kubernetes resources
+kubectl get all -n grafana -o yaml > grafana-k8s-backup.yaml
+
+# Backup persistent data
+$podName = kubectl get pods -n grafana -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}'
+kubectl exec -n grafana $podName -- tar czf - /var/lib/grafana | Set-Content -Path "grafana-data-backup.tar.gz" -AsByteStream
+```
+
+### Update Resources
+
+```powershell
+# Scale deployment (vertical scaling only for Grafana)
+kubectl patch deployment grafana -n grafana -p '{"spec":{"template":{"spec":{"containers":[{"name":"grafana","resources":{"limits":{"memory":"2Gi","cpu":"2000m"}}}]}}}}'
+
+# Update admin password
+$newPassword = "NewSecurePassword123!"
+$encodedPassword = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($newPassword))
+kubectl patch secret grafana-admin-secret -n grafana -p "{`"data`":{`"admin-password`":`"$encodedPassword`"}}"
+
+# Restart deployment
+kubectl rollout restart deployment/grafana -n grafana
+```
+
+## Uninstall Commands
+
+```powershell
+# Stop any running port-forwards
+Get-Job | Where-Object { $_.Command -like "*port-forward*" } | Stop-Job
+Get-Job | Where-Object { $_.Command -like "*port-forward*" } | Remove-Job
+
+# Uninstall Grafana
+& "C:\Users\user01\kube-bin\helm.exe" uninstall grafana -n grafana
+
+# Delete persistent volume claims (optional - removes data)
+kubectl delete pvc -n grafana --all
+
+# Delete namespace
 kubectl delete namespace grafana
+
+# Remove Helm repository (optional)
+& "C:\Users\user01\kube-bin\helm.exe" repo remove grafana
+
+Write-Host "✅ Grafana uninstalled successfully" -ForegroundColor Green
 ```
 
-## Security Notes
+## Sample Custom Values File
 
-1. **Change Default Password:** Always change the default admin password in production
-2. **Use HTTPS:** Configure TLS/SSL for production deployments
-3. **Network Policies:** The provided NetworkPolicy restricts access appropriately
-4. **RBAC:** The deployment uses minimal RBAC permissions
-5. **Security Context:** Grafana runs as non-root user (UID 472)
+Create your `C:\Users\user01\kube-bin\my-values\custom-values.yaml` with:
 
-## Support and Resources
+```yaml
+# Image configuration for Grafana OSS v12
+image:
+  repository: grafana/grafana-oss
+  tag: "12.0.0"
+  pullPolicy: IfNotPresent
 
-- **Official Grafana Documentation:** https://grafana.com/docs/grafana/latest/
-- **Grafana GitHub Repository:** https://github.com/grafana/grafana
-- **AKS Documentation:** https://docs.microsoft.com/en-us/azure/aks/
-- **kubectl Reference:** https://kubernetes.io/docs/reference/kubectl/
+# Admin credentials
+adminUser: admin
+adminPassword: "SecureGrafanaPassword123!"
 
-## Quick Reference Commands (PowerShell)
+# Persistence configuration
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: managed-csi
+  accessModes:
+    - ReadWriteOnce
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+# Resource configuration
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+
+# Grafana configuration
+grafana.ini:
+  server:
+    domain: localhost
+    root_url: "http://localhost:3000/"
+    http_port: 3000
+    enable_gzip: true
+  security:
+    admin_user: admin
+    admin_password: SecureGrafanaPassword123!
+    allow_embedding: false
+    cookie_secure: false
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  log:
+    mode: console
+    level: info
+  database:
+    type: sqlite3
+  plugins:
+    enable_alpha: true
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 30
+  timeoutSeconds: 30
+  failureThreshold: 3
+
+# Deployment strategy
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Node selector and affinity (optional)
+nodeSelector: {}
+tolerations: []
+affinity: {}
+```
+
+## Quick Access Commands
+
+After deployment, use these one-liner commands:
 
 ```powershell
+# Start port-forward
+kubectl port-forward -n grafana svc/grafana 3000:80
+
+# Get credentials (one-liner)
+$pwd = kubectl get secret grafana-admin-secret -n grafana -o jsonpath='{.data.admin-password}'; $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($pwd)); Write-Host "Username: admin, Password: $decoded"
+
 # Check status
 kubectl get all -n grafana
 
 # View logs
 kubectl logs deployment/grafana -n grafana -f
 
-# Port forward
-kubectl port-forward -n grafana svc/grafana 3000:80
-
-# Get admin password
-$adminPasswordBase64 = kubectl get secret grafana-admin-secret -n grafana -o jsonpath='{.data.admin-password}'
-$adminPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($adminPasswordBase64))
-Write-Host "Admin password: $adminPassword"
-
-# Restart Grafana
-kubectl rollout restart deployment/grafana -n grafana
-
-# Scale resources (example)
-$resourcePatch = '{"spec":{"template":{"spec":{"containers":[{"name":"grafana","resources":{"limits":{"memory":"2Gi"}}}]}}}}'
-kubectl patch deployment grafana -n grafana --type merge -p $resourcePatch
-
-# Using PowerShell scripts
-.\deploy-grafana.ps1 deploy      # Deploy Grafana
-.\deploy-grafana.ps1 verify      # Verify deployment
-.\deploy-grafana.ps1 port-forward # Start port forwarding
-.\test-network.ps1 comprehensive # Test connectivity
+# Test health
+kubectl run health-check --image=curlimages/curl --rm --restart=Never -- curl -s http://grafana.grafana.svc.cluster.local/api/health
 ```
+
+## Access Information
+
+After successful deployment:
+
+- **URL**: http://localhost:3000 (when port-forward is running)
+- **Username**: admin
+- **Password**: As specified in your custom-values.yaml or retrieved from secret
+- **Health Check**: http://localhost:3000/api/health
+- **Metrics**: http://localhost:3000/metrics
 
 ## PowerShell-Specific Notes
 
-1. **Execution Policy:** You may need to set the execution policy to run scripts:
+1. **Execution Policy**: You may need to set execution policy:
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
 
-2. **Background Jobs:** Port-forwarding uses PowerShell background jobs instead of Unix processes:
+2. **Background Jobs**: Use PowerShell jobs for port-forwarding:
    ```powershell
-   # List background jobs
-   Get-Job
-   
-   # Stop port-forward jobs
-   Get-Job | Where-Object { $_.Command -like "*port-forward*" } | Stop-Job
+   Get-Job                    # List jobs
+   Stop-Job -Id <id>         # Stop specific job
+   Remove-Job -Id <id>       # Remove job
    ```
 
-3. **Base64 Encoding/Decoding:** PowerShell uses .NET methods for base64 operations:
+3. **Base64 Handling**: PowerShell uses .NET methods:
    ```powershell
    # Encode
-   $encoded = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("password"))
-   
+   [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("text"))
    # Decode
-   $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encoded))
+   [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("base64"))
    ```
 
-This completes your Grafana OSS v12 deployment on AKS using kubectl with PowerShell!
+4. **Path Handling**: Use backslashes and quotes for Windows paths:
+   ```powershell
+   & "C:\Users\user01\kube-bin\helm.exe"
+   ```
+
+## Troubleshooting Common Issues
+
+### Helm Binary Not Found
+```powershell
+# Verify helm binary exists
+Test-Path "C:\Users\user01\kube-bin\helm.exe"
+# If false, check the path or download Helm
+```
+
+### Values File Not Found
+```powershell
+# Verify values file exists
+Test-Path "C:\Users\user01\kube-bin\my-values\custom-values.yaml"
+# Create directory if needed
+New-Item -ItemType Directory -Path "C:\Users\user01\kube-bin\my-values" -Force
+```
+
+### Port Already in Use
+```powershell
+# Check what's using port 3000
+Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
+# Kill process if needed or use different port
+kubectl port-forward -n grafana svc/grafana 3001:80
+```
+
+This completes your comprehensive PowerShell deployment guide for Grafana OSS v12 on AKS!
