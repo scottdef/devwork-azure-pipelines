@@ -1,6 +1,6 @@
 // Dynatrace Query Language (DQL) Security Detection Query
-// Corrected with proper DPL syntax - spaces handled with character groups
-// Focus on reliable detection patterns using DPL built-in matchers
+// Corrected with proper DPL built-in matchers
+// Using SPACE, WHITESPACE, and proper character groups
 
 fetch logs
 | filter log.source == "AppServiceConsoleLogs" // Adjust based on your log source
@@ -24,27 +24,26 @@ fetch logs
 | filterOut matchesPhrase(content, "Service Authorization System Error")
 | filterOut matchesPhrase(content, "Answer")
 
-// Simple patterns using DPL built-in matchers and character groups
-// Note: [ ]+ means one or more spaces, [ ]* means zero or more spaces
+// Simple patterns using proper DPL matchers
 
-// Parse for basic secret patterns with simple delimiters
-| parse content, "password" [ ]+ [A-Za-z0-9+/=]{8,}:basic_password
-| parse content, "secret" [ ]+ [A-Za-z0-9+/=]{8,}:basic_secret  
-| parse content, "token" [ ]+ [A-Za-z0-9+/=]{8,}:basic_token
-| parse content, "api_key" [ ]+ [A-Za-z0-9+/=]{8,}:basic_api_key
+// Parse for basic secret patterns with space delimiters
+| parse content, "password" SPACE [A-Za-z0-9+/=]{8,}:basic_password
+| parse content, "secret" SPACE [A-Za-z0-9+/=]{8,}:basic_secret  
+| parse content, "token" SPACE [A-Za-z0-9+/=]{8,}:basic_token
+| parse content, "api_key" SPACE [A-Za-z0-9+/=]{8,}:basic_api_key
 
-// Parse for quoted secrets
-| parse content, "password" [ ]* "=" [ ]* DQUOTE [^\"]+:quoted_password DQUOTE
-| parse content, "secret" [ ]* "=" [ ]* DQUOTE [^\"]+:quoted_secret DQUOTE
-| parse content, "api_key" [ ]* "=" [ ]* DQUOTE [^\"]+:quoted_api_key DQUOTE
+// Parse for quoted secrets (using optional spaces)
+| parse content, "password" SPACE? "=" SPACE? DQUOTE LD:quoted_password DQUOTE
+| parse content, "secret" SPACE? "=" SPACE? DQUOTE LD:quoted_secret DQUOTE
+| parse content, "api_key" SPACE? "=" SPACE? DQUOTE LD:quoted_api_key DQUOTE
 
-// Parse for common secret formats with colons
+// Parse for common secret formats with colons (no spaces)
 | parse content, "password:" [A-Za-z0-9+/=]{8,}:colon_password
 | parse content, "secret:" [A-Za-z0-9+/=]{8,}:colon_secret
 | parse content, "api_key:" [A-Za-z0-9+/=]{8,}:colon_api_key
 
 // Parse for Bearer tokens
-| parse content, "Bearer" [ ]+ [A-Za-z0-9._~+/=-]{20,}:bearer_token
+| parse content, "Bearer" SPACE [A-Za-z0-9._~+/=-]{20,}:bearer_token
 
 // Parse for JWT tokens (eyJ start)
 | parse content, "eyJ" [A-Za-z0-9+/=]+ "." [A-Za-z0-9+/=]+ "." [A-Za-z0-9+/=]*:jwt_token
@@ -63,16 +62,16 @@ fetch logs
 | parse content, "sig=" [a-z0-9%]+:azure_sig
 | parse content, "SharedAccessKey=" [A-Za-z0-9+/=]{40,}:shared_access_key
 
-// Parse for AWS keys (basic pattern)
-| parse content, "aws_access_key_id" [ ]* "=" [ ]* [A-Z0-9]{20}:aws_access_key
-| parse content, "aws_secret_access_key" [ ]* "=" [ ]* [A-Za-z0-9+/=]{40}:aws_secret_key
+// Parse for AWS keys
+| parse content, "aws_access_key_id" SPACE? "=" SPACE? [A-Z0-9]{20}:aws_access_key
+| parse content, "aws_secret_access_key" SPACE? "=" SPACE? [A-Za-z0-9+/=]{40}:aws_secret_key
 
 // Parse for database passwords
-| parse content, "DB_PASS" [ ]* "=" [ ]* [^\s\"';,<]{6,}:db_password
-| parse content, "database_password" [ ]* "=" [ ]* [^\s\"';,<]{6,}:database_password
+| parse content, "DB_PASS" SPACE? "=" SPACE? [A-Za-z0-9]{6,}:db_password
+| parse content, "database_password" SPACE? "=" SPACE? [A-Za-z0-9]{6,}:database_password
 
 // Parse for Azure Functions keys
-| parse content, "x-functions-key" [ ]* ":" [ ]* [A-Za-z0-9+/=]{50,}:azure_function_key
+| parse content, "x-functions-key" SPACE? ":" SPACE? [A-Za-z0-9+/=]{50,}:azure_function_key
 | parse content, "code=" [A-Za-z0-9%+/=]{50,}:azure_code_param
 
 // Parse for Slack tokens
@@ -80,7 +79,7 @@ fetch logs
 | parse content, "xoxp-" [a-z0-9-]+:slack_user_token
 
 // Parse for private key headers
-| parse content, "-----BEGIN" [ ]+ LD [ ]+ "PRIVATE KEY-----":private_key_marker
+| parse content, "-----BEGIN" SPACE UPPER SPACE "PRIVATE KEY-----":private_key_marker
 
 // Parse for connection strings with credentials
 | parse content, "://" LD ":" LD "@" LD:connection_string_with_creds
@@ -90,8 +89,8 @@ fetch logs
 | parse content, LD "secret" LD "=" LD [A-Za-z0-9+/=]{12,}:generic_secret_equals
 
 // Parse for JSON-style secrets
-| parse content, DQUOTE LD "secret" LD DQUOTE [ ]* ":" [ ]* DQUOTE [^\"]+:json_secret DQUOTE
-| parse content, DQUOTE LD "password" LD DQUOTE [ ]* ":" [ ]* DQUOTE [^\"]+:json_password DQUOTE
+| parse content, DQUOTE LD "secret" LD DQUOTE SPACE? ":" SPACE? DQUOTE LD:json_secret DQUOTE
+| parse content, DQUOTE LD "password" LD DQUOTE SPACE? ":" SPACE? DQUOTE LD:json_password DQUOTE
 
 // Create summary field for detected secrets
 | fieldsAdd has_secrets = isNotNull(basic_password) or isNotNull(basic_secret) or isNotNull(basic_token)
