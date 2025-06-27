@@ -1,0 +1,26 @@
+[
+  {
+    "pipeline-repo": "db-ofs",
+    "total_deployments": 39,
+    "total_succeeded": 31,
+    "total_failed": 8,
+    "percent_succeeded": 79.49,
+    "latest": "2025-06-10T19:57:17.2766667Z"
+  },
+  {
+    "pipeline-repo": "web-api-ofs-base",
+    "total_deployments": 26,
+    "total_succeeded": 24,
+    "total_failed": 2,
+    "percent_succeeded": 92.31,
+    "latest": "2025-06-10T20:01:45.81Z"
+  },
+  {
+    "pipeline-repo": "web-ofs",
+    "total_deployments": 35,
+    "total_succeeded": 35,
+    "total_failed": 0,
+    "percent_succeeded": 100,
+    "latest": "2025-06-10T20:13:15.97Z"
+  }
+]
