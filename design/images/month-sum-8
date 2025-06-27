@@ -1,1 +1,34 @@
-
+[
+  {
+    "pipeline-repo": "web-990",
+    "total_deployments": 1,
+    "total_succeeded": 1,
+    "total_failed": 0,
+    "percent_succeeded": 100,
+    "latest": "2025-06-23T01:44:19.1466667Z"
+  },
+  {
+    "pipeline-repo": "web-api-taxexchange-base",
+    "total_deployments": 1,
+    "total_succeeded": 1,
+    "total_failed": 0,
+    "percent_succeeded": 100,
+    "latest": "2025-06-23T01:35:38.65Z"
+  },
+  {
+    "pipeline-repo": "worker-taxexchange-axcesstransfer",
+    "total_deployments": 1,
+    "total_succeeded": 1,
+    "total_failed": 0,
+    "percent_succeeded": 100,
+    "latest": "2025-06-05T01:07:05.37Z"
+  },
+  {
+    "pipeline-repo": "worker-taxexchange-provision-bulk",
+    "total_deployments": 1,
+    "total_succeeded": 0,
+    "total_failed": 1,
+    "percent_succeeded": 0,
+    "latest": "2025-06-23T01:32:14.1966667Z"
+  }
+]
