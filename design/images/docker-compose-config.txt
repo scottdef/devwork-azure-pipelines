@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  ado-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        BUILD_VERSION: ${BUILD_VERSION:-1.0.0}
+        BUILD_COMMIT: ${BUILD_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
+    image: ado-cli:latest
+    container_name: ado-cli
+    environment:
+      - AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
+      - ADO_ORGANIZATION=${ADO_ORGANIZATION:-myorga}
+      - ADO_PROJECT=${ADO_PROJECT:-project001}
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    working_dir: /data
+    command: help
+    restart: "no"
+    
+  # Interactive shell for development
+  ado-cli-dev:
+    extends: ado-cli
+    container_name: ado-cli-dev
+    entrypoint: /bin/sh
+    command: -c "while true; do sleep 30; done"
+    tty: true
+    stdin_open: true
+    restart: "no"
+
+  # Scheduled job runner (example for cron-like usage)
+  ado-cli-scheduler:
+    extends: ado-cli
+    container_name: ado-cli-scheduler
+    entrypoint: /bin/sh
+    command: |
+      -c "
+      echo '🕐 ADO CLI Scheduler started'
+      while true; do
+        echo '⏰ Running scheduled ADO CLI job...'
+        ado-cli full -monthly
+        echo '✅ Scheduled job completed. Waiting 24 hours...'
+        sleep 86400  # 24 hours
+      done
+      "
+    restart: unless-stopped
+    profiles:
+      - scheduler
+
+volumes:
+  ado-data:
+    driver: local
+
+networks:
+  default:
+    name: ado-cli-network
