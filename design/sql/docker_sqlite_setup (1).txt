@@ -1,0 +1,388 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  sqlite-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite
+    container_name: sqlite-container
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    networks:
+      - sqlite-network
+    command: tail -f /dev/null  # Keep container running
+
+  json-importer:
+    build:
+      context: .
+      dockerfile: Dockerfile.importer
+    container_name: json-importer
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    networks:
+      - sqlite-network
+    depends_on:
+      - sqlite-service
+    environment:
+      - SQLITE_HOST=sqlite-service
+    command: /scripts/sqlite_json_import_docker.sh
+
+networks:
+  sqlite-network:
+    driver: bridge
+
+volumes:
+  data:
+  scripts:
+
+---
+# Dockerfile.sqlite
+FROM alpine:3.18
+
+# Install SQLite
+RUN apk add --no-cache sqlite
+
+# Create data directory
+RUN mkdir -p /data /scripts
+
+# Set working directory
+WORKDIR /data
+
+# Expose SQLite (though it's file-based, we'll use docker exec)
+EXPOSE 3306
+
+CMD ["tail", "-f", "/dev/null"]
+
+---
+# Dockerfile.importer
+FROM alpine:3.18
+
+# Install required packages
+RUN apk add --no-cache \
+    bash \
+    jq \
+    sqlite \
+    curl
+
+# Create directories
+RUN mkdir -p /data /scripts
+
+# Set working directory
+WORKDIR /scripts
+
+# Copy the modified script
+COPY scripts/sqlite_json_import_docker.sh /scripts/
+RUN chmod +x /scripts/sqlite_json_import_docker.sh
+
+CMD ["/scripts/sqlite_json_import_docker.sh"]
+
+---
+# scripts/sqlite_json_import_docker.sh
+#!/bin/bash
+
+# SQLite JSON Import Script for Docker Environment
+# This script creates a table and imports Azure DevOps deployment records
+# Modified to work with SQLite in a separate container
+
+set -e  # Exit on any error
+
+# Set variables
+DB_NAME="/data/deployments.db"
+JSON_FILE="/data/env-dep-rec-res.json"
+TABLE_NAME="deployment_records"
+SQLITE_CONTAINER="sqlite-service"
+
+# Function to execute SQLite commands in the remote container
+execute_sqlite() {
+    local sql_command="$1"
+    local db_path="$2"
+    
+    if [ -n "$db_path" ]; then
+        docker exec "$SQLITE_CONTAINER" sqlite3 "$db_path" "$sql_command"
+    else
+        docker exec "$SQLITE_CONTAINER" sqlite3 "$DB_NAME" "$sql_command"
+    fi
+}
+
+# Function to execute SQLite with heredoc
+execute_sqlite_heredoc() {
+    local db_path="$1"
+    local sql_content="$2"
+    
+    echo "$sql_content" | docker exec -i "$SQLITE_CONTAINER" sqlite3 "$db_path"
+}
+
+# Wait for SQLite container to be ready
+echo "Waiting for SQLite container to be ready..."
+until docker exec "$SQLITE_CONTAINER" sqlite3 --version > /dev/null 2>&1; do
+    echo "SQLite container not ready, waiting..."
+    sleep 2
+done
+echo "SQLite container is ready!"
+
+# Check if JSON file exists
+if [ ! -f "$JSON_FILE" ]; then
+    echo "Error: JSON file $JSON_FILE not found!"
+    echo "Please ensure the JSON file is placed in the ./data directory"
+    exit 1
+fi
+
+# Create SQLite database and table
+echo "Creating table '$TABLE_NAME' in $DB_NAME..."
+
+CREATE_TABLE_SQL='CREATE TABLE IF NOT EXISTS deployment_records (
+    id INTEGER PRIMARY KEY,
+    requestIdentifier TEXT,
+    environmentId INTEGER,
+    serviceOwner TEXT,
+    scopeId TEXT,
+    planType TEXT,
+    planId TEXT,
+    stageName TEXT,
+    jobName TEXT,
+    stageAttempt INTEGER,
+    jobAttempt INTEGER,
+    definition_id INTEGER,
+    definition_name TEXT,
+    definition_web_url TEXT,
+    definition_api_url TEXT,
+    owner_id INTEGER,
+    owner_name TEXT,
+    owner_web_url TEXT,
+    owner_api_url TEXT,
+    result TEXT,
+    queueTime TEXT,
+    startTime TEXT,
+    finishTime TEXT
+);'
+
+execute_sqlite_heredoc "$DB_NAME" "$CREATE_TABLE_SQL"
+
+echo "Table '$TABLE_NAME' created successfully in $DB_NAME"
+
+# Method 1: Using jq to parse JSON and generate SQL INSERT statements
+echo "Importing data using jq..."
+
+# Generate INSERT statements and pipe to SQLite container
+jq -r '.value[] | 
+    "INSERT INTO deployment_records (
+        id, requestIdentifier, environmentId, serviceOwner, scopeId, 
+        planType, planId, stageName, jobName, stageAttempt, jobAttempt,
+        definition_id, definition_name, definition_web_url, definition_api_url,
+        owner_id, owner_name, owner_web_url, owner_api_url,
+        result, queueTime, startTime, finishTime
+    ) VALUES (" +
+    (.id | tostring) + ", " +
+    ("\"" + (.requestIdentifier | gsub("\""; "\"\"")) + "\"") + ", " +
+    (.environmentId | tostring) + ", " +
+    ("\"" + (.serviceOwner | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.scopeId | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.planType | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.planId | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.stageName | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.jobName | gsub("\""; "\"\"")) + "\"") + ", " +
+    (.stageAttempt | tostring) + ", " +
+    (.jobAttempt | tostring) + ", " +
+    (.definition.id | tostring) + ", " +
+    ("\"" + (.definition.name | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.definition._links.web.href | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.definition._links.self.href | gsub("\""; "\"\"")) + "\"") + ", " +
+    (.owner.id | tostring) + ", " +
+    ("\"" + (.owner.name | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.owner._links.web.href | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.owner._links.self.href | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.result | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.queueTime | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.startTime | gsub("\""; "\"\"")) + "\"") + ", " +
+    ("\"" + (.finishTime | gsub("\""; "\"\"")) + "\"") +
+    ");"' "$JSON_FILE" | docker exec -i "$SQLITE_CONTAINER" sqlite3 "$DB_NAME"
+
+echo "Data imported successfully using Method 1!"
+
+# Verify the import
+echo "Verifying import - Record count:"
+RECORD_COUNT=$(execute_sqlite "SELECT COUNT(*) FROM deployment_records;")
+echo "Total records imported: $RECORD_COUNT"
+
+echo "Sample records:"
+execute_sqlite_heredoc "$DB_NAME" ".mode column
+.headers on
+SELECT id, definition_name, result, stageName, queueTime 
+FROM deployment_records 
+LIMIT 5;"
+
+# Query examples
+echo ""
+echo "Example queries:"
+echo "1. Count by result status:"
+execute_sqlite_heredoc "$DB_NAME" ".mode column
+.headers on
+SELECT result, COUNT(*) as count 
+FROM deployment_records 
+GROUP BY result 
+ORDER BY count DESC;"
+
+echo ""
+echo "2. Recent deployments:"
+execute_sqlite_heredoc "$DB_NAME" ".mode column
+.headers on
+SELECT definition_name, result, queueTime 
+FROM deployment_records 
+ORDER BY queueTime DESC 
+LIMIT 10;"
+
+echo ""
+echo "3. Failed deployments:"
+execute_sqlite_heredoc "$DB_NAME" ".mode column
+.headers on
+SELECT definition_name, result, queueTime, finishTime
+FROM deployment_records 
+WHERE result = 'failed'
+ORDER BY queueTime DESC;"
+
+echo ""
+echo "Import completed successfully!"
+echo "Database file location: $DB_NAME"
+echo "Access the database directly with: docker exec -it sqlite-service sqlite3 $DB_NAME"
+
+---
+# Makefile
+.PHONY: build up down clean logs shell-sqlite shell-importer
+
+# Build and start services
+up:
+	docker-compose up --build
+
+# Build services without starting
+build:
+	docker-compose build
+
+# Start services in background
+start:
+	docker-compose up -d --build
+
+# Stop services
+down:
+	docker-compose down
+
+# Clean up everything
+clean:
+	docker-compose down -v --rmi all --remove-orphans
+	docker system prune -f
+
+# View logs
+logs:
+	docker-compose logs -f
+
+# Shell into SQLite container
+shell-sqlite:
+	docker exec -it sqlite-container sh
+
+# Shell into importer container
+shell-importer:
+	docker exec -it json-importer sh
+
+# Run SQLite CLI
+sqlite:
+	docker exec -it sqlite-container sqlite3 /data/deployments.db
+
+# Show database info
+db-info:
+	docker exec sqlite-container sqlite3 /data/deployments.db ".tables"
+	docker exec sqlite-container sqlite3 /data/deployments.db ".schema"
+
+# Import data manually
+import:
+	docker exec json-importer /scripts/sqlite_json_import_docker.sh
+
+---
+# README.md
+# Dockerized SQLite JSON Import
+
+This setup runs a JSON import process using two separate Docker containers:
+- `sqlite-service`: Contains SQLite database
+- `json-importer`: Contains the import script and jq
+
+## Directory Structure
+```
+├── docker-compose.yml
+├── Dockerfile.sqlite
+├── Dockerfile.importer
+├── Makefile
+├── data/
+│   ├── env-dep-rec-res.json  # Your JSON file goes here
+│   └── deployments.db        # Generated database file
+└── scripts/
+    └── sqlite_json_import_docker.sh
+```
+
+## Quick Start
+
+1. **Setup directory structure:**
+   ```bash
+   mkdir -p data scripts
+   # Copy your JSON file to data/env-dep-rec-res.json
+   ```
+
+2. **Run the import:**
+   ```bash
+   make up
+   # or
+   docker-compose up --build
+   ```
+
+3. **Access the database:**
+   ```bash
+   make sqlite
+   # or
+   docker exec -it sqlite-container sqlite3 /data/deployments.db
+   ```
+
+## Available Commands
+
+- `make up` - Build and start services
+- `make down` - Stop services  
+- `make clean` - Clean up all containers and images
+- `make logs` - View service logs
+- `make sqlite` - Access SQLite CLI
+- `make db-info` - Show database schema
+- `make shell-sqlite` - Shell into SQLite container
+- `make shell-importer` - Shell into importer container
+
+## Manual Operations
+
+**Execute custom SQL:**
+```bash
+docker exec sqlite-container sqlite3 /data/deployments.db "SELECT COUNT(*) FROM deployment_records;"
+```
+
+**Re-run import:**
+```bash
+docker exec json-importer /scripts/sqlite_json_import_docker.sh
+```
+
+**Backup database:**
+```bash
+docker exec sqlite-container sqlite3 /data/deployments.db ".backup /data/backup.db"
+```
+
+## Troubleshooting
+
+**Check container status:**
+```bash
+docker-compose ps
+```
+
+**View container logs:**
+```bash
+docker-compose logs sqlite-service
+docker-compose logs json-importer
+```
+
+**Verify file permissions:**
+```bash
+ls -la data/
+```
