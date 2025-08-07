@@ -1,0 +1,230 @@
+terraform {
+  required_providers {
+    github = {
+      source  = "integrations/github"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "github" {
+  # Configure with GITHUB_TOKEN environment variable
+}
+
+# Variables
+variable "repository_name" {
+  description = "Name of the GitHub repository"
+  type        = string
+  default     = "databricks-document-intelligence-deploy"
+}
+
+variable "organization" {
+  description = "GitHub organization name"
+  type        = string
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID"
+  type        = string
+}
+
+variable "azure_tenant_id" {
+  description = "Azure tenant ID"
+  type        = string
+}
+
+variable "databricks_workspace_url" {
+  description = "Databricks workspace URL"
+  type        = string
+}
+
+# Create the repository
+resource "github_repository" "main" {
+  name         = var.repository_name
+  description  = "Databricks Asset Bundle deployment with Azure Document Intelligence"
+  visibility   = "private"
+  
+  has_issues   = true
+  has_wiki     = true
+  has_projects = true
+  
+  auto_init          = true
+  gitignore_template = "Python"
+  license_template   = "mit"
+  
+  allow_merge_commit     = true
+  allow_squash_merge     = true
+  allow_rebase_merge     = true
+  delete_branch_on_merge = true
+  
+  security_and_analysis {
+    secret_scanning {
+      status = "enabled"
+    }
+    secret_scanning_push_protection {
+      status = "enabled"
+    }
+  }
+}
+
+# Create team
+resource "github_team" "team_alpha_blue_i" {
+  name        = "team-alpha-blue-i"
+  description = "Alpha Blue I Development Team"
+  privacy     = "closed"
+}
+
+# Add team to repository with admin access
+resource "github_team_repository" "team_access" {
+  team_id    = github_team.team_alpha_blue_i.id
+  repository = github_repository.main.name
+  permission = "admin"
+}
+
+# Branch protection rule
+resource "github_branch_protection" "main" {
+  repository_id = github_repository.main.node_id
+  pattern       = "main"
+  
+  required_status_checks {
+    strict = true
+    contexts = [
+      "ci/databricks-validate",
+      "ci/terraform-validate"
+    ]
+  }
+  
+  required_pull_request_reviews {
+    required_approving_review_count = 2
+    require_code_owner_reviews      = true
+    dismiss_stale_reviews           = true
+    restrict_dismissals             = false
+  }
+  
+  restrict_pushes {
+    blocks_creations = false
+  }
+  
+  enforce_admins = false
+  allows_deletions = false
+  allows_force_pushes = false
+}
+
+# Custom repository role
+resource "github_repository_custom_deployment_protection_rule" "super_special_role" {
+  repository = github_repository.main.name
+  environment = "prod"
+  
+  # Note: GitHub API limitations require using specific protection rules
+  # Custom roles are managed through GitHub UI or separate API calls
+}
+
+# Environment: nonprod
+resource "github_repository_environment" "nonprod" {
+  repository  = github_repository.main.name
+  environment = "nonprod"
+  
+  reviewers {
+    teams = [github_team.team_alpha_blue_i.id]
+  }
+  
+  deployment_branch_policy {
+    protected_branches     = false
+    custom_branch_policies = true
+  }
+}
+
+# Environment: prod
+resource "github_repository_environment" "prod" {
+  repository  = github_repository.main.name
+  environment = "prod"
+  
+  reviewers {
+    teams = [github_team.team_alpha_blue_i.id]
+  }
+  
+  deployment_branch_policy {
+    protected_branches     = true
+    custom_branch_policies = false
+  }
+}
+
+# Environment variables for nonprod
+resource "github_actions_environment_variable" "nonprod_vars" {
+  for_each = {
+    AZURE_SUBSCRIPTION_ID      = var.azure_subscription_id
+    AZURE_TENANT_ID           = var.azure_tenant_id
+    DATABRICKS_WORKSPACE_URL  = var.databricks_workspace_url
+    ENVIRONMENT              = "nonprod"
+    AZURE_RESOURCE_GROUP     = "rg-databricks-nonprod"
+    DOCUMENT_INTELLIGENCE_ENDPOINT = "https://doc-intel-nonprod.cognitiveservices.azure.com/"
+  }
+  
+  repository    = github_repository.main.name
+  environment   = github_repository_environment.nonprod.environment
+  variable_name = each.key
+  value         = each.value
+}
+
+# Environment variables for prod
+resource "github_actions_environment_variable" "prod_vars" {
+  for_each = {
+    AZURE_SUBSCRIPTION_ID      = var.azure_subscription_id
+    AZURE_TENANT_ID           = var.azure_tenant_id
+    DATABRICKS_WORKSPACE_URL  = var.databricks_workspace_url
+    ENVIRONMENT              = "prod"
+    AZURE_RESOURCE_GROUP     = "rg-databricks-prod"
+    DOCUMENT_INTELLIGENCE_ENDPOINT = "https://doc-intel-prod.cognitiveservices.azure.com/"
+  }
+  
+  repository    = github_repository.main.name
+  environment   = github_repository_environment.prod.environment
+  variable_name = each.key
+  value         = each.value
+}
+
+# Repository secrets (these would need to be set manually or via separate secure process)
+resource "github_actions_secret" "azure_credentials" {
+  repository      = github_repository.main.name
+  secret_name     = "AZURE_CREDENTIALS"
+  plaintext_value = jsonencode({
+    clientId       = "your-service-principal-client-id"
+    clientSecret   = "your-service-principal-client-secret"
+    subscriptionId = var.azure_subscription_id
+    tenantId       = var.azure_tenant_id
+  })
+  
+  # In production, use a more secure method to set secrets
+}
+
+resource "github_actions_secret" "databricks_token" {
+  repository      = github_repository.main.name
+  secret_name     = "DATABRICKS_TOKEN"
+  plaintext_value = "your-databricks-token"
+  
+  # In production, use a more secure method to set secrets
+}
+
+resource "github_actions_secret" "document_intelligence_key" {
+  repository      = github_repository.main.name
+  secret_name     = "DOCUMENT_INTELLIGENCE_KEY"
+  plaintext_value = "your-document-intelligence-key"
+  
+  # In production, use a more secure method to set secrets
+}
+
+# Output values
+output "repository_clone_url" {
+  description = "HTTPS clone URL for the repository"
+  value       = github_repository.main.clone_url
+}
+
+output "repository_ssh_clone_url" {
+  description = "SSH clone URL for the repository"
+  value       = github_repository.main.ssh_clone_url
+}
+
+output "team_id" {
+  description = "ID of the created team"
+  value       = github_team.team_alpha_blue_i.id
+}

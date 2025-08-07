@@ -1,0 +1,461 @@
+name: Terraform Apply on PR Merge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.tf'
+      - '**/*.tfvars'
+      - '**/*.tfvars.json'
+      - 'terraform/**'
+  
+  workflow_dispatch:
+    inputs:
+      terraform_action:
+        description: 'Terraform action to perform'
+        required: false
+        default: 'apply'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      working_directory:
+        description: 'Terraform working directory'
+        required: false
+        default: 'terraform'
+        type: string
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_changed: ${{ steps.changes.outputs.terraform }}
+      working_directories: ${{ steps.directories.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect terraform file changes
+        id: changes
+        run: |
+          if git diff HEAD^ HEAD --name-only | grep -E '\.(tf|tfvars|tfvars\.json)$'; then
+            echo "terraform=true" >> $GITHUB_OUTPUT
+            echo "Terraform files changed:"
+            git diff HEAD^ HEAD --name-only | grep -E '\.(tf|tfvars|tfvars\.json)$'
+          else
+            echo "terraform=false" >> $GITHUB_OUTPUT
+            echo "No Terraform files changed"
+          fi
+
+      - name: Find terraform directories
+        id: directories
+        run: |
+          # Find all directories containing .tf files
+          TERRAFORM_DIRS=$(find . -name "*.tf" -not -path "./.terraform/*" | xargs -I {} dirname {} | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=$TERRAFORM_DIRS" >> $GITHUB_OUTPUT
+          echo "Found Terraform directories: $TERRAFORM_DIRS"
+
+  terraform-plan:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.terraform_changed == 'true'
+    runs-on: ubuntu-latest
+    environment: terraform-cicd
+    strategy:
+      matrix:
+        directory: ${{ fromJson(needs.detect-changes.outputs.working_directories) }}
+      fail-fast: false
+    
+    outputs:
+      plan_exitcode: ${{ steps.plan.outputs.exitcode }}
+      plan_outcome: ${{ steps.plan.outcome }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure Terraform credentials
+        run: |
+          # Configure Git for Terraform modules if needed
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          
+          # Set up Terraform CLI config if using Terraform Cloud/Enterprise
+          if [ ! -z "${{ secrets.TF_API_TOKEN }}" ]; then
+            cat > ~/.terraformrc << EOF
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
+          fi
+
+      - name: Azure Login
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure AWS Credentials
+        if: vars.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Init
+        id: init
+        run: |
+          echo "Initializing Terraform in ${{ matrix.directory }}"
+          terraform init -input=false
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Security Scan
+        id: security
+        run: |
+          # Install and run terraform security scanner (example using Checkov)
+          if command -v checkov &> /dev/null; then
+            echo "Running Checkov security scan..."
+            checkov -d ${{ matrix.directory }} --framework terraform --output cli --quiet
+          else
+            echo "Checkov not installed, skipping security scan"
+            echo "Consider adding: pip install checkov to your workflow"
+          fi
+        continue-on-error: true
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          # Create tfvars file if environment variables are provided
+          if [ ! -z "${{ vars.TF_VARS_FILE_CONTENT }}" ]; then
+            echo '${{ vars.TF_VARS_FILE_CONTENT }}' > terraform.tfvars
+          fi
+          
+          # Run terraform plan and capture exit code
+          set +e
+          terraform plan -detailed-exitcode -no-color -out=tfplan
+          EXIT_CODE=$?
+          set -e
+          
+          echo "exitcode=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Exit code 0: No changes
+          # Exit code 1: Error
+          # Exit code 2: Changes present
+          case $EXIT_CODE in
+            0)
+              echo "✅ No changes detected"
+              ;;
+            1)
+              echo "❌ Terraform plan failed"
+              exit 1
+              ;;
+            2)
+              echo "📋 Changes detected, plan successful"
+              ;;
+          esac
+        working-directory: ${{ matrix.directory }}
+
+      - name: Generate Plan Summary
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          echo "## Terraform Plan Summary - ${{ matrix.directory }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changes Detected:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform show -no-color tfplan | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ matrix.directory }}
+
+      - name: Upload Plan Artifact
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.directory }}-${{ github.sha }}
+          path: ${{ matrix.directory }}/tfplan
+          retention-days: 7
+
+  terraform-apply:
+    needs: [detect-changes, terraform-plan]
+    if: needs.terraform-plan.outputs.plan_exitcode == '2' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: terraform-cicd
+    strategy:
+      matrix:
+        directory: ${{ fromJson(needs.detect-changes.outputs.working_directories) }}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure Terraform credentials
+        run: |
+          # Configure Git for Terraform modules if needed
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          
+          # Set up Terraform CLI config if using Terraform Cloud/Enterprise
+          if [ ! -z "${{ secrets.TF_API_TOKEN }}" ]; then
+            cat > ~/.terraformrc << EOF
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
+          fi
+
+      - name: Azure Login
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure AWS Credentials
+        if: vars.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ matrix.directory }}-${{ github.sha }}
+          path: ${{ matrix.directory }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          echo "🚀 Applying Terraform plan for ${{ matrix.directory }}"
+          
+          # Create tfvars file if environment variables are provided
+          if [ ! -z "${{ vars.TF_VARS_FILE_CONTENT }}" ]; then
+            echo '${{ vars.TF_VARS_FILE_CONTENT }}' > terraform.tfvars
+          fi
+          
+          # Apply the plan
+          terraform apply -auto-approve -no-color tfplan
+          
+          echo "✅ Terraform apply completed successfully"
+        working-directory: ${{ matrix.directory }}
+
+      - name: Generate Apply Summary
+        if: always()
+        run: |
+          echo "## Terraform Apply Results - ${{ matrix.directory }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.apply.outcome }}" == "success" ]; then
+            echo "### ✅ Apply Successful" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Infrastructure changes have been applied successfully." >> $GITHUB_STEP_SUMMARY
+            
+            # Show terraform state if needed
+            if [ -f "${{ matrix.directory }}/terraform.tfstate" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Resource Summary:" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              terraform state list 2>/dev/null | head -20 >> $GITHUB_STEP_SUMMARY || echo "Unable to list resources" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### ❌ Apply Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Terraform apply encountered errors. Check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+        working-directory: ${{ matrix.directory }}
+
+      - name: Terraform Output
+        id: output
+        run: |
+          echo "## Terraform Outputs - ${{ matrix.directory }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform output -no-color >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No outputs defined" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ matrix.directory }}
+        continue-on-error: true
+
+  manual-terraform-action:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: terraform-cicd
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure Terraform credentials
+        run: |
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          
+          if [ ! -z "${{ secrets.TF_API_TOKEN }}" ]; then
+            cat > ~/.terraformrc << EOF
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOF
+          fi
+
+      - name: Azure Login
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure AWS Credentials
+        if: vars.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ${{ github.event.inputs.working_directory }}
+
+      - name: Execute Terraform Action
+        run: |
+          ACTION="${{ github.event.inputs.terraform_action }}"
+          
+          # Create tfvars file if environment variables are provided
+          if [ ! -z "${{ vars.TF_VARS_FILE_CONTENT }}" ]; then
+            echo '${{ vars.TF_VARS_FILE_CONTENT }}' > terraform.tfvars
+          fi
+          
+          case $ACTION in
+            plan)
+              echo "📋 Running Terraform Plan"
+              terraform plan -no-color
+              ;;
+            apply)
+              echo "🚀 Running Terraform Apply"
+              terraform plan -out=tfplan
+              terraform apply -auto-approve tfplan
+              ;;
+            destroy)
+              echo "🗑️ Running Terraform Destroy"
+              terraform plan -destroy -out=tfplan
+              echo "⚠️ WARNING: This will destroy infrastructure!"
+              terraform apply -auto-approve tfplan
+              ;;
+            *)
+              echo "❌ Unknown action: $ACTION"
+              exit 1
+              ;;
+          esac
+        working-directory: ${{ github.event.inputs.working_directory }}
+
+  post-apply-validation:
+    needs: [terraform-apply]
+    if: always() && needs.terraform-apply.result == 'success'
+    runs-on: ubuntu-latest
+    environment: terraform-cicd
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Post-Apply Validation
+        run: |
+          echo "🔍 Running post-apply validation..."
+          
+          # Add any post-deployment validation scripts here
+          # Examples:
+          # - Health checks
+          # - Smoke tests
+          # - Resource verification
+          
+          # Example validation script
+          if [ -f "scripts/validate-infrastructure.sh" ]; then
+            echo "Running custom validation script..."
+            chmod +x scripts/validate-infrastructure.sh
+            ./scripts/validate-infrastructure.sh
+          else
+            echo "No custom validation script found, skipping..."
+          fi
+          
+          echo "✅ Post-apply validation completed"
+
+      - name: Notification
+        if: always()
+        run: |
+          # Add notification logic here (Slack, Teams, email, etc.)
+          echo "## 📢 Terraform Deployment Notification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** terraform-cicd" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.terraform-apply.result }}" == "success" ]; then
+            echo "**Status:** ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." >> $GITHUB_STEP_SUMMARY
+
+  cleanup:
+    needs: [terraform-apply, post-apply-validation]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Cleanup Artifacts
+        run: |
+          echo "🧹 Cleaning up temporary artifacts and resources..."
+          # Add any cleanup logic here
+          echo "✅ Cleanup completed"

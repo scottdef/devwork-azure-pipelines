@@ -1,0 +1,498 @@
+name: Terraform PR Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**/*.tf'
+      - '**/*.tfvars'
+      - '**/*.tfvars.json'
+      - 'terraform/**'
+    types: [opened, synchronize, reopened]
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+  id-token: write
+
+jobs:
+  terraform-checks:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure Terraform credentials
+        run: |
+          # Configure Git for Terraform modules
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          
+          # Set up Terraform CLI config if using Terraform Cloud/Enterprise
+          if [ ! -z "${{ secrets.TF_API_TOKEN }}" ]; then
+            mkdir -p ~/.terraform.d
+            cat > ~/.terraform.d/credentials.tfrc.json << EOF
+          {
+            "credentials": {
+              "app.terraform.io": {
+                "token": "${{ secrets.TF_API_TOKEN }}"
+              }
+            }
+          }
+          EOF
+          fi
+
+      - name: Find Terraform directories
+        id: find-dirs
+        run: |
+          # Find all directories containing .tf files
+          TERRAFORM_DIRS=$(find . -name "*.tf" -not -path "./.terraform/*" -not -path "./.*" | xargs -I {} dirname {} | sort -u)
+          echo "Found Terraform directories:"
+          echo "$TERRAFORM_DIRS"
+          
+          # Convert to JSON array for matrix
+          DIRS_JSON=$(echo "$TERRAFORM_DIRS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "directories=$DIRS_JSON" >> $GITHUB_OUTPUT
+
+      - name: Terraform Format Check
+        id: fmt
+        run: |
+          echo "## 🎨 Terraform Format Check Results" > fmt_results.md
+          echo "" >> fmt_results.md
+          
+          fmt_success=true
+          for dir in $(echo '${{ steps.find-dirs.outputs.directories }}' | jq -r '.[]'); do
+            echo "Checking format in directory: $dir"
+            echo "### Directory: \`$dir\`" >> fmt_results.md
+            
+            cd "$dir"
+            if terraform fmt -check -diff -recursive; then
+              echo "✅ **Format check passed**" >> ../fmt_results.md
+              echo "" >> ../fmt_results.md
+            else
+              echo "❌ **Format check failed**" >> ../fmt_results.md
+              echo "" >> ../fmt_results.md
+              echo '```diff' >> ../fmt_results.md
+              terraform fmt -check -diff -recursive >> ../fmt_results.md 2>&1 || true
+              echo '```' >> ../fmt_results.md
+              echo "" >> ../fmt_results.md
+              fmt_success=false
+            fi
+            cd - > /dev/null
+          done
+          
+          if [ "$fmt_success" = false ]; then
+            echo "fmt_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "fmt_status=passed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Init and Validate
+        id: validate
+        run: |
+          echo "## 🔍 Terraform Validation Results" > validate_results.md
+          echo "" >> validate_results.md
+          
+          validate_success=true
+          for dir in $(echo '${{ steps.find-dirs.outputs.directories }}' | jq -r '.[]'); do
+            echo "Validating directory: $dir"
+            echo "### Directory: \`$dir\`" >> validate_results.md
+            
+            cd "$dir"
+            
+            # Initialize Terraform
+            if terraform init -backend=false -input=false; then
+              echo "✅ **Init successful**" >> ../validate_results.md
+              
+              # Validate configuration
+              if terraform validate; then
+                echo "✅ **Validation passed**" >> ../validate_results.md
+              else
+                echo "❌ **Validation failed**" >> ../validate_results.md
+                echo '```' >> ../validate_results.md
+                terraform validate >> ../validate_results.md 2>&1 || true
+                echo '```' >> ../validate_results.md
+                validate_success=false
+              fi
+            else
+              echo "❌ **Init failed**" >> ../validate_results.md
+              echo '```' >> ../validate_results.md
+              terraform init -backend=false -input=false >> ../validate_results.md 2>&1 || true
+              echo '```' >> ../validate_results.md
+              validate_success=false
+            fi
+            echo "" >> ../validate_results.md
+            cd - > /dev/null
+          done
+          
+          if [ "$validate_success" = false ]; then
+            echo "validate_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "validate_status=passed" >> $GITHUB_OUTPUT
+          fi
+
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: terraform-checks
+    if: success()
+    environment: terraform-cicd
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure Terraform credentials
+        run: |
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          
+          if [ ! -z "${{ secrets.TF_API_TOKEN }}" ]; then
+            mkdir -p ~/.terraform.d
+            cat > ~/.terraform.d/credentials.tfrc.json << EOF
+          {
+            "credentials": {
+              "app.terraform.io": {
+                "token": "${{ secrets.TF_API_TOKEN }}"
+              }
+            }
+          }
+          EOF
+          fi
+
+      - name: Azure Login
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure AWS Credentials
+        if: vars.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Find Terraform directories
+        id: find-dirs
+        run: |
+          TERRAFORM_DIRS=$(find . -name "*.tf" -not -path "./.terraform/*" -not -path "./.*" | xargs -I {} dirname {} | sort -u)
+          DIRS_JSON=$(echo "$TERRAFORM_DIRS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "directories=$DIRS_JSON" >> $GITHUB_OUTPUT
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          echo "## 📋 Terraform Plan Results" > plan_results.md
+          echo "" >> plan_results.md
+          
+          plan_success=true
+          has_changes=false
+          
+          for dir in $(echo '${{ steps.find-dirs.outputs.directories }}' | jq -r '.[]'); do
+            echo "Planning directory: $dir"
+            echo "### Directory: \`$dir\`" >> plan_results.md
+            echo "" >> plan_results.md
+            
+            cd "$dir"
+            
+            # Create tfvars file if environment variables are provided
+            if [ ! -z "${{ vars.TF_VARS_FILE_CONTENT }}" ]; then
+              echo '${{ vars.TF_VARS_FILE_CONTENT }}' > terraform.tfvars
+            fi
+            
+            # Initialize Terraform with backend
+            if terraform init -input=false; then
+              # Run terraform plan
+              set +e
+              terraform plan -detailed-exitcode -no-color -out=tfplan 2>&1 | tee plan_output.txt
+              EXIT_CODE=$?
+              set -e
+              
+              case $EXIT_CODE in
+                0)
+                  echo "✅ **No changes detected**" >> ../plan_results.md
+                  ;;
+                1)
+                  echo "❌ **Plan failed**" >> ../plan_results.md
+                  echo "" >> ../plan_results.md
+                  echo '<details>' >> ../plan_results.md
+                  echo '<summary>Show Error Details</summary>' >> ../plan_results.md
+                  echo "" >> ../plan_results.md
+                  echo '```' >> ../plan_results.md
+                  cat plan_output.txt >> ../plan_results.md
+                  echo '```' >> ../plan_results.md
+                  echo '</details>' >> ../plan_results.md
+                  plan_success=false
+                  ;;
+                2)
+                  echo "📋 **Changes detected**" >> ../plan_results.md
+                  has_changes=true
+                  echo "" >> ../plan_results.md
+                  
+                  # Show plan summary
+                  echo '<details>' >> ../plan_results.md
+                  echo '<summary>Show Plan Details</summary>' >> ../plan_results.md
+                  echo "" >> ../plan_results.md
+                  echo '```hcl' >> ../plan_results.md
+                  
+                  # Truncate large plans to avoid hitting comment size limits
+                  if [ $(wc -l < plan_output.txt) -gt 100 ]; then
+                    head -50 plan_output.txt >> ../plan_results.md
+                    echo "" >> ../plan_results.md
+                    echo "... (output truncated - see workflow logs for full plan) ..." >> ../plan_results.md
+                    echo "" >> ../plan_results.md
+                    tail -50 plan_output.txt >> ../plan_results.md
+                  else
+                    cat plan_output.txt >> ../plan_results.md
+                  fi
+                  
+                  echo '```' >> ../plan_results.md
+                  echo '</details>' >> ../plan_results.md
+                  ;;
+              esac
+              
+              # Show resource summary if plan succeeded
+              if [ $EXIT_CODE -ne 1 ]; then
+                echo "" >> ../plan_results.md
+                echo "#### Resource Summary:" >> ../plan_results.md
+                terraform show -no-color tfplan | grep -E "^  # " | head -20 >> ../plan_results.md 2>/dev/null || true
+              fi
+              
+            else
+              echo "❌ **Init failed**" >> ../plan_results.md
+              plan_success=false
+            fi
+            
+            echo "" >> ../plan_results.md
+            echo "---" >> ../plan_results.md
+            echo "" >> ../plan_results.md
+            
+            cd - > /dev/null
+          done
+          
+          # Set outputs
+          echo "plan_status=$([ "$plan_success" = true ] && echo "passed" || echo "failed")" >> $GITHUB_OUTPUT
+          echo "has_changes=$([ "$has_changes" = true ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          
+          # Fail the job if plan failed
+          if [ "$plan_success" = false ]; then
+            exit 1
+          fi
+
+      - name: Security Scan
+        id: security
+        continue-on-error: true
+        run: |
+          echo "## 🛡️ Security Scan Results" > security_results.md
+          echo "" >> security_results.md
+          
+          # Install Checkov
+          pip install checkov
+          
+          for dir in $(echo '${{ steps.find-dirs.outputs.directories }}' | jq -r '.[]'); do
+            echo "### Directory: \`$dir\`" >> security_results.md
+            echo "" >> security_results.md
+            
+            # Run Checkov security scan
+            if checkov -d "$dir" --framework terraform --output cli --quiet --compact; then
+              echo "✅ **No security issues found**" >> security_results.md
+            else
+              echo "⚠️ **Security issues detected**" >> security_results.md
+              echo "" >> security_results.md
+              echo '<details>' >> security_results.md
+              echo '<summary>Show Security Scan Details</summary>' >> security_results.md
+              echo "" >> security_results.md
+              echo '```' >> security_results.md
+              checkov -d "$dir" --framework terraform --output cli --quiet >> security_results.md 2>&1 || true
+              echo '```' >> security_results.md
+              echo '</details>' >> security_results.md
+            fi
+            echo "" >> security_results.md
+          done
+
+      - name: Cost Estimation (Optional)
+        id: cost
+        continue-on-error: true
+        run: |
+          echo "## 💰 Cost Estimation" > cost_results.md
+          echo "" >> cost_results.md
+          
+          # Add cost estimation logic here if using tools like Infracost
+          # For now, just add a placeholder
+          echo "💡 **Cost estimation not configured**" >> cost_results.md
+          echo "" >> cost_results.md
+          echo "To enable cost estimation, integrate with tools like:" >> cost_results.md
+          echo "- [Infracost](https://www.infracost.io/)" >> cost_results.md
+          echo "- [Azure Cost Management](https://docs.microsoft.com/en-us/azure/cost-management-billing/)" >> cost_results.md
+          echo "- [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/)" >> cost_results.md
+          echo "" >> cost_results.md
+
+      - name: Create or Update PR Comment
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            // Read result files
+            let comment = `# 🏗️ Terraform PR Check Results\n\n`;
+            comment += `**Triggered by:** @${{ github.actor }}\n`;
+            comment += `**Commit:** ${{ github.sha }}\n`;
+            comment += `**Workflow:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n`;
+            
+            // Add status summary
+            comment += `## 📊 Summary\n\n`;
+            comment += `| Check | Status |\n`;
+            comment += `|-------|--------|\n`;
+            comment += `| Format | ${{ steps.fmt.outputs.fmt_status == 'passed' && '✅ Passed' || '❌ Failed' }} |\n`;
+            comment += `| Validation | ${{ needs.terraform-checks.result == 'success' && '✅ Passed' || '❌ Failed' }} |\n`;
+            comment += `| Plan | ${{ steps.plan.outputs.plan_status == 'passed' && '✅ Passed' || '❌ Failed' }} |\n`;
+            comment += `| Security | ${{ steps.security.outcome == 'success' && '✅ Passed' || '⚠️ Warning' }} |\n\n`;
+            
+            // Read and append format results
+            try {
+              const fmtResults = fs.readFileSync('fmt_results.md', 'utf8');
+              comment += fmtResults + '\n';
+            } catch (e) {
+              console.log('No format results found');
+            }
+            
+            // Read and append validation results
+            try {
+              const validateResults = fs.readFileSync('validate_results.md', 'utf8');
+              comment += validateResults + '\n';
+            } catch (e) {
+              console.log('No validation results found');
+            }
+            
+            // Read and append plan results
+            try {
+              const planResults = fs.readFileSync('plan_results.md', 'utf8');
+              comment += planResults + '\n';
+            } catch (e) {
+              console.log('No plan results found');
+            }
+            
+            // Read and append security results
+            try {
+              const securityResults = fs.readFileSync('security_results.md', 'utf8');
+              comment += securityResults + '\n';
+            } catch (e) {
+              console.log('No security results found');
+            }
+            
+            // Read and append cost results
+            try {
+              const costResults = fs.readFileSync('cost_results.md', 'utf8');
+              comment += costResults + '\n';
+            } catch (e) {
+              console.log('No cost results found');
+            }
+            
+            comment += `---\n`;
+            comment += `*Terraform version: ${{ env.TERRAFORM_VERSION }}*\n`;
+            comment += `*Updated: ${new Date().toISOString()}*\n`;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🏗️ Terraform PR Check Results')
+            );
+            
+            // Update existing comment or create new one
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Set Check Status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const checkName = 'Terraform Validation';
+            const conclusion = '${{ needs.terraform-checks.result }}' === 'success' && 
+                              '${{ steps.plan.outputs.plan_status }}' === 'passed' ? 'success' : 'failure';
+            
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: checkName,
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: conclusion,
+              output: {
+                title: conclusion === 'success' ? 'All Terraform checks passed' : 'Terraform checks failed',
+                summary: `Format: ${{ needs.terraform-checks.result }}, Plan: ${{ steps.plan.outputs.plan_status || 'skipped' }}`
+              }
+            });
+
+  results:
+    name: PR Check Results
+    runs-on: ubuntu-latest
+    needs: [terraform-checks, terraform-plan]
+    if: always()
+    
+    steps:
+      - name: Check Results
+        run: |
+          echo "## Final Results Summary"
+          echo "Terraform Checks: ${{ needs.terraform-checks.result }}"
+          echo "Terraform Plan: ${{ needs.terraform-plan.result }}"
+          
+          if [ "${{ needs.terraform-checks.result }}" != "success" ]; then
+            echo "❌ Terraform validation failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.terraform-plan.result }}" != "success" ]; then
+            echo "❌ Terraform plan failed"
+            exit 1
+          fi
+          
+          echo "✅ All checks passed successfully!"

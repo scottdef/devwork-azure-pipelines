@@ -1,0 +1,93 @@
+{
+  "default_source_repo": "organization/databricks-templates",
+  "default_source_ref": "main",
+  "default_bundle_name": "document-intelligence-bundle",
+  "environments": {
+    "nonprod": {
+      "databricks_profile": "nonprod",
+      "azure_resource_group": "rg-databricks-nonprod",
+      "cluster_config": {
+        "node_type_id": "Standard_DS3_v2",
+        "num_workers": 2,
+        "spark_version": "13.3.x-scala2.12"
+      },
+      "document_intelligence": {
+        "models": ["prebuilt-read", "prebuilt-document"],
+        "batch_size": 50,
+        "max_retries": 3
+      },
+      "storage": {
+        "input_container": "nonprod-input",
+        "output_container": "nonprod-output",
+        "checkpoint_location": "/mnt/nonprod/checkpoints/"
+      }
+    },
+    "prod": {
+      "databricks_profile": "prod",
+      "azure_resource_group": "rg-databricks-prod",
+      "cluster_config": {
+        "node_type_id": "Standard_DS4_v2",
+        "num_workers": 4,
+        "spark_version": "13.3.x-scala2.12"
+      },
+      "document_intelligence": {
+        "models": ["prebuilt-read", "prebuilt-document", "prebuilt-invoice", "prebuilt-receipt"],
+        "batch_size": 100,
+        "max_retries": 5
+      },
+      "storage": {
+        "input_container": "prod-input",
+        "output_container": "prod-output",
+        "checkpoint_location": "/mnt/prod/checkpoints/"
+      }
+    }
+  },
+  "template_repositories": {
+    "primary": {
+      "repo": "organization/databricks-templates",
+      "branch": "main",
+      "path": "templates/document-intelligence"
+    },
+    "experimental": {
+      "repo": "organization/databricks-experimental-templates",
+      "branch": "develop",
+      "path": "experimental/document-intelligence"
+    }
+  },
+  "deployment_options": {
+    "validation": {
+      "enabled": true,
+      "timeout_minutes": 10,
+      "required_checks": [
+        "bundle_validation",
+        "azure_connectivity",
+        "document_intelligence_service"
+      ]
+    },
+    "rollback": {
+      "enabled": true,
+      "keep_previous_versions": 3
+    },
+    "monitoring": {
+      "enabled": true,
+      "alert_channels": ["#data-engineering", "#alerts"],
+      "metrics": [
+        "job_success_rate",
+        "document_processing_latency",
+        "error_rate"
+      ]
+    }
+  },
+  "custom_properties": {
+    "super_special_role_permissions": [
+      "read",
+      "write",
+      "execute",
+      "admin"
+    ],
+    "team_alpha_blue_i_access": {
+      "environments": ["nonprod", "prod"],
+      "permissions": ["deploy", "monitor", "debug"]
+    }
+  }
+}

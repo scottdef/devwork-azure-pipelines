@@ -1,0 +1,497 @@
+name: Deploy Databricks Asset Bundle with Document Intelligence
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'nonprod'
+        type: choice
+        options:
+          - nonprod
+          - prod
+      source_repo:
+        description: 'Source repository for code templates'
+        required: false
+        default: 'organization/databricks-templates'
+        type: string
+      source_ref:
+        description: 'Branch/tag/commit from source repo'
+        required: false
+        default: 'main'
+        type: string
+      bundle_name:
+        description: 'Databricks Asset Bundle name'
+        required: false
+        default: 'document-intelligence-bundle'
+        type: string
+      
+  repository_dispatch:
+    types: [deploy-pr-trigger]
+    
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'databricks/**'
+      - 'config/**'
+      - '.github/workflows/**'
+
+env:
+  PYTHON_VERSION: '3.11'
+  DATABRICKS_CLI_VERSION: '0.218.0'
+  AZURE_CLI_VERSION: '2.53.0'
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    outputs:
+      config: ${{ steps.load-config.outputs.config }}
+      environment: ${{ steps.determine-env.outputs.environment }}
+      source_repo: ${{ steps.load-config.outputs.source_repo }}
+      source_ref: ${{ steps.load-config.outputs.source_ref }}
+      bundle_name: ${{ steps.load-config.outputs.bundle_name }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "environment=${{ github.event.client_payload.environment || 'nonprod' }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=nonprod" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Load configuration
+        id: load-config
+        run: |
+          CONFIG_FILE="config/deployment-config.json"
+          
+          if [[ ! -f "$CONFIG_FILE" ]]; then
+            echo "Creating default config file"
+            mkdir -p config
+            cat > "$CONFIG_FILE" << EOF
+          {
+            "default_source_repo": "${{ github.event.inputs.source_repo || 'organization/databricks-templates' }}",
+            "default_source_ref": "${{ github.event.inputs.source_ref || 'main' }}",
+            "default_bundle_name": "${{ github.event.inputs.bundle_name || 'document-intelligence-bundle' }}",
+            "environments": {
+              "nonprod": {
+                "databricks_profile": "nonprod",
+                "azure_resource_group": "rg-databricks-nonprod"
+              },
+              "prod": {
+                "databricks_profile": "prod",
+                "azure_resource_group": "rg-databricks-prod"
+              }
+            }
+          }
+          EOF
+          fi
+          
+          # Handle different trigger types
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SOURCE_REPO="${{ github.event.inputs.source_repo }}"
+            SOURCE_REF="${{ github.event.inputs.source_ref }}"
+            BUNDLE_NAME="${{ github.event.inputs.bundle_name }}"
+          elif [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            SOURCE_REPO="${{ github.event.client_payload.source_repo }}"
+            SOURCE_REF="${{ github.event.client_payload.source_ref }}"
+            BUNDLE_NAME="${{ github.event.client_payload.bundle_name }}"
+          else
+            SOURCE_REPO=$(jq -r '.default_source_repo // "organization/databricks-templates"' "$CONFIG_FILE")
+            SOURCE_REF=$(jq -r '.default_source_ref // "main"' "$CONFIG_FILE")
+            BUNDLE_NAME=$(jq -r '.default_bundle_name // "document-intelligence-bundle"' "$CONFIG_FILE")
+          fi
+          
+          # Fallback to defaults if empty
+          SOURCE_REPO="${SOURCE_REPO:-organization/databricks-templates}"
+          SOURCE_REF="${SOURCE_REF:-main}"
+          BUNDLE_NAME="${BUNDLE_NAME:-document-intelligence-bundle}"
+          
+          echo "source_repo=$SOURCE_REPO" >> $GITHUB_OUTPUT
+          echo "source_ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+          echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
+          
+          # Output the entire config for downstream jobs
+          jq -c . "$CONFIG_FILE" > /tmp/config.json
+          echo "config<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/config.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Validate configuration
+        run: |
+          echo "Deployment Configuration:"
+          echo "Environment: ${{ steps.determine-env.outputs.environment }}"
+          echo "Source Repository: ${{ steps.load-config.outputs.source_repo }}"
+          echo "Source Reference: ${{ steps.load-config.outputs.source_ref }}"
+          echo "Bundle Name: ${{ steps.load-config.outputs.bundle_name }}"
+
+  fetch-template-code:
+    needs: validate-config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          path: main-repo
+
+      - name: Checkout template repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.validate-config.outputs.source_repo }}
+          ref: ${{ needs.validate-config.outputs.source_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: template-repo
+
+      - name: Merge template code
+        run: |
+          echo "Merging template code from ${{ needs.validate-config.outputs.source_repo }}"
+          
+          # Create databricks directory structure if it doesn't exist
+          mkdir -p main-repo/databricks/{src,resources,notebooks}
+          
+          # Copy template files (customize based on your template structure)
+          if [[ -d "template-repo/databricks" ]]; then
+            cp -r template-repo/databricks/* main-repo/databricks/
+          fi
+          
+          if [[ -d "template-repo/notebooks" ]]; then
+            cp -r template-repo/notebooks/* main-repo/databricks/notebooks/
+          fi
+          
+          # Process Go templates if they exist
+          if command -v go &> /dev/null && [[ -f "template-repo/process-templates.go" ]]; then
+            cd template-repo
+            go run process-templates.go \
+              --bundle-name "${{ needs.validate-config.outputs.bundle_name }}" \
+              --environment "${{ needs.validate-config.outputs.environment }}" \
+              --output-dir "../main-repo/databricks"
+          fi
+
+      - name: Upload merged code
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-databricks-code
+          path: main-repo/
+          retention-days: 7
+
+  databricks-validate:
+    needs: [validate-config, fetch-template-code]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.validate-config.outputs.environment }}
+    
+    steps:
+      - name: Download merged code
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-databricks-code
+          path: ./
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Databricks CLI
+        run: |
+          pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+          pip install databricks-sdk
+          databricks --version
+
+      - name: Configure Databricks CLI
+        run: |
+          mkdir -p ~/.databrickscfg
+          cat > ~/.databrickscfg << EOF
+          [DEFAULT]
+          host = ${{ vars.DATABRICKS_WORKSPACE_URL }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          
+          [${{ needs.validate-config.outputs.environment }}]
+          host = ${{ vars.DATABRICKS_WORKSPACE_URL }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
+
+      - name: Validate Databricks Asset Bundle
+        run: |
+          if [[ -f "databricks.yml" ]] || [[ -f "bundle.yml" ]]; then
+            echo "Validating Databricks Asset Bundle..."
+            databricks bundle validate --profile ${{ needs.validate-config.outputs.environment }}
+          else
+            echo "No bundle configuration found, skipping validation"
+          fi
+
+  azure-setup:
+    needs: [validate-config, fetch-template-code]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.validate-config.outputs.environment }}
+    
+    steps:
+      - name: Download merged code
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-databricks-code
+          path: ./
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          az --version
+
+      - name: Verify Azure Document Intelligence Service
+        run: |
+          echo "Checking Document Intelligence service..."
+          az cognitiveservices account show \
+            --name $(echo "${{ vars.DOCUMENT_INTELLIGENCE_ENDPOINT }}" | grep -o 'https://[^.]*' | sed 's/https:\/\///') \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} || echo "Service verification failed, continuing..."
+
+      - name: Setup Document Intelligence Configuration
+        run: |
+          echo "Setting up Document Intelligence configuration..."
+          mkdir -p config
+          cat > config/document-intelligence.json << EOF
+          {
+            "endpoint": "${{ vars.DOCUMENT_INTELLIGENCE_ENDPOINT }}",
+            "api_key": "${{ secrets.DOCUMENT_INTELLIGENCE_KEY }}",
+            "api_version": "2023-07-31",
+            "models": {
+              "prebuilt": ["prebuilt-read", "prebuilt-document", "prebuilt-invoice"],
+              "custom": []
+            }
+          }
+          EOF
+
+  deploy-databricks:
+    needs: [validate-config, fetch-template-code, databricks-validate, azure-setup]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.validate-config.outputs.environment }}
+    
+    steps:
+      - name: Download merged code
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-databricks-code
+          path: ./
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+          pip install databricks-sdk
+          pip install azure-ai-documentintelligence
+          pip install azure-identity
+          pip install pandas numpy
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure Databricks CLI
+        run: |
+          mkdir -p ~/.databrickscfg
+          cat > ~/.databrickscfg << EOF
+          [DEFAULT]
+          host = ${{ vars.DATABRICKS_WORKSPACE_URL }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          
+          [${{ needs.validate-config.outputs.environment }}]
+          host = ${{ vars.DATABRICKS_WORKSPACE_URL }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
+
+      - name: Create Databricks Bundle Configuration
+        run: |
+          BUNDLE_NAME="${{ needs.validate-config.outputs.bundle_name }}"
+          ENVIRONMENT="${{ needs.validate-config.outputs.environment }}"
+          
+          if [[ ! -f "databricks.yml" ]]; then
+            echo "Creating databricks.yml bundle configuration..."
+            cat > databricks.yml << EOF
+          bundle:
+            name: ${BUNDLE_NAME}
+            
+          workspace:
+            host: ${{ vars.DATABRICKS_WORKSPACE_URL }}
+            
+          targets:
+            ${ENVIRONMENT}:
+              mode: development
+              workspace:
+                file_path: /Workspace/Users/${{ github.actor }}/${BUNDLE_NAME}
+              variables:
+                environment: ${ENVIRONMENT}
+                document_intelligence_endpoint: ${{ vars.DOCUMENT_INTELLIGENCE_ENDPOINT }}
+                
+          resources:
+            jobs:
+              document_processing_job:
+                name: Document Processing Job - ${ENVIRONMENT}
+                job_clusters:
+                  - job_cluster_key: main_cluster
+                    new_cluster:
+                      spark_version: "13.3.x-scala2.12"
+                      node_type_id: "Standard_DS3_v2"
+                      num_workers: 2
+                      spark_conf:
+                        "spark.databricks.cluster.profile": "singleNode"
+                      custom_tags:
+                        ResourceClass: "SingleNode"
+                        Environment: ${ENVIRONMENT}
+                tasks:
+                  - task_key: process_documents
+                    job_cluster_key: main_cluster
+                    python_wheel_task:
+                      package_name: document_intelligence_processor
+                      entry_point: main
+                    libraries:
+                      - pypi:
+                          package: azure-ai-documentintelligence
+                      - pypi:
+                          package: azure-identity
+          EOF
+          fi
+
+      - name: Deploy Databricks Asset Bundle
+        run: |
+          echo "Deploying Databricks Asset Bundle..."
+          databricks bundle deploy \
+            --profile ${{ needs.validate-config.outputs.environment }} \
+            --target ${{ needs.validate-config.outputs.environment }}
+
+      - name: Create Document Intelligence Integration
+        run: |
+          echo "Setting up Document Intelligence integration..."
+          
+          # Create a Python script for Document Intelligence integration
+          cat > setup_document_intelligence.py << 'EOF'
+          import json
+          import os
+          from azure.ai.documentintelligence import DocumentIntelligenceClient
+          from azure.core.credentials import AzureKeyCredential
+          from databricks.sdk import WorkspaceClient
+          
+          def setup_document_intelligence():
+              # Load configuration
+              with open('config/document-intelligence.json', 'r') as f:
+                  config = json.load(f)
+              
+              # Initialize Document Intelligence client
+              doc_intel_client = DocumentIntelligenceClient(
+                  endpoint=config['endpoint'],
+                  credential=AzureKeyCredential(os.environ['DOCUMENT_INTELLIGENCE_KEY'])
+              )
+              
+              # Initialize Databricks client
+              databricks_client = WorkspaceClient()
+              
+              # Create or update Databricks secrets for Document Intelligence
+              try:
+                  databricks_client.secrets.create_scope(
+                      scope="document-intelligence",
+                      initial_manage_principal="users"
+                  )
+              except Exception as e:
+                  print(f"Secret scope may already exist: {e}")
+              
+              # Store Document Intelligence credentials in Databricks secrets
+              databricks_client.secrets.put_secret(
+                  scope="document-intelligence",
+                  key="endpoint",
+                  string_value=config['endpoint']
+              )
+              
+              databricks_client.secrets.put_secret(
+                  scope="document-intelligence",
+                  key="api-key",
+                  string_value=os.environ['DOCUMENT_INTELLIGENCE_KEY']
+              )
+              
+              print("Document Intelligence integration setup completed")
+          
+          if __name__ == "__main__":
+              setup_document_intelligence()
+          EOF
+          
+          python setup_document_intelligence.py
+        env:
+          DOCUMENT_INTELLIGENCE_KEY: ${{ secrets.DOCUMENT_INTELLIGENCE_KEY }}
+
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          
+          # Create a simple test script
+          cat > test_integration.py << 'EOF'
+          import json
+          from databricks.sdk import WorkspaceClient
+          
+          def test_integration():
+              client = WorkspaceClient()
+              
+              # Test if the bundle was deployed successfully
+              try:
+                  jobs = client.jobs.list()
+                  bundle_jobs = [job for job in jobs if 'Document Processing Job' in job.settings.name]
+                  
+                  if bundle_jobs:
+                      print(f"✓ Found {len(bundle_jobs)} bundle jobs")
+                      return True
+                  else:
+                      print("✗ No bundle jobs found")
+                      return False
+              except Exception as e:
+                  print(f"✗ Integration test failed: {e}")
+                  return False
+          
+          if __name__ == "__main__":
+              success = test_integration()
+              exit(0 if success else 1)
+          EOF
+          
+          python test_integration.py
+
+  post-deployment:
+    needs: [validate-config, deploy-databricks]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.validate-config.outputs.environment }}
+    if: always()
+    
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.validate-config.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bundle Name**: ${{ needs.validate-config.outputs.bundle_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Repository**: ${{ needs.validate-config.outputs.source_repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Reference**: ${{ needs.validate-config.outputs.source_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Databricks Workspace**: ${{ vars.DATABRICKS_WORKSPACE_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Document Intelligence**: ${{ vars.DOCUMENT_INTELLIGENCE_ENDPOINT }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.deploy-databricks.result }}" == "success" ]]; then
+            echo "- **Status**: ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          echo "Cleaning up failed deployment..."
+          # Add cleanup logic here if needed
