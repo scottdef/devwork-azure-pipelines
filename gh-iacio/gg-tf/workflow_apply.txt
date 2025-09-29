@@ -1,0 +1,120 @@
+name: Terraform Apply
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+    paths:
+      - 'repo-yamls/**'
+      - 'team-yamls/**'
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to apply (NOT main)'
+        required: true
+      confirm:
+        description: 'Type "apply" to confirm'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    
+    # Only run if PR was merged OR manual dispatch with confirmation
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.confirm == 'apply' && github.event.inputs.branch != 'main')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          terraform apply -auto-approve \
+            -var="github_org=${{ secrets.GITHUB_ORG }}" \
+            -var="github_token=${{ secrets.GH_ADMIN_TOKEN }}"
+        working-directory: ./terraform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+
+      - name: Terraform Output
+        id: output
+        if: always()
+        run: terraform output -json > outputs.json
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Upload Output Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ github.sha }}
+          path: terraform/outputs.json
+          retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Apply ✅ \`${{ steps.apply.outcome }}\`
+            
+            The infrastructure changes have been applied successfully.
+            
+            *Applied by: @${{ github.actor }}*
+            *Commit: ${{ github.sha }}*
+            
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Trigger Downstream Workflows
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            // Trigger webhook or downstream workflow if needed
+            console.log('Apply completed successfully');
+            
+            // Example: Trigger another workflow
+            // await github.rest.actions.createWorkflowDispatch({
+            //   owner: context.repo.owner,
+            //   repo: 'other-repo',
+            //   workflow_id: 'workflow.yml',
+            //   ref: 'main'
+            // });
+
+      - name: Apply Status
+        if: steps.apply.outcome == 'failure'
+        run: exit 1

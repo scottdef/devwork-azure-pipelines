@@ -1,0 +1,74 @@
+# IssueOps Configuration
+# Configuration for IssueOps automation
+
+# Teams that can approve requests
+approver_teams:
+  - platform-team
+
+# Number of approvals required
+approvals_required: 2
+
+# Approval methods
+approval_methods:
+  reactions: true      # Count thumbs up reactions
+  comments: true       # Count /approve or approved comments
+
+# Valid approval comment patterns
+approval_patterns:
+  - "/approve"
+  - "approved"
+  - "/lgtm"
+
+# Auto-label configuration
+auto_labels:
+  on_approval: "approved"
+  on_pr_created: "pr-created"
+  on_error: "error"
+  pending: "pending-approval"
+
+# Team options for repository creation
+# These should match your team-yamls/*.yml files
+available_teams:
+  - platform-team
+  - data-team
+  - engineering
+  - security-team
+  - devops-team
+
+# Default repository settings
+default_repo_settings:
+  visibility: private
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_discussions: false
+  has_downloads: true
+  allow_merge_commit: false
+  allow_squash_merge: true
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  require_signed_commits: false
+
+# Workflow file template
+workflow_template: |
+  name: CI/CD Pipeline
+  
+  on:
+    push:
+      branches: [main]
+    pull_request:
+      branches: [main]
+  
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Placeholder
+          run: echo "Configure your CI/CD pipeline here"
+
+# Notification settings
+notifications:
+  slack_webhook: ""  # Optional: Slack webhook for notifications
+  teams_webhook: ""  # Optional: Microsoft Teams webhook
+  email: ""          # Optional: Email for notifications

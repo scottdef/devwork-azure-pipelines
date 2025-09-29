@@ -1,0 +1,319 @@
+name: IssueOps - Add Team Member
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to process'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  add-member:
+    name: Add Team Member
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Get Issue Details
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }}
+            });
+            
+            const labels = issue.data.labels.map(l => l.name);
+            if (!labels.includes('approved')) {
+              throw new Error('Issue is not approved yet');
+            }
+            
+            return issue.data;
+
+      - name: Parse Issue Body
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = ${{ steps.issue.outputs.result }};
+            const body = issue.body;
+            
+            const parseField = (fieldName) => {
+              const regex = new RegExp(`### ${fieldName}\\s*([\\s\\S]*?)(?=###|$)`, 'i');
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            };
+            
+            const username = parseField('GitHub Username');
+            const team = parseField('Team');
+            const role = parseField('Role').toLowerCase();
+            const justification = parseField('Justification');
+            
+            if (!username || !team || !role) {
+              throw new Error('Missing required fields');
+            }
+            
+            return {
+              username: username,
+              team: team,
+              role: role,
+              justification: justification
+            };
+
+      - name: Verify User Exists
+        id: verify_user
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const data = ${{ steps.parse.outputs.result }};
+            
+            try {
+              const user = await github.rest.users.getByUsername({
+                username: data.username
+              });
+              console.log(`User ${data.username} exists`);
+              return true;
+            } catch (error) {
+              console.log(`User ${data.username} does not exist`);
+              throw new Error(`GitHub user ${data.username} not found`);
+            }
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Branch
+        run: |
+          git checkout -b request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Add Team Member to YAML
+        id: add_member
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import sys
+          from pathlib import Path
+          
+          data = ${{ steps.parse.outputs.result }}
+          team = data['team']
+          username = data['username']
+          role = data['role']
+          
+          yaml_file = Path(f'team-yamls/{team}.yml')
+          
+          if not yaml_file.exists():
+              print(f"Error: Team YAML file not found: {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          with open(yaml_file) as f:
+              content = yaml.safe_load(f)
+          
+          if not content or 'teams' not in content:
+              print(f"Error: No teams found in {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          # Find the team and add member
+          team_found = False
+          for t in content['teams']:
+              if t['name'] == team:
+                  team_found = True
+                  members = t.setdefault('members', [])
+                  
+                  # Check if member already exists
+                  if any(m['username'] == username for m in members):
+                      print(f"Error: User {username} already exists in {team}", file=sys.stderr)
+                      sys.exit(1)
+                  
+                  # Add new member
+                  members.append({
+                      'username': username,
+                      'role': role
+                  })
+                  
+                  print(f"Added {username} to {team} as {role}")
+                  break
+          
+          if not team_found:
+              print(f"Error: Team {team} not found in {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          # Write back
+          with open(yaml_file, 'w') as f:
+              yaml.dump(content, f, default_flow_style=False, sort_keys=False)
+          
+          print(f"yaml_file={yaml_file}")
+          PYTHON_SCRIPT
+          
+          echo "yaml_file=team-yamls/${{ fromJson(steps.parse.outputs.result).team }}.yml" >> $GITHUB_OUTPUT
+
+      - name: Validate YAML
+        run: |
+          python3 scripts/validate-yaml.py || {
+            echo "YAML validation failed!"
+            exit 1
+          }
+
+      - name: Commit Changes
+        run: |
+          git add team-yamls/
+          
+          cat > /tmp/commit-msg <<EOF
+          Add team member: ${{ fromJson(steps.parse.outputs.result).username }} to ${{ fromJson(steps.parse.outputs.result).team }}
+          
+          Added via IssueOps
+          Issue: #${{ github.event.inputs.issue_number }}
+          Team: ${{ fromJson(steps.parse.outputs.result).team }}
+          Role: ${{ fromJson(steps.parse.outputs.result).role }}
+          
+          Justification: ${{ fromJson(steps.parse.outputs.result).justification }}
+          
+          Changes:
+          - Added ${{ fromJson(steps.parse.outputs.result).username }} to ${{ steps.add_member.outputs.yaml_file }}
+          EOF
+          
+          git commit -F /tmp/commit-msg
+
+      - name: Push Branch
+        run: |
+          git push origin request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const data = ${{ steps.parse.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[IssueOps] Add @${data.username} to ${data.team}`,
+              head: `request/issue-${issueNumber}`,
+              base: 'main',
+              body: `## Add Team Member Request
+            
+            This PR was automatically generated from issue #${issueNumber}.
+            
+            ### Member Details
+            - **Username**: @${data.username}
+            - **Team**: \`${data.team}\`
+            - **Role**: \`${data.role}\`
+            - **Justification**: ${data.justification}
+            
+            ### Changes
+            - Added @${data.username} to \`${{ steps.add_member.outputs.yaml_file }}\`
+            
+            ### What This Grants
+            
+            As a **${data.role}** of \`${data.team}\`:
+            ${data.role === 'maintainer' 
+              ? '- Full team management permissions\n- Can add/remove team members\n- Access to all team repositories'
+              : '- Access to all team repositories\n- Can view and contribute to team projects'}
+            
+            ### Next Steps
+            1. Review the Terraform plan (will be posted automatically)
+            2. Two reviewers must approve this PR
+            3. Merge to add user to team via Terraform
+            4. User will receive GitHub notification of team addition
+            
+            Closes #${issueNumber}
+            
+            ---
+            
+            *Automated by IssueOps* 🤖`
+            });
+            
+            return pr.data;
+
+      - name: Comment on Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = ${{ steps.create_pr.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            const data = ${{ steps.parse.outputs.result }};
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 👥 Team Addition Request Processed
+            
+            Your team member addition request has been processed!
+            
+            **Pull Request**: #${pr.number}
+            **Branch**: \`request/issue-${issueNumber}\`
+            **User**: @${data.username}
+            **Team**: \`${data.team}\`
+            **Role**: \`${data.role}\`
+            
+            ### What's Next?
+            1. The Terraform plan will run automatically
+            2. Two reviewers must approve the PR
+            3. Once merged, @${data.username} will be added to the team
+            4. User will receive a GitHub notification
+            
+            [View Pull Request](${pr.html_url})
+            
+            ---
+            
+            *This issue will be automatically closed when the PR is merged.*`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['pr-created']
+            });
+
+      - name: Handle Errors
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              body: `## ❌ Error Processing Request
+            
+            The automation workflow encountered an error.
+            
+            **Workflow Run**: [View logs](${context.payload.repository.html_url}/actions/runs/${context.runId})
+            
+            Common issues:
+            - GitHub username doesn't exist
+            - User already in team
+            - Team YAML file not found
+            - YAML validation failed
+            
+            Please check the logs and try again, or contact @platform-team for assistance.`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              labels: ['error']
+            });

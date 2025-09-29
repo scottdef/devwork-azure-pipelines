@@ -1,0 +1,124 @@
+name: Workflow Trigger & Webhook
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_workflow:
+        description: 'Target workflow to trigger (plan/apply)'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+      target_repo:
+        description: 'Target repository (leave empty for this repo)'
+        required: false
+      target_branch:
+        description: 'Target branch'
+        required: false
+        default: 'main'
+      webhook_url:
+        description: 'Webhook URL to notify (optional)'
+        required: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  trigger-workflow:
+    name: Trigger Workflow
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Repository
+        id: repo
+        run: |
+          if [ -z "${{ github.event.inputs.target_repo }}" ]; then
+            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+            echo "owner=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+            echo "repo_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            echo "repo=${{ github.event.inputs.target_repo }}" >> $GITHUB_OUTPUT
+            IFS='/' read -r owner repo_name <<< "${{ github.event.inputs.target_repo }}"
+            echo "owner=${owner}" >> $GITHUB_OUTPUT
+            echo "repo_name=${repo_name}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Plan Workflow
+        if: github.event.inputs.target_workflow == 'plan'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const response = await github.rest.actions.createWorkflowDispatch({
+              owner: '${{ steps.repo.outputs.owner }}',
+              repo: '${{ steps.repo.outputs.repo_name }}',
+              workflow_id: 'terraform-plan.yml',
+              ref: '${{ github.event.inputs.target_branch }}',
+              inputs: {
+                branch: '${{ github.event.inputs.target_branch }}'
+              }
+            });
+            console.log('Triggered plan workflow:', response.status);
+
+      - name: Trigger Apply Workflow
+        if: github.event.inputs.target_workflow == 'apply'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const response = await github.rest.actions.createWorkflowDispatch({
+              owner: '${{ steps.repo.outputs.owner }}',
+              repo: '${{ steps.repo.outputs.repo_name }}',
+              workflow_id: 'terraform-apply.yml',
+              ref: '${{ github.event.inputs.target_branch }}',
+              inputs: {
+                branch: '${{ github.event.inputs.target_branch }}',
+                confirm: 'apply'
+              }
+            });
+            console.log('Triggered apply workflow:', response.status);
+
+      - name: Send Webhook Notification
+        if: github.event.inputs.webhook_url != ''
+        run: |
+          curl -X POST "${{ github.event.inputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: workflow_dispatch" \
+            -d '{
+              "event": "terraform_workflow_triggered",
+              "workflow": "${{ github.event.inputs.target_workflow }}",
+              "repository": "${{ steps.repo.outputs.repo }}",
+              "branch": "${{ github.event.inputs.target_branch }}",
+              "triggered_by": "${{ github.actor }}",
+              "run_id": "${{ github.run_id }}",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }'
+
+      - name: Create Commit with Workflow Run Info
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          mkdir -p .workflow-runs
+          cat > .workflow-runs/run-${{ github.run_id }}.json << EOF
+          {
+            "run_id": "${{ github.run_id }}",
+            "workflow": "${{ github.event.inputs.target_workflow }}",
+            "target_repo": "${{ steps.repo.outputs.repo }}",
+            "target_branch": "${{ github.event.inputs.target_branch }}",
+            "triggered_by": "${{ github.actor }}",
+            "triggered_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          
+          git add .workflow-runs/run-${{ github.run_id }}.json
+          git commit -m "Workflow trigger: ${{ github.event.inputs.target_workflow }} on ${{ github.event.inputs.target_branch }}" || true
+          git push || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}

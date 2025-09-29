@@ -1,0 +1,344 @@
+name: IssueOps - Create Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to process'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  create-repo:
+    name: Create Repository
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Get Issue Details
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }}
+            });
+            
+            // Check if approved
+            const labels = issue.data.labels.map(l => l.name);
+            if (!labels.includes('approved')) {
+              throw new Error('Issue is not approved yet');
+            }
+            
+            return issue.data;
+
+      - name: Parse Issue Body
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = ${{ steps.issue.outputs.result }};
+            const body = issue.body;
+            
+            // Parse GitHub issue form format
+            const parseField = (fieldName) => {
+              const regex = new RegExp(`### ${fieldName}\\s*([\\s\\S]*?)(?=###|$)`, 'i');
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            };
+            
+            const parseCheckboxes = (fieldName) => {
+              const section = parseField(fieldName);
+              return section.split('\n')
+                .filter(line => line.includes('- [x]') || line.includes('- [X]'))
+                .map(line => line.replace(/- \[x\]/i, '').trim())
+                .filter(item => item.length > 0);
+            };
+            
+            const repoName = parseField('Repository Name');
+            const workflowFile = parseField('Workflow Filename');
+            const team = parseField('Responsible Team');
+            const description = parseField('Repository Description');
+            const visibility = parseField('Visibility');
+            const features = parseCheckboxes('Repository Features');
+            const requirements = parseCheckboxes('Requirements & Compliance');
+            
+            // Validate
+            if (!repoName || !workflowFile || !team || !description) {
+              throw new Error('Missing required fields');
+            }
+            
+            // Normalize repo name
+            const normalizedName = repoName.toLowerCase()
+              .replace(/[^a-z0-9-]/g, '-')
+              .replace(/^-+|-+$/g, '');
+            
+            return {
+              repo_name: normalizedName,
+              workflow_file: workflowFile,
+              team: team,
+              description: description,
+              visibility: visibility.toLowerCase(),
+              has_issues: features.includes('Issues'),
+              has_projects: features.includes('Projects'),
+              has_wiki: features.includes('Wiki'),
+              has_discussions: features.includes('Discussions'),
+              require_signed_commits: requirements.some(r => r.includes('signed commits'))
+            };
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Branch
+        run: |
+          git checkout -b request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Update Repository YAML
+        id: update_repo_yaml
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import sys
+          from pathlib import Path
+          
+          # Parse the repository data
+          data = ${{ steps.parse.outputs.result }}
+          
+          # Determine which YAML file to update
+          team = data['team']
+          yaml_file = Path(f'repo-yamls/{team}-repos.yml')
+          
+          # Create file if it doesn't exist
+          if not yaml_file.exists():
+              yaml_file.parent.mkdir(parents=True, exist_ok=True)
+              content = {'repos': []}
+          else:
+              with open(yaml_file) as f:
+                  content = yaml.safe_load(f) or {'repos': []}
+          
+          # Check if repo already exists
+          existing = [r for r in content.get('repos', []) if r['name'] == data['repo_name']]
+          if existing:
+              print(f"Error: Repository {data['repo_name']} already exists", file=sys.stderr)
+              sys.exit(1)
+          
+          # Add new repository
+          new_repo = {
+              'name': data['repo_name'],
+              'description': data['description'],
+              'team': data['team'],
+              'visibility': data['visibility'],
+              'has_issues': data['has_issues'],
+              'has_projects': data['has_projects'],
+              'has_wiki': data['has_wiki'],
+              'has_discussions': data['has_discussions'],
+              'permission': 'push'
+          }
+          
+          if data['require_signed_commits']:
+              new_repo['require_signed_commits'] = True
+          
+          content['repos'].append(new_repo)
+          
+          # Write back
+          with open(yaml_file, 'w') as f:
+              yaml.dump(content, f, default_flow_style=False, sort_keys=False)
+          
+          print(f"Updated {yaml_file}")
+          print(f"yaml_file={yaml_file}", file=sys.stdout)
+          PYTHON_SCRIPT
+          
+          # Capture output
+          echo "yaml_file=repo-yamls/${{ fromJson(steps.parse.outputs.result).team }}-repos.yml" >> $GITHUB_OUTPUT
+
+      - name: Create Empty Workflow File
+        run: |
+          workflow_file="${{ fromJson(steps.parse.outputs.result).workflow_file }}"
+          workflow_path=".github/workflows/${workflow_file}"
+          
+          # Create workflow directory if needed
+          mkdir -p "$(dirname "$workflow_path")"
+          
+          # Create empty workflow with basic structure
+          cat > "$workflow_path" <<'EOF'
+          name: Placeholder Workflow
+          
+          # This workflow was created via IssueOps
+          # Issue: #${{ github.event.inputs.issue_number }}
+          # Replace this with your actual workflow configuration
+          
+          on:
+            workflow_dispatch:
+          
+          jobs:
+            placeholder:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Placeholder
+                  run: echo "Replace this workflow with your configuration"
+          EOF
+          
+          echo "Created workflow: $workflow_path"
+          echo "workflow_path=$workflow_path" >> $GITHUB_OUTPUT
+        id: create_workflow
+
+      - name: Validate YAML
+        run: |
+          # Validate the updated YAML file
+          python3 scripts/validate-yaml.py || {
+            echo "YAML validation failed!"
+            exit 1
+          }
+
+      - name: Commit Changes
+        run: |
+          git add repo-yamls/
+          git add .github/workflows/
+          
+          cat > /tmp/commit-msg <<EOF
+          Add repository: ${{ fromJson(steps.parse.outputs.result).repo_name }}
+          
+          Created via IssueOps
+          Issue: #${{ github.event.inputs.issue_number }}
+          Team: ${{ fromJson(steps.parse.outputs.result).team }}
+          
+          Changes:
+          - Added ${{ fromJson(steps.parse.outputs.result).repo_name }} to ${{ steps.update_repo_yaml.outputs.yaml_file }}
+          - Created workflow file: ${{ steps.create_workflow.outputs.workflow_path }}
+          EOF
+          
+          git commit -F /tmp/commit-msg
+
+      - name: Push Branch
+        run: |
+          git push origin request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const repoData = ${{ steps.parse.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[IssueOps] Add repository: ${repoData.repo_name}`,
+              head: `request/issue-${issueNumber}`,
+              base: 'main',
+              body: `## Repository Creation Request
+            
+            This PR was automatically generated from issue #${issueNumber}.
+            
+            ### Repository Details
+            - **Name**: \`${repoData.repo_name}\`
+            - **Team**: \`${repoData.team}\`
+            - **Visibility**: \`${repoData.visibility}\`
+            - **Description**: ${repoData.description}
+            
+            ### Features Enabled
+            - Issues: ${repoData.has_issues ? '✅' : '❌'}
+            - Projects: ${repoData.has_projects ? '✅' : '❌'}
+            - Wiki: ${repoData.has_wiki ? '✅' : '❌'}
+            - Discussions: ${repoData.has_discussions ? '✅' : '❌'}
+            - Signed Commits: ${repoData.require_signed_commits ? '✅' : '❌'}
+            
+            ### Changes
+            - Updated \`${{ steps.update_repo_yaml.outputs.yaml_file }}\`
+            - Created workflow \`${{ steps.create_workflow.outputs.workflow_path }}\`
+            
+            ### Next Steps
+            1. Review the Terraform plan (will be posted automatically)
+            2. Two reviewers must approve this PR
+            3. Merge to create the repository via Terraform
+            
+            Closes #${issueNumber}
+            
+            ---
+            
+            *Automated by IssueOps* 🤖`
+            });
+            
+            return pr.data;
+
+      - name: Comment on Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = ${{ steps.create_pr.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 🚀 Pull Request Created
+            
+            Your repository creation request has been processed!
+            
+            **Pull Request**: #${pr.number}
+            **Branch**: \`request/issue-${issueNumber}\`
+            
+            ### What's Next?
+            1. The Terraform plan will run automatically
+            2. Two reviewers must approve the PR
+            3. Once merged, Terraform will create your repository
+            
+            [View Pull Request](${pr.html_url})
+            
+            ---
+            
+            *This issue will be automatically closed when the PR is merged.*`
+            });
+            
+            // Add label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['pr-created']
+            });
+
+      - name: Handle Errors
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              body: `## ❌ Error Processing Request
+            
+            The automation workflow encountered an error while processing this request.
+            
+            **Workflow Run**: [View logs](${context.payload.repository.html_url}/actions/runs/${context.runId})
+            
+            Please check the logs and try again, or contact @platform-team for assistance.`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              labels: ['error']
+            });

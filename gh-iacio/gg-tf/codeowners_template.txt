@@ -1,0 +1,13 @@
+# CODEOWNERS
+# This file is managed by Terraform. Manual edits will be overwritten.
+#
+# These owners will be the default owners for everything in the repo.
+# Unless a later match takes precedence, these teams will be requested
+# for review when someone opens a pull request.
+
+* ${parent_team} ${pr_approvers_team}
+
+# You can add additional patterns below this line
+# Example:
+# /docs/ @your-org/docs-team
+# *.js @your-org/js-team

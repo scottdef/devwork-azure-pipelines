@@ -1,0 +1,290 @@
+name: IssueOps - Delete Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to process'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  delete-repo:
+    name: Delete Repository
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Get Issue Details
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }}
+            });
+            
+            const labels = issue.data.labels.map(l => l.name);
+            if (!labels.includes('approved')) {
+              throw new Error('Issue is not approved yet');
+            }
+            
+            return issue.data;
+
+      - name: Parse Issue Body
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = ${{ steps.issue.outputs.result }};
+            const body = issue.body;
+            
+            const parseField = (fieldName) => {
+              const regex = new RegExp(`### ${fieldName}\\s*([\\s\\S]*?)(?=###|$)`, 'i');
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            };
+            
+            const repoName = parseField('Repository Name');
+            const team = parseField('Repository Team');
+            const reason = parseField('Reason for Deletion');
+            
+            if (!repoName || !team) {
+              throw new Error('Missing required fields');
+            }
+            
+            const normalizedName = repoName.toLowerCase()
+              .replace(/[^a-z0-9-]/g, '-')
+              .replace(/^-+|-+$/g, '');
+            
+            return {
+              repo_name: normalizedName,
+              team: team,
+              reason: reason
+            };
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Branch
+        run: |
+          git checkout -b request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Remove Repository from YAML
+        id: remove_repo
+        run: |
+          python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import sys
+          from pathlib import Path
+          
+          data = ${{ steps.parse.outputs.result }}
+          team = data['team']
+          repo_name = data['repo_name']
+          
+          yaml_file = Path(f'repo-yamls/{team}-repos.yml')
+          
+          if not yaml_file.exists():
+              print(f"Error: YAML file not found: {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          with open(yaml_file) as f:
+              content = yaml.safe_load(f)
+          
+          if not content or 'repos' not in content:
+              print(f"Error: No repos found in {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          # Find and remove the repo
+          original_count = len(content['repos'])
+          content['repos'] = [r for r in content['repos'] if r['name'] != repo_name]
+          
+          if len(content['repos']) == original_count:
+              print(f"Error: Repository {repo_name} not found in {yaml_file}", file=sys.stderr)
+              sys.exit(1)
+          
+          # Write back
+          with open(yaml_file, 'w') as f:
+              yaml.dump(content, f, default_flow_style=False, sort_keys=False)
+          
+          print(f"Removed {repo_name} from {yaml_file}")
+          print(f"yaml_file={yaml_file}")
+          PYTHON_SCRIPT
+          
+          echo "yaml_file=repo-yamls/${{ fromJson(steps.parse.outputs.result).team }}-repos.yml" >> $GITHUB_OUTPUT
+
+      - name: Validate YAML
+        run: |
+          python3 scripts/validate-yaml.py || {
+            echo "YAML validation failed!"
+            exit 1
+          }
+
+      - name: Commit Changes
+        run: |
+          git add repo-yamls/
+          
+          cat > /tmp/commit-msg <<EOF
+          Remove repository: ${{ fromJson(steps.parse.outputs.result).repo_name }}
+          
+          Deleted via IssueOps
+          Issue: #${{ github.event.inputs.issue_number }}
+          Team: ${{ fromJson(steps.parse.outputs.result).team }}
+          Reason: ${{ fromJson(steps.parse.outputs.result).reason }}
+          
+          Changes:
+          - Removed ${{ fromJson(steps.parse.outputs.result).repo_name }} from ${{ steps.remove_repo.outputs.yaml_file }}
+          
+          ⚠️  MANUAL STEP REQUIRED: Delete the actual GitHub repository manually
+          EOF
+          
+          git commit -F /tmp/commit-msg
+
+      - name: Push Branch
+        run: |
+          git push origin request/issue-${{ github.event.inputs.issue_number }}
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const repoData = ${{ steps.parse.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[IssueOps] Delete repository: ${repoData.repo_name}`,
+              head: `request/issue-${issueNumber}`,
+              base: 'main',
+              body: `## Repository Deletion Request
+            
+            This PR was automatically generated from issue #${issueNumber}.
+            
+            ### Repository Details
+            - **Name**: \`${repoData.repo_name}\`
+            - **Team**: \`${repoData.team}\`
+            - **Reason**: ${repoData.reason}
+            
+            ### Changes
+            - Removed \`${repoData.repo_name}\` from \`${{ steps.remove_repo.outputs.yaml_file }}\`
+            
+            ### ⚠️ IMPORTANT: Manual Step Required
+            
+            After this PR is merged, you **MUST** manually delete the GitHub repository:
+            
+            \`\`\`bash
+            # Using gh CLI
+            gh repo delete ${context.repo.owner}/${repoData.repo_name}
+            
+            # Or use GitHub web UI
+            # https://github.com/${context.repo.owner}/${repoData.repo_name}/settings
+            \`\`\`
+            
+            ### Next Steps
+            1. Review the Terraform plan (will be posted automatically)
+            2. Two reviewers must approve this PR
+            3. Merge to remove from Terraform state
+            4. **Manually delete the GitHub repository**
+            
+            Closes #${issueNumber}
+            
+            ---
+            
+            *Automated by IssueOps* 🤖`
+            });
+            
+            return pr.data;
+
+      - name: Comment on Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = ${{ steps.create_pr.outputs.result }};
+            const issueNumber = ${{ github.event.inputs.issue_number }};
+            const repoData = ${{ steps.parse.outputs.result }};
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 🗑️ Deletion Request Processed
+            
+            Your repository deletion request has been processed!
+            
+            **Pull Request**: #${pr.number}
+            **Branch**: \`request/issue-${issueNumber}\`
+            
+            ### What's Next?
+            1. The Terraform plan will run automatically
+            2. Two reviewers must approve the PR
+            3. Once merged, **you must manually delete the repository**:
+               \`\`\`bash
+               gh repo delete ${context.repo.owner}/${repoData.repo_name}
+               \`\`\`
+            
+            [View Pull Request](${pr.html_url})
+            
+            ### ⚠️ Remember
+            The automation only removes the repository from YAML files. You must delete the actual GitHub repository manually for safety.
+            
+            ---
+            
+            *This issue will be automatically closed when the PR is merged.*`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['pr-created']
+            });
+
+      - name: Handle Errors
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              body: `## ❌ Error Processing Deletion Request
+            
+            The automation workflow encountered an error.
+            
+            **Workflow Run**: [View logs](${context.payload.repository.html_url}/actions/runs/${context.runId})
+            
+            Common issues:
+            - Repository not found in YAML files
+            - YAML file doesn't exist for team
+            - YAML validation failed
+            
+            Please check the logs and try again, or contact @platform-team for assistance.`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+              labels: ['error']
+            });

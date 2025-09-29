@@ -1,0 +1,178 @@
+# Makefile for GitHub Governance
+# Simple. Clean. Unix.
+
+.PHONY: help validate validate-bash validate-python plan apply fmt clean install-tools
+
+# Colors for output
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+NC := \033[0m # No Color
+
+help: ## Show this help message
+	@echo "GitHub Governance - Make targets:"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+
+validate: validate-python ## Run all validations (default: Python validator)
+	@echo "$(GREEN)✓ Validation complete$(NC)"
+
+validate-bash: ## Validate using bash script (requires yq)
+	@echo "Running bash validation..."
+	@./scripts/parse-yamls.sh validate
+
+validate-python: ## Validate using Python script (comprehensive)
+	@echo "Running Python validation..."
+	@python3 scripts/validate-yaml.py
+
+list-repos: ## List all repositories defined in YAMLs
+	@./scripts/parse-yamls.sh list-repos
+
+list-teams: ## List all teams defined in YAMLs
+	@./scripts/parse-yamls.sh list-teams
+
+init: ## Initialize Terraform
+	@echo "Initializing Terraform..."
+	@cd terraform && terraform init
+
+plan: init validate ## Run Terraform plan
+	@echo "Running Terraform plan..."
+	@cd terraform && terraform plan \
+		-var="github_org=$(GITHUB_ORG)" \
+		-var="github_token=$(GITHUB_TOKEN)"
+
+apply: init validate ## Run Terraform apply (requires confirmation)
+	@echo "$(YELLOW)⚠ This will apply changes to GitHub$(NC)"
+	@read -p "Type 'yes' to continue: " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@cd terraform && terraform apply \
+		-var="github_org=$(GITHUB_ORG)" \
+		-var="github_token=$(GITHUB_TOKEN)"
+
+fmt: ## Format Terraform files
+	@echo "Formatting Terraform files..."
+	@cd terraform && terraform fmt -recursive
+
+clean: ## Clean Terraform state and artifacts
+	@echo "Cleaning Terraform artifacts..."
+	@rm -rf terraform/.terraform
+	@rm -f terraform/tfplan
+	@rm -f terraform/plan.txt
+	@rm -f terraform/outputs.json
+	@echo "$(GREEN)✓ Clean complete$(NC)"
+
+install-tools: ## Install required tools (yq, terraform)
+	@echo "Checking required tools..."
+	@which terraform >/dev/null 2>&1 || (echo "$(RED)✗ terraform not found$(NC)" && exit 1)
+	@which python3 >/dev/null 2>&1 || (echo "$(RED)✗ python3 not found$(NC)" && exit 1)
+	@which yq >/dev/null 2>&1 || echo "$(YELLOW)⚠ yq not found (optional for bash validation)$(NC)"
+	@which gh >/dev/null 2>&1 || echo "$(YELLOW)⚠ gh CLI not found (optional for workflows)$(NC)"
+	@echo "$(GREEN)✓ Required tools installed$(NC)"
+
+test: validate ## Alias for validate
+	@echo "$(GREEN)✓ Tests passed$(NC)"
+
+check: validate fmt ## Validate and check formatting
+	@echo "$(GREEN)✓ All checks passed$(NC)"
+
+# Development helpers
+watch: ## Watch for YAML changes and validate
+	@echo "Watching for changes (requires fswatch or inotifywait)..."
+	@if command -v fswatch >/dev/null 2>&1; then \
+		fswatch -o repo-yamls/ team-yamls/ | xargs -n1 -I{} make validate; \
+	elif command -v inotifywait >/dev/null 2>&1; then \
+		while inotifywait -r -e modify repo-yamls/ team-yamls/; do make validate; done; \
+	else \
+		echo "$(RED)✗ fswatch or inotifywait required$(NC)"; \
+		exit 1; \
+	fi
+
+graph: ## Generate Terraform dependency graph (requires graphviz)
+	@cd terraform && terraform graph | dot -Tpng > ../graph.png
+	@echo "$(GREEN)✓ Graph saved to graph.png$(NC)"
+
+show: ## Show current Terraform state
+	@cd terraform && terraform show
+
+output: ## Show Terraform outputs
+	@cd terraform && terraform output -json | python3 -m json.tool
+
+# Quick adds
+add-repo: ## Quick add repository (interactive)
+	@echo "Add new repository"
+	@read -p "Repository name: " name; \
+	read -p "Team name: " team; \
+	read -p "Description: " desc; \
+	read -p "YAML file (e.g., platform-repos.yml): " file; \
+	echo "  - name: $$name" >> repo-yamls/$$file; \
+	echo "    description: \"$$desc\"" >> repo-yamls/$$file; \
+	echo "    team: $$team" >> repo-yamls/$$file; \
+	echo "    visibility: private" >> repo-yamls/$$file; \
+	echo "$(GREEN)✓ Added to repo-yamls/$$file$(NC)"; \
+	make validate
+
+add-team: ## Quick add team (interactive)
+	@echo "Add new team"
+	@read -p "Team name: " name; \
+	read -p "Description: " desc; \
+	read -p "AD group (optional): " ad; \
+	read -p "YAML file (e.g., platform-team.yml): " file; \
+	echo "  - name: $$name" >> team-yamls/$$file; \
+	echo "    description: \"$$desc\"" >> team-yamls/$$file; \
+	echo "    privacy: closed" >> team-yamls/$$file; \
+	[ -n "$ad" ] && echo "    ad_group: \"$ad\"" >> team-yamls/$file || true; \
+	echo "    members: []" >> team-yamls/$file; \
+	echo "$(GREEN)✓ Added to team-yamls/$file$(NC)"; \
+	make validate
+
+# IssueOps targets
+issueops-bootstrap: ## Bootstrap IssueOps system (one-time setup)
+	@echo "$(BLUE)Bootstrapping IssueOps...$(NC)"
+	@./scripts/bootstrap-issueops.sh
+
+issueops-test: ## Test IssueOps configuration
+	@echo "$(BLUE)Testing IssueOps setup...$(NC)"
+	@./scripts/test-issueops.sh
+
+issueops-dashboard: ## Show IssueOps dashboard with all requests
+	@./scripts/issueops-dashboard.sh
+
+issueops-pending: ## Show pending approval requests
+	@./scripts/issueops-dashboard.sh pending
+
+issueops-stats: ## Show IssueOps statistics
+	@./scripts/issueops-dashboard.sh stats
+
+issueops-errors: ## Show failed IssueOps requests
+	@./scripts/issueops-dashboard.sh errors
+
+issueops-approve: ## Approve an IssueOps request (requires ISSUE_NUM)
+	@if [ -z "$(ISSUE_NUM)" ]; then \
+		echo "$(RED)Error: ISSUE_NUM not set$(NC)"; \
+		echo "Usage: make issueops-approve ISSUE_NUM=123"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)Approving issue #$(ISSUE_NUM)...$(NC)"
+	@gh issue comment $(ISSUE_NUM) --body "/approve"
+	@echo "$(GREEN)✓ Approval submitted$(NC)"
+
+issueops-create: ## Create repository via CLI (interactive)
+	@echo "$(BLUE)Create Repository via IssueOps$(NC)"
+	@echo "Or use: gh issue create --template create-repo.yml"
+	@gh issue create --repo $(shell gh repo view --json nameWithOwner -q .nameWithOwner) \
+		--title "[REPO] Create: " \
+		--label "issueops,create-repo,pending-approval" \
+		--web
+
+issueops-list: ## List all IssueOps requests
+	@gh issue list --label issueops
+
+issueops-watch: ## Watch for new IssueOps requests (live updates)
+	@echo "$(BLUE)Watching for IssueOps requests... (Ctrl+C to stop)$(NC)"
+	@while true; do \
+		clear; \
+		make issueops-dashboard; \
+		sleep 30; \
+	done
+
+.DEFAULT_GOAL := help

@@ -1,0 +1,34 @@
+# Platform Team Repositories
+# This file defines all repositories owned by the platform team
+
+repos:
+  - name: platform-api
+    description: "Core platform API service"
+    team: platform-team
+    visibility: private
+    has_issues: true
+    has_wiki: false
+    has_projects: false
+    permission: push
+    require_signed_commits: false
+    
+  - name: platform-infrastructure
+    description: "Infrastructure as Code for platform"
+    team: platform-team
+    visibility: private
+    has_issues: true
+    permission: push
+    
+  - name: platform-shared-libraries
+    description: "Shared libraries and utilities"
+    team: platform-team
+    visibility: private
+    has_issues: true
+    
+  - name: platform-documentation
+    description: "Platform documentation and runbooks"
+    team: platform-team
+    visibility: private
+    has_issues: true
+    has_wiki: true
+    permission: push

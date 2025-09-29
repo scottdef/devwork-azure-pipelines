@@ -1,0 +1,128 @@
+name: IssueOps - Cleanup
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  cleanup:
+    name: Cleanup Closed Issue
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.issue.labels.*.name, 'issueops') &&
+      !contains(github.event.issue.labels.*.name, 'pr-created')
+    
+    steps:
+      - name: Check if Issue was Rejected
+        id: check_rejection
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+            
+            // Check if approved but not processed
+            const wasApproved = labels.includes('approved');
+            const prCreated = labels.includes('pr-created');
+            
+            return {
+              was_approved: wasApproved,
+              pr_created: prCreated,
+              should_cleanup: wasApproved && !prCreated
+            };
+
+      - name: Checkout Repository
+        if: fromJson(steps.check_rejection.outputs.result).should_cleanup
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+
+      - name: Delete Branch if Exists
+        if: fromJson(steps.check_rejection.outputs.result).should_cleanup
+        run: |
+          issue_num=${{ github.event.issue.number }}
+          branch="request/issue-${issue_num}"
+          
+          # Check if branch exists
+          if git ls-remote --heads origin "$branch" | grep -q "$branch"; then
+            echo "Deleting branch: $branch"
+            git push origin --delete "$branch" || true
+          else
+            echo "Branch $branch does not exist, nothing to clean up"
+          fi
+        continue-on-error: true
+
+      - name: Comment on Closed Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const result = ${{ steps.check_rejection.outputs.result }};
+            
+            let message = '';
+            
+            if (result.pr_created) {
+              // Issue closed with PR created - normal flow
+              message = `Issue closed. The associated PR should handle the rest.`;
+            } else if (result.was_approved) {
+              // Approved but closed before PR created
+              message = `## 🗑️ Request Cancelled
+              
+              This request was approved but closed before automation completed.
+              
+              Any branches or drafts have been cleaned up.
+              
+              To reopen this request, create a new issue.`;
+            } else {
+              // Closed without approval - rejected or cancelled
+              message = `## ❌ Request Closed
+              
+              This request was closed without approval.
+              
+              **Common reasons**:
+              - Request withdrawn by requester
+              - Duplicate request
+              - Did not meet requirements
+              - Better handled another way
+              
+              If you believe this was closed in error, please create a new issue with more details.`;
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: message
+            });
+
+      - name: Remove Pending Labels
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const labelsToRemove = ['pending-approval', 'approved'];
+            
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label
+                });
+              } catch (error) {
+                // Label might not exist, ignore
+              }
+            }
+            
+            // Add closed label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['closed']
+            });

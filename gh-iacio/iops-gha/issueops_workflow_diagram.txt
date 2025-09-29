@@ -1,0 +1,406 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       ISSUEOPS WORKFLOW DIAGRAM                                ║
+║                                                                                ║
+║  Complete flow from issue creation to infrastructure deployment                ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: USER CREATES ISSUE                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+         User navigates to: Issues → New Issue
+                           │
+                           ▼
+         ┌──────────────────────────────────────┐
+         │   Select Issue Template:              │
+         │   ├─ Create Repository                │
+         │   ├─ Delete Repository                │
+         │   └─ Add Team Member                  │
+         └──────────────┬───────────────────────┘
+                        │
+                        ▼
+         ┌──────────────────────────────────────┐
+         │   Fill Out Form:                      │
+         │   • Repository name / Team name       │
+         │   • Description / Justification       │
+         │   • Options & confirmations           │
+         └──────────────┬───────────────────────┘
+                        │
+                        ▼
+         ┌──────────────────────────────────────┐
+         │   Submit Issue                        │
+         │                                       │
+         │   Auto-labeled:                       │
+         │   • issueops                          │
+         │   • [operation-type]                  │
+         │   • pending-approval                  │
+         └──────────────┬───────────────────────┘
+                        │
+                        └──────────► Issue #42 Created
+                                            │
+                                            ▼
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: APPROVAL TRACKING                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    [issueops-approval.yml triggers]
+                                  │
+                                  ▼
+              ┌────────────────────────────────────┐
+              │  Workflow watches for:              │
+              │  • 👍 reactions on issue            │
+              │  • Comments: /approve, approved     │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │  Validate Approver:                 │
+              │  1. Extract username                │
+              │  2. Query GitHub API                │
+              │  3. Check platform-team membership  │
+              └─────────────┬──────────────────────┘
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+            Valid ✓                 Invalid ✗
+                │                       │
+                ▼                       ▼
+    ┌───────────────────────┐  ┌────────────────────────┐
+    │ Add approval to count │  │ Comment: "Only         │
+    │ Post status update    │  │ platform-team can      │
+    └──────────┬────────────┘  │ approve"               │
+               │               └────────────────────────┘
+               ▼
+    ┌───────────────────────┐
+    │ Count < 2?            │
+    └──────────┬────────────┘
+               │
+      ┌────────┴────────┐
+      │                 │
+   Yes (wait)         No (proceed)
+      │                 │
+      ▼                 ▼
+  [Post status]    ┌────────────────────────┐
+  "1/2 approvals"  │ Update labels:         │
+                   │ • Remove pending       │
+                   │ • Add approved         │
+                   └──────────┬─────────────┘
+                              │
+                              ▼
+                   ┌────────────────────────┐
+                   │ Post comment:          │
+                   │ "✅ Approved by        │
+                   │  @alice, @bob"         │
+                   └──────────┬─────────────┘
+                              │
+                              ▼
+                   ┌────────────────────────┐
+                   │ Determine operation:   │
+                   │ • create-repo label?   │
+                   │ • delete-repo label?   │
+                   │ • add-member label?    │
+                   └──────────┬─────────────┘
+                              │
+                              ▼
+                   ┌────────────────────────┐
+                   │ Trigger workflow:      │
+                   │ workflow_dispatch      │
+                   │ issue_number: 42       │
+                   └──────────┬─────────────┘
+                              │
+                              ▼
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: OPERATION WORKFLOW                                                   │
+│         (Example: issueops-create-repo.yml)                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+            [Workflow triggered with issue_number: 42]
+                              │
+                              ▼
+              ┌────────────────────────────────────┐
+              │ 1. Get Issue Details:               │
+              │    • Fetch via GitHub API           │
+              │    • Verify "approved" label        │
+              │    • Extract body content           │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 2. Parse Issue Form:                │
+              │    • Extract field values           │
+              │    • Validate data format           │
+              │    • Check GitHub user exists       │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 3. Checkout Repo:                   │
+              │    • git checkout main              │
+              │    • Configure git user             │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 4. Create Branch:                   │
+              │    • git checkout -b                │
+              │      request/issue-42               │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 5. Update YAML Files:               │
+              │    • Python script modifies:        │
+              │      - repo-yamls/team-repos.yml    │
+              │      - team-yamls/team.yml          │
+              │    • Create workflow file if needed │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 6. Validate YAML:                   │
+              │    • Run validate-yaml.py           │
+              │    • Check for duplicates           │
+              │    • Verify references              │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 7. Commit Changes:                  │
+              │    • git add modified files         │
+              │    • git commit -m "..."            │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 8. Push Branch:                     │
+              │    • git push origin                │
+              │      request/issue-42               │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 9. Create Pull Request:             │
+              │    • Title: [IssueOps] Operation    │
+              │    • Body: Full context + details   │
+              │    • Links: Closes #42              │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+                       PR #43 Created
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 10. Comment on Issue:               │
+              │     • "🚀 PR Created"               │
+              │     • Link to PR #43                │
+              │     • Next steps explanation        │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ 11. Add Labels:                     │
+              │     • pr-created                    │
+              └────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: PULL REQUEST REVIEW                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    PR #43 opened automatically
+                              │
+                              ▼
+              ┌────────────────────────────────────┐
+              │ terraform-plan.yml triggers:        │
+              │ • on: pull_request                  │
+              │ • paths: repo-yamls/**, etc         │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Terraform Plan Runs:                │
+              │ 1. terraform init                   │
+              │ 2. terraform fmt -check             │
+              │ 3. terraform validate               │
+              │ 4. terraform plan                   │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Plan Output Posted to PR:           │
+              │                                     │
+              │ + github_repository.repos[...]      │
+              │ + github_team_repository[...]       │
+              │ + github_repository_file[...]       │
+              │ + github_repository_ruleset[...]    │
+              │                                     │
+              │ Plan: 4 to add, 0 to change         │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Human Review:                       │
+              │ • Platform team reviews plan        │
+              │ • Checks YAML changes               │
+              │ • Verifies naming/settings          │
+              │ • 2 approvals required              │
+              └─────────────┬──────────────────────┘
+                            │
+                ┌───────────┴────────────┐
+                │                        │
+          Changes needed            All good ✓
+                │                        │
+                ▼                        ▼
+    ┌───────────────────────┐  ┌──────────────────┐
+    │ Request changes       │  │ Approve PR       │
+    │ User updates YAML     │  │ (2 required)     │
+    │ Plan reruns           │  └────────┬─────────┘
+    └───────────────────────┘           │
+                                        ▼
+                            ┌────────────────────────┐
+                            │ Merge Pull Request     │
+                            └────────┬───────────────┘
+                                     │
+                                     ▼
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: TERRAFORM APPLY                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                PR #43 merged to main branch
+                              │
+                              ▼
+              ┌────────────────────────────────────┐
+              │ terraform-apply.yml triggers:       │
+              │ • on: pull_request.closed           │
+              │ • if: merged == true                │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Terraform Apply Runs:               │
+              │ 1. terraform init                   │
+              │ 2. terraform apply -auto-approve    │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Infrastructure Created:             │
+              │ ✓ Repository created                │
+              │ ✓ Teams configured                  │
+              │ ✓ Branch protection enabled         │
+              │ ✓ CODEOWNERS file added             │
+              │ ✓ Workflow file in place            │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Comment on PR:                      │
+              │ "✅ Terraform Apply Successful"    │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────────────┐
+              │ Issue #42 Auto-Closed:              │
+              │ (via "Closes #42" in PR)            │
+              └─────────────┬──────────────────────┘
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │   COMPLETE    │
+                    └───────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ERROR HANDLING                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    At any step, if error occurs:
+            │
+            ▼
+    ┌──────────────────────┐
+    │ Workflow fails        │
+    └──────────┬───────────┘
+               │
+               ▼
+    ┌──────────────────────┐
+    │ Comment on issue:     │
+    │ "❌ Error occurred"   │
+    │ Link to workflow logs │
+    └──────────┬───────────┘
+               │
+               ▼
+    ┌──────────────────────┐
+    │ Add "error" label     │
+    └──────────┬───────────┘
+               │
+               ▼
+    User can:
+    • Check workflow logs
+    • Fix issue details
+    • Manually trigger workflow
+    • Contact platform team
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CANCELLATION / CLEANUP                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    User closes issue before completion
+            │
+            ▼
+    ┌──────────────────────┐
+    │ issueops-cleanup.yml  │
+    │ triggers              │
+    └──────────┬───────────┘
+               │
+               ▼
+    ┌──────────────────────┐
+    │ Delete branch if      │
+    │ exists:               │
+    │ request/issue-42      │
+    └──────────┬───────────┘
+               │
+               ▼
+    ┌──────────────────────┐
+    │ Comment explaining    │
+    │ closure               │
+    └──────────┬───────────┘
+               │
+               ▼
+    ┌──────────────────────┐
+    │ Remove labels:        │
+    │ • pending-approval    │
+    │ • approved            │
+    │ Add: closed           │
+    └──────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                              TIME BREAKDOWN                                    ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  Step 1: User Creates Issue                         < 1 minute                ║
+║  Step 2: Approval Phase                             5-60 minutes              ║
+║         (depends on platform team availability)                               ║
+║  Step 3: Automation Runs                            1-2 minutes               ║
+║  Step 4: PR Review                                  5-30 minutes              ║
+║  Step 5: Terraform Apply                            1-2 minutes               ║
+║                                                                                ║
+║  Total Time: ~15-95 minutes (mostly waiting for approvals)                    ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                           ACTOR INTERACTIONS                                   ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                                ║
+║  👤 User             Creates issue → Waits → Gets repository                  ║
+║  👥 Approvers (x2)   Review request → Approve → Done                          ║
+║  👥 PR Reviewers(x2) Review PR → Check plan → Approve → Done                 ║
+║  🤖 Automation       Everything else (parsing, YAML, commits, PRs)            ║
+║  🚀 Terraform        Creates actual infrastructure in GitHub                  ║
+║                                                                                ║
+╚═══════════════════════════════════════════════════════════════════════════════╝

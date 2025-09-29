@@ -1,0 +1,48 @@
+# Data Engineering Team Configuration
+
+teams:
+  - name: data-team
+    description: "Data Engineering and Analytics"
+    privacy: closed
+    ad_group: "engineering-data"  # Auto-creates subteams
+    members:
+      - username: data-lead
+        role: maintainer
+      - username: data-engineer-1
+        role: maintainer
+      - username: data-engineer-2
+        role: member
+      - username: data-analyst-1
+        role: member
+      - username: data-analyst-2
+        role: member
+    review_request_delegation:
+      algorithm: LOAD_BALANCE
+      member_count: 1
+      notify: true
+
+  # Data Science subteam
+  - name: data-science
+    description: "Machine Learning and Data Science"
+    privacy: closed
+    parent_name: data-team
+    members:
+      - username: ds-lead
+        role: maintainer
+      - username: ml-engineer-1
+        role: member
+      - username: ml-engineer-2
+        role: member
+
+  # Analytics subteam
+  - name: data-analytics
+    description: "Business Intelligence and Analytics"
+    privacy: closed
+    parent_name: data-team
+    members:
+      - username: analytics-lead
+        role: maintainer
+      - username: data-analyst-1
+        role: member
+      - username: data-analyst-2
+        role: member

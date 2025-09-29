@@ -1,0 +1,41 @@
+# Data Team Repositories
+
+repos:
+  - name: data-pipeline
+    description: "Main data ingestion and processing pipeline"
+    team: data-team
+    visibility: private
+    has_issues: true
+    has_wiki: false
+    has_projects: true
+    permission: push
+    
+  - name: data-warehouse
+    description: "Data warehouse schemas and transformations"
+    team: data-team
+    visibility: private
+    has_issues: true
+    permission: push
+    require_signed_commits: true
+    
+  - name: ml-models
+    description: "Machine learning models and experiments"
+    team: data-science
+    visibility: private
+    has_issues: true
+    has_discussions: true
+    permission: push
+    
+  - name: analytics-dashboards
+    description: "BI dashboards and reporting tools"
+    team: data-analytics
+    visibility: private
+    has_issues: true
+    permission: push
+    
+  - name: data-quality
+    description: "Data quality checks and monitoring"
+    team: data-team
+    visibility: private
+    has_issues: true
+    permission: push

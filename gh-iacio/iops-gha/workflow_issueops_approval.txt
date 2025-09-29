@@ -1,0 +1,229 @@
+name: IssueOps - Track Approvals
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  track-approval:
+    name: Track Approval
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.issue.labels.*.name, 'issueops') &&
+      contains(github.event.issue.labels.*.name, 'pending-approval')
+    
+    steps:
+      - name: Check if Approval Comment
+        id: check_comment
+        if: github.event_name == 'issue_comment'
+        run: |
+          comment="${{ github.event.comment.body }}"
+          if [[ "$comment" =~ ^/(approve|approved)$ ]] || [[ "$comment" =~ ^approved$ ]]; then
+            echo "is_approval=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_approval=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get Platform Team Members
+        id: team_members
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            // Get platform-team members
+            const team = await github.rest.teams.getByName({
+              org: context.repo.owner,
+              team_slug: 'platform-team'
+            });
+            
+            const members = await github.rest.teams.listMembersInOrg({
+              org: context.repo.owner,
+              team_slug: 'platform-team'
+            });
+            
+            const memberLogins = members.data.map(m => m.login);
+            console.log('Platform team members:', memberLogins);
+            
+            return memberLogins;
+
+      - name: Check if User is Platform Team Member
+        id: check_member
+        if: github.event_name == 'issue_comment' && steps.check_comment.outputs.is_approval == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const platformTeam = ${{ steps.team_members.outputs.result }};
+            const commenter = '${{ github.event.comment.user.login }}';
+            
+            if (platformTeam.includes(commenter)) {
+              console.log(`${commenter} is a platform-team member ✓`);
+              return true;
+            } else {
+              console.log(`${commenter} is NOT a platform-team member ✗`);
+              return false;
+            }
+
+      - name: Add Approval Reaction
+        if: |
+          github.event_name == 'issue_comment' && 
+          steps.check_comment.outputs.is_approval == 'true' &&
+          steps.check_member.outputs.result == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ github.event.comment.id }},
+              content: '+1'
+            });
+
+      - name: Reject Non-Member Approval
+        if: |
+          github.event_name == 'issue_comment' && 
+          steps.check_comment.outputs.is_approval == 'true' &&
+          steps.check_member.outputs.result == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `@${{ github.event.comment.user.login }} Sorry, only \`platform-team\` members can approve this request.`
+            });
+
+      - name: Count Approvals
+        id: count_approvals
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const platformTeam = ${{ steps.team_members.outputs.result }};
+            
+            // Get all comments
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            // Count approvals from platform-team members
+            const approvalPattern = /^\/(approve|approved)$|^approved$/i;
+            const approvers = new Set();
+            
+            for (const comment of comments.data) {
+              const commenter = comment.user.login;
+              const body = comment.body.trim();
+              
+              if (platformTeam.includes(commenter) && approvalPattern.test(body)) {
+                approvers.add(commenter);
+                console.log(`Approval from: ${commenter}`);
+              }
+            }
+            
+            const approvalCount = approvers.size;
+            console.log(`Total approvals: ${approvalCount}`);
+            console.log(`Approvers: ${Array.from(approvers).join(', ')}`);
+            
+            return {
+              count: approvalCount,
+              approvers: Array.from(approvers),
+              needed: 2
+            };
+
+      - name: Update Issue Labels
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const approvalData = ${{ steps.count_approvals.outputs.result }};
+            const issueNumber = context.issue.number;
+            
+            if (approvalData.count >= approvalData.needed) {
+              // Remove pending-approval, add approved
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                name: 'pending-approval'
+              }).catch(() => {});
+              
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ['approved']
+              });
+              
+              // Comment on issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `## ✅ Approved!\n\nThis request has been approved by ${approvalData.count} platform-team members:\n${approvalData.approvers.map(a => `- @${a}`).join('\n')}\n\nThe automation workflow will now process this request.`
+              });
+            } else {
+              // Update with current status
+              const remaining = approvalData.needed - approvalData.count;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `📊 **Approval Status**: ${approvalData.count}/${approvalData.needed}\n\nApprovers so far: ${approvalData.approvers.map(a => `@${a}`).join(', ') || 'none'}\n\n${remaining} more approval(s) needed from \`platform-team\` members.`
+              });
+            }
+
+      - name: Trigger Appropriate Workflow
+        if: steps.count_approvals.outputs.result != null
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ADMIN_TOKEN }}
+          script: |
+            const approvalData = ${{ steps.count_approvals.outputs.result }};
+            
+            if (approvalData.count >= approvalData.needed) {
+              const labels = context.payload.issue.labels.map(l => l.name);
+              
+              // Determine which workflow to trigger based on labels
+              let workflowFile = null;
+              let operationType = null;
+              
+              if (labels.includes('create-repo')) {
+                workflowFile = 'issueops-create-repo.yml';
+                operationType = 'create-repo';
+              } else if (labels.includes('delete-repo')) {
+                workflowFile = 'issueops-delete-repo.yml';
+                operationType = 'delete-repo';
+              } else if (labels.includes('add-member')) {
+                workflowFile = 'issueops-add-member.yml';
+                operationType = 'add-member';
+              }
+              
+              if (workflowFile) {
+                console.log(`Triggering ${operationType} workflow...`);
+                
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: workflowFile,
+                  ref: 'main',
+                  inputs: {
+                    issue_number: context.issue.number.toString()
+                  }
+                });
+                
+                console.log(`${operationType} workflow triggered successfully`);
+              } else {
+                console.log('No matching workflow found for issue labels');
+              }
+            }

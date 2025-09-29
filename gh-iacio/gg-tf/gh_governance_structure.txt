@@ -1,0 +1,62 @@
+# GitHub Governance Repository Structure
+
+```
+github-governance/
+├── .github/
+│   └── workflows/
+│       ├── terraform-plan.yml
+│       ├── terraform-apply.yml
+│       └── workflow-trigger.yml
+├── terraform/
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── providers.tf
+│   ├── repos.tf
+│   ├── teams.tf
+│   ├── branch-protection.tf
+│   └── modules/
+│       └── codeowners/
+│           ├── main.tf
+│           └── templates/
+│               └── CODEOWNERS.tpl
+├── repo-yamls/
+│   ├── platform-repos.yml
+│   └── data-repos.yml
+├── team-yamls/
+│   ├── platform-team.yml
+│   └── data-team.yml
+├── scripts/
+│   ├── parse-yamls.sh
+│   └── validate-yaml.py
+├── .gitignore
+├── .terraform.lock.hcl
+└── README.md
+```
+
+## Philosophy
+
+Keep it simple. Keep it fast. Make it work.
+
+- YAML files are the source of truth
+- Terraform applies the state
+- GitHub Actions orchestrates
+- Everything is code, everything is versioned
+
+## Usage
+
+```bash
+# Add a new repo
+echo "repos:
+  - name: new-service" >> repo-yamls/myteam-repos.yml
+
+# Commit and push
+git add repo-yamls/myteam-repos.yml
+git commit -m "Add new-service repo"
+git push
+
+# PR opens, plan runs automatically
+# Merge PR, apply runs automatically
+```
+
+No ceremony. No XML. No JSON. Just clean YAML and Terraform doing what they do best.

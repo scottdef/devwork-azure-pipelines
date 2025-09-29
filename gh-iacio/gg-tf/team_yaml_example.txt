@@ -1,0 +1,35 @@
+# Platform Team Configuration
+# Teams with ad_group will automatically get three subteams:
+#   - {teamname}-admins
+#   - {teamname}-workflow-admins  
+#   - {teamname}-pr-approvers
+
+teams:
+  - name: platform-team
+    description: "Platform Engineering Team"
+    privacy: closed
+    ad_group: "engineering-platform"  # Triggers subteam creation
+    members:
+      - username: alice
+        role: maintainer  # Will be added to platform-team-admins
+      - username: bob
+        role: maintainer
+      - username: charlie
+        role: member
+      - username: diana
+        role: member
+    review_request_delegation:
+      algorithm: ROUND_ROBIN
+      member_count: 2
+      notify: true
+
+  # Child team example (no ad_group = no auto subteams)
+  - name: platform-sre
+    description: "Platform SRE subteam"
+    privacy: closed
+    parent_name: platform-team
+    members:
+      - username: alice
+        role: maintainer
+      - username: bob
+        role: member
