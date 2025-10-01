@@ -1,0 +1,641 @@
+name: Generate Docker Configuration
+
+# Practical example: Generate complete Docker setup for a project
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Target repository'
+        required: true
+        type: string
+      app_name:
+        description: 'Application name'
+        required: true
+        type: string
+      port:
+        description: 'Application port'
+        required: false
+        default: '3000'
+        type: string
+      language:
+        description: 'Programming language'
+        required: true
+        type: choice
+        options:
+          - node
+          - python
+          - go
+          - ruby
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-docker-setup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Target Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Branch
+        run: |
+          BRANCH="docker-setup"
+          git push origin --delete "$BRANCH" 2>/dev/null || true
+          git checkout -b "$BRANCH"
+
+      - name: Generate Dockerfile
+        run: |
+          APP_NAME="${{ github.event.inputs.app_name }}"
+          LANG="${{ github.event.inputs.language }}"
+          PORT="${{ github.event.inputs.port }}"
+          
+          case "$LANG" in
+            node)
+              cat > Dockerfile <<'EOF'
+          # Node.js Application Dockerfile
+          FROM node:20-alpine AS builder
+          
+          WORKDIR /app
+          
+          # Copy package files
+          COPY package*.json ./
+          
+          # Install dependencies
+          RUN npm ci --only=production
+          
+          # Copy application code
+          COPY . .
+          
+          # Build if needed
+          RUN npm run build || true
+          
+          # Production image
+          FROM node:20-alpine
+          
+          WORKDIR /app
+          
+          # Copy from builder
+          COPY --from=builder /app/node_modules ./node_modules
+          COPY --from=builder /app/dist ./dist
+          COPY --from=builder /app/package*.json ./
+          
+          # Create non-root user
+          RUN addgroup -g 1001 -S nodejs && \
+              adduser -S nodejs -u 1001
+          
+          USER nodejs
+          
+          EXPOSE 3000
+          
+          CMD ["node", "dist/index.js"]
+          EOF
+              ;;
+              
+            python)
+              cat > Dockerfile <<'EOF'
+          # Python Application Dockerfile
+          FROM python:3.11-slim AS builder
+          
+          WORKDIR /app
+          
+          # Install dependencies
+          COPY requirements.txt .
+          RUN pip install --user --no-cache-dir -r requirements.txt
+          
+          # Production image
+          FROM python:3.11-slim
+          
+          WORKDIR /app
+          
+          # Copy dependencies from builder
+          COPY --from=builder /root/.local /root/.local
+          
+          # Copy application
+          COPY . .
+          
+          # Create non-root user
+          RUN useradd -m -u 1001 appuser && \
+              chown -R appuser:appuser /app
+          
+          USER appuser
+          
+          # Update PATH
+          ENV PATH=/root/.local/bin:$PATH
+          
+          EXPOSE 8000
+          
+          CMD ["python", "app.py"]
+          EOF
+              ;;
+              
+            go)
+              cat > Dockerfile <<'EOF'
+          # Go Application Dockerfile
+          FROM golang:1.21-alpine AS builder
+          
+          WORKDIR /app
+          
+          # Copy go mod files
+          COPY go.* ./
+          RUN go mod download
+          
+          # Copy source
+          COPY . .
+          
+          # Build
+          RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+          
+          # Production image
+          FROM alpine:latest
+          
+          RUN apk --no-cache add ca-certificates
+          
+          WORKDIR /root/
+          
+          # Copy binary from builder
+          COPY --from=builder /app/main .
+          
+          EXPOSE 8080
+          
+          CMD ["./main"]
+          EOF
+              ;;
+              
+            ruby)
+              cat > Dockerfile <<'EOF'
+          # Ruby Application Dockerfile
+          FROM ruby:3.2-alpine AS builder
+          
+          WORKDIR /app
+          
+          # Install build dependencies
+          RUN apk add --no-cache build-base
+          
+          # Copy Gemfile
+          COPY Gemfile* ./
+          RUN bundle install --without development test
+          
+          # Production image
+          FROM ruby:3.2-alpine
+          
+          WORKDIR /app
+          
+          # Copy gems from builder
+          COPY --from=builder /usr/local/bundle /usr/local/bundle
+          
+          # Copy application
+          COPY . .
+          
+          EXPOSE 3000
+          
+          CMD ["bundle", "exec", "ruby", "app.rb"]
+          EOF
+              ;;
+          esac
+          
+          # Replace placeholder port
+          sed -i "s/EXPOSE [0-9]*/EXPOSE $PORT/" Dockerfile
+          
+          echo "✓ Generated Dockerfile for $LANG"
+
+      - name: Generate docker-compose.yml
+        run: |
+          APP_NAME="${{ github.event.inputs.app_name }}"
+          PORT="${{ github.event.inputs.port }}"
+          
+          cat > docker-compose.yml <<EOF
+          version: '3.8'
+          
+          services:
+            app:
+              build:
+                context: .
+                dockerfile: Dockerfile
+              container_name: ${APP_NAME}
+              ports:
+                - "${PORT}:${PORT}"
+              environment:
+                - NODE_ENV=production
+                - PORT=${PORT}
+              restart: unless-stopped
+              networks:
+                - app-network
+              healthcheck:
+                test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${PORT}/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+          
+            redis:
+              image: redis:7-alpine
+              container_name: ${APP_NAME}-redis
+              ports:
+                - "6379:6379"
+              restart: unless-stopped
+              networks:
+                - app-network
+              volumes:
+                - redis-data:/data
+          
+            postgres:
+              image: postgres:15-alpine
+              container_name: ${APP_NAME}-postgres
+              environment:
+                POSTGRES_DB: ${APP_NAME}
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: \${DB_PASSWORD:-changeme}
+              ports:
+                - "5432:5432"
+              restart: unless-stopped
+              networks:
+                - app-network
+              volumes:
+                - postgres-data:/var/lib/postgresql/data
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U postgres"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
+          
+          networks:
+            app-network:
+              driver: bridge
+          
+          volumes:
+            redis-data:
+            postgres-data:
+          EOF
+          
+          echo "✓ Generated docker-compose.yml"
+
+      - name: Generate .dockerignore
+        run: |
+          cat > .dockerignore <<'EOF'
+          # Git
+          .git
+          .gitignore
+          .gitattributes
+          
+          # Dependencies
+          node_modules
+          vendor
+          __pycache__
+          *.pyc
+          
+          # Build artifacts
+          dist
+          build
+          target
+          *.o
+          *.a
+          
+          # IDE
+          .vscode
+          .idea
+          *.swp
+          *.swo
+          
+          # Logs
+          *.log
+          npm-debug.log*
+          
+          # Testing
+          coverage
+          .pytest_cache
+          
+          # OS
+          .DS_Store
+          Thumbs.db
+          
+          # Environment
+          .env
+          .env.*
+          !.env.example
+          
+          # Docker
+          Dockerfile
+          docker-compose*.yml
+          .dockerignore
+          
+          # Documentation
+          README.md
+          docs/
+          
+          # CI/CD
+          .github
+          .gitlab-ci.yml
+          EOF
+          
+          echo "✓ Generated .dockerignore"
+
+      - name: Generate Docker Scripts
+        run: |
+          mkdir -p docker-scripts
+          
+          # Build script
+          cat > docker-scripts/build.sh <<'EOF'
+          #!/bin/bash
+          # Docker build script
+          
+          set -euo pipefail
+          
+          IMAGE_NAME="${IMAGE_NAME:-myapp}"
+          TAG="${TAG:-latest}"
+          
+          echo "Building Docker image: ${IMAGE_NAME}:${TAG}"
+          
+          docker build \
+            --tag "${IMAGE_NAME}:${TAG}" \
+            --tag "${IMAGE_NAME}:$(git rev-parse --short HEAD)" \
+            --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg VCS_REF="$(git rev-parse --short HEAD)" \
+            .
+          
+          echo "✓ Build complete"
+          EOF
+          
+          # Run script
+          cat > docker-scripts/run.sh <<'EOF'
+          #!/bin/bash
+          # Docker run script
+          
+          set -euo pipefail
+          
+          IMAGE_NAME="${IMAGE_NAME:-myapp}"
+          TAG="${TAG:-latest}"
+          
+          echo "Starting containers..."
+          
+          docker-compose up -d
+          
+          echo "✓ Containers started"
+          echo ""
+          echo "View logs:"
+          echo "  docker-compose logs -f"
+          echo ""
+          echo "Stop containers:"
+          echo "  docker-compose down"
+          EOF
+          
+          # Push script
+          cat > docker-scripts/push.sh <<'EOF'
+          #!/bin/bash
+          # Docker push script
+          
+          set -euo pipefail
+          
+          REGISTRY="${REGISTRY:-docker.io}"
+          IMAGE_NAME="${IMAGE_NAME:-myapp}"
+          TAG="${TAG:-latest}"
+          
+          FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          
+          echo "Pushing to: ${FULL_IMAGE}"
+          
+          docker tag "${IMAGE_NAME}:${TAG}" "${FULL_IMAGE}"
+          docker push "${FULL_IMAGE}"
+          
+          echo "✓ Push complete"
+          EOF
+          
+          # Clean script
+          cat > docker-scripts/clean.sh <<'EOF'
+          #!/bin/bash
+          # Docker cleanup script
+          
+          set -euo pipefail
+          
+          echo "Stopping containers..."
+          docker-compose down -v
+          
+          echo "Removing dangling images..."
+          docker image prune -f
+          
+          echo "Removing unused volumes..."
+          docker volume prune -f
+          
+          echo "✓ Cleanup complete"
+          EOF
+          
+          chmod +x docker-scripts/*.sh
+          
+          echo "✓ Generated Docker scripts"
+
+      - name: Generate Docker Documentation
+        run: |
+          cat > DOCKER.md <<'EOF'
+          # Docker Setup
+          
+          This repository includes a complete Docker setup for running the application.
+          
+          ## Quick Start
+          
+          ```bash
+          # Build and start all services
+          docker-compose up -d
+          
+          # View logs
+          docker-compose logs -f
+          
+          # Stop services
+          docker-compose down
+          ```
+          
+          ## Development
+          
+          ```bash
+          # Build image
+          ./docker-scripts/build.sh
+          
+          # Run locally
+          ./docker-scripts/run.sh
+          
+          # Clean up
+          ./docker-scripts/clean.sh
+          ```
+          
+          ## Services
+          
+          - **app** - Main application
+          - **postgres** - PostgreSQL database
+          - **redis** - Redis cache
+          
+          ## Environment Variables
+          
+          Create a `.env` file:
+          
+          ```env
+          DB_PASSWORD=your_secure_password
+          REDIS_PASSWORD=your_redis_password
+          ```
+          
+          ## Production Deployment
+          
+          ```bash
+          # Build production image
+          docker build -t myapp:latest .
+          
+          # Tag for registry
+          docker tag myapp:latest registry.example.com/myapp:latest
+          
+          # Push to registry
+          docker push registry.example.com/myapp:latest
+          ```
+          
+          ## Troubleshooting
+          
+          ### Container won't start
+          
+          Check logs:
+          ```bash
+          docker-compose logs app
+          ```
+          
+          ### Database connection issues
+          
+          Verify database is ready:
+          ```bash
+          docker-compose exec postgres pg_isready
+          ```
+          
+          ### Port conflicts
+          
+          Change ports in `docker-compose.yml`
+          
+          ## Health Checks
+          
+          Application health endpoint:
+          ```bash
+          curl http://localhost:3000/health
+          ```
+          
+          ## Scaling
+          
+          Scale the application:
+          ```bash
+          docker-compose up -d --scale app=3
+          ```
+          
+          ## Security
+          
+          - Never commit `.env` files
+          - Use secrets management for production
+          - Regularly update base images
+          - Scan images for vulnerabilities
+          
+          ## Monitoring
+          
+          View container stats:
+          ```bash
+          docker stats
+          ```
+          
+          View resource usage:
+          ```bash
+          docker-compose ps
+          ```
+          EOF
+          
+          echo "✓ Generated Docker documentation"
+
+      - name: Commit and Push
+        run: |
+          git add Dockerfile docker-compose.yml .dockerignore docker-scripts/ DOCKER.md
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          cat > /tmp/commit-msg <<EOF
+          Add Docker configuration
+          
+          Generated complete Docker setup including:
+          - Dockerfile (optimized multi-stage build)
+          - docker-compose.yml (app + postgres + redis)
+          - .dockerignore
+          - Build/run/push/clean scripts
+          - Documentation
+          
+          Application: ${{ github.event.inputs.app_name }}
+          Language: ${{ github.event.inputs.language }}
+          Port: ${{ github.event.inputs.port }}
+          
+          Generated by: GitHub Actions
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          EOF
+          
+          git commit -F /tmp/commit-msg
+          git push origin docker-setup --force
+          
+          echo "has_changes=true" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: env.has_changes == 'true'
+        run: |
+          gh pr create \
+            --title "Add Docker configuration" \
+            --body "## Docker Setup
+          
+          Complete Docker configuration generated for **${{ github.event.inputs.app_name }}**.
+          
+          ### What's Included
+          
+          **Dockerfile**:
+          - Multi-stage build for optimal image size
+          - Non-root user for security
+          - Health checks configured
+          - Language: ${{ github.event.inputs.language }}
+          
+          **docker-compose.yml**:
+          - Application service
+          - PostgreSQL database
+          - Redis cache
+          - Health checks for all services
+          - Volume persistence
+          
+          **Scripts** (\`docker-scripts/\`):
+          - \`build.sh\` - Build Docker image
+          - \`run.sh\` - Start all services
+          - \`push.sh\` - Push to registry
+          - \`clean.sh\` - Cleanup containers and volumes
+          
+          **Documentation**:
+          - \`DOCKER.md\` - Complete usage guide
+          - Quick start instructions
+          - Troubleshooting tips
+          
+          ### Quick Start
+          
+          After merging:
+          \`\`\`bash
+          docker-compose up -d
+          \`\`\`
+          
+          ### Configuration
+          
+          Edit \`docker-compose.yml\` to customize:
+          - Port mappings
+          - Environment variables
+          - Service dependencies
+          
+          ---
+          
+          *Generated by GitHub Actions*" \
+            --base main \
+            --head docker-setup
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}

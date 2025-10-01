@@ -1,0 +1,600 @@
+name: Generate Kubernetes Manifests
+
+# Practical example: Generate complete K8s deployment setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Target repository'
+        required: true
+      app_name:
+        description: 'Application name'
+        required: true
+      namespace:
+        description: 'Kubernetes namespace'
+        default: 'default'
+      replicas:
+        description: 'Number of replicas'
+        default: '3'
+      image:
+        description: 'Container image'
+        required: true
+      port:
+        description: 'Application port'
+        default: '8080'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-k8s:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.GH_ADMIN_TOKEN }}
+
+      - name: Setup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin --delete k8s-manifests 2>/dev/null || true
+          git checkout -b k8s-manifests
+
+      - name: Create Directory Structure
+        run: |
+          mkdir -p k8s/{base,overlays/{dev,staging,prod}}
+          echo "✓ Created k8s directory structure"
+
+      - name: Generate Namespace
+        run: |
+          cat > k8s/base/namespace.yaml <<EOF
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: ${{ github.event.inputs.namespace }}
+            labels:
+              app: ${{ github.event.inputs.app_name }}
+              managed-by: github-actions
+          EOF
+
+      - name: Generate Deployment
+        run: |
+          cat > k8s/base/deployment.yaml <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${{ github.event.inputs.app_name }}
+            namespace: ${{ github.event.inputs.namespace }}
+            labels:
+              app: ${{ github.event.inputs.app_name }}
+              version: v1
+          spec:
+            replicas: ${{ github.event.inputs.replicas }}
+            selector:
+              matchLabels:
+                app: ${{ github.event.inputs.app_name }}
+            template:
+              metadata:
+                labels:
+                  app: ${{ github.event.inputs.app_name }}
+                  version: v1
+              spec:
+                containers:
+                - name: app
+                  image: ${{ github.event.inputs.image }}
+                  ports:
+                  - containerPort: ${{ github.event.inputs.port }}
+                    name: http
+                  env:
+                  - name: PORT
+                    value: "${{ github.event.inputs.port }}"
+                  - name: NODE_ENV
+                    value: "production"
+                  resources:
+                    requests:
+                      memory: "128Mi"
+                      cpu: "100m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+                  livenessProbe:
+                    httpGet:
+                      path: /health
+                      port: http
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  readinessProbe:
+                    httpGet:
+                      path: /ready
+                      port: http
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  allowPrivilegeEscalation: false
+          EOF
+
+      - name: Generate Service
+        run: |
+          cat > k8s/base/service.yaml <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${{ github.event.inputs.app_name }}
+            namespace: ${{ github.event.inputs.namespace }}
+            labels:
+              app: ${{ github.event.inputs.app_name }}
+          spec:
+            type: ClusterIP
+            selector:
+              app: ${{ github.event.inputs.app_name }}
+            ports:
+            - name: http
+              port: 80
+              targetPort: http
+              protocol: TCP
+          EOF
+
+      - name: Generate Ingress
+        run: |
+          cat > k8s/base/ingress.yaml <<'EOF'
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: ${{ github.event.inputs.app_name }}
+            namespace: ${{ github.event.inputs.namespace }}
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-prod
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          spec:
+            ingressClassName: nginx
+            tls:
+            - hosts:
+              - ${{ github.event.inputs.app_name }}.example.com
+              secretName: ${{ github.event.inputs.app_name }}-tls
+            rules:
+            - host: ${{ github.event.inputs.app_name }}.example.com
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: ${{ github.event.inputs.app_name }}
+                      port:
+                        number: 80
+          EOF
+
+      - name: Generate ConfigMap
+        run: |
+          cat > k8s/base/configmap.yaml <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: ${{ github.event.inputs.app_name }}-config
+            namespace: ${{ github.event.inputs.namespace }}
+          data:
+            app.conf: |
+              server {
+                listen ${{ github.event.inputs.port }};
+                server_name _;
+                
+                location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host \\\$host;
+                  proxy_set_header X-Real-IP \\\$remote_addr;
+                }
+              }
+            
+            application.yml: |
+              server:
+                port: ${{ github.event.inputs.port }}
+              
+              logging:
+                level:
+                  root: INFO
+          EOF
+
+      - name: Generate Secret Template
+        run: |
+          cat > k8s/base/secret.yaml <<'EOF'
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: ${{ github.event.inputs.app_name }}-secrets
+            namespace: ${{ github.event.inputs.namespace }}
+          type: Opaque
+          stringData:
+            # Add your secrets here (DO NOT COMMIT ACTUAL SECRETS)
+            # Use sealed-secrets or external-secrets in production
+            database-url: ""
+            api-key: ""
+            jwt-secret: ""
+          EOF
+
+      - name: Generate HPA
+        run: |
+          cat > k8s/base/hpa.yaml <<EOF
+          apiVersion: autoscaling/v2
+          kind: HorizontalPodAutoscaler
+          metadata:
+            name: ${{ github.event.inputs.app_name }}
+            namespace: ${{ github.event.inputs.namespace }}
+          spec:
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind: Deployment
+              name: ${{ github.event.inputs.app_name }}
+            minReplicas: 2
+            maxReplicas: 10
+            metrics:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 70
+            - type: Resource
+              resource:
+                name: memory
+                target:
+                  type: Utilization
+                  averageUtilization: 80
+          EOF
+
+      - name: Generate Kustomization
+        run: |
+          cat > k8s/base/kustomization.yaml <<'EOF'
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+
+          resources:
+          - namespace.yaml
+          - deployment.yaml
+          - service.yaml
+          - ingress.yaml
+          - configmap.yaml
+          - secret.yaml
+          - hpa.yaml
+
+          commonLabels:
+            app: ${{ github.event.inputs.app_name }}
+            managed-by: kustomize
+          EOF
+
+      - name: Generate Dev Overlay
+        run: |
+          cat > k8s/overlays/dev/kustomization.yaml <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+
+          namespace: ${{ github.event.inputs.namespace }}-dev
+
+          bases:
+          - ../../base
+
+          replicas:
+          - name: ${{ github.event.inputs.app_name }}
+            count: 1
+
+          patches:
+          - patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/env/1/value
+                value: development
+            target:
+              kind: Deployment
+              name: ${{ github.event.inputs.app_name }}
+          EOF
+
+      - name: Generate Staging Overlay
+        run: |
+          cat > k8s/overlays/staging/kustomization.yaml <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+
+          namespace: ${{ github.event.inputs.namespace }}-staging
+
+          bases:
+          - ../../base
+
+          replicas:
+          - name: ${{ github.event.inputs.app_name }}
+            count: 2
+
+          patches:
+          - patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/env/1/value
+                value: staging
+            target:
+              kind: Deployment
+              name: ${{ github.event.inputs.app_name }}
+          EOF
+
+      - name: Generate Prod Overlay
+        run: |
+          cat > k8s/overlays/prod/kustomization.yaml <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+
+          namespace: ${{ github.event.inputs.namespace }}-prod
+
+          bases:
+          - ../../base
+
+          replicas:
+          - name: ${{ github.event.inputs.app_name }}
+            count: ${{ github.event.inputs.replicas }}
+
+          patches:
+          - patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/env/1/value
+                value: production
+            target:
+              kind: Deployment
+              name: ${{ github.event.inputs.app_name }}
+          EOF
+
+      - name: Generate README
+        run: |
+          cat > k8s/README.md <<'EOF'
+          # Kubernetes Manifests
+
+          Generated Kubernetes manifests for ${{ github.event.inputs.app_name }}.
+
+          ## Structure
+
+          ```
+          k8s/
+          ├── base/                  # Base manifests
+          │   ├── deployment.yaml    # Main deployment
+          │   ├── service.yaml       # Service
+          │   ├── ingress.yaml       # Ingress
+          │   ├── configmap.yaml     # Configuration
+          │   ├── secret.yaml        # Secrets (template)
+          │   ├── hpa.yaml          # Horizontal Pod Autoscaler
+          │   └── kustomization.yaml # Kustomize base
+          └── overlays/             # Environment-specific
+              ├── dev/              # Development
+              ├── staging/          # Staging
+              └── prod/             # Production
+          ```
+
+          ## Deployment
+
+          ### Using kubectl
+
+          ```bash
+          # Deploy to dev
+          kubectl apply -k k8s/overlays/dev/
+
+          # Deploy to staging
+          kubectl apply -k k8s/overlays/staging/
+
+          # Deploy to production
+          kubectl apply -k k8s/overlays/prod/
+          ```
+
+          ### Using Kustomize
+
+          ```bash
+          # Build and view
+          kustomize build k8s/overlays/prod/
+
+          # Apply
+          kustomize build k8s/overlays/prod/ | kubectl apply -f -
+          ```
+
+          ### Using Helm (if wrapped)
+
+          ```bash
+          helm install ${{ github.event.inputs.app_name }} ./charts/
+          ```
+
+          ## Configuration
+
+          ### Update Image
+
+          ```bash
+          cd k8s/overlays/prod
+          kustomize edit set image \
+            ${{ github.event.inputs.image }}:new-tag
+          ```
+
+          ### Update Replicas
+
+          Edit `kustomization.yaml` in the overlay.
+
+          ### Update Environment Variables
+
+          Edit patches in overlay `kustomization.yaml`.
+
+          ## Secrets Management
+
+          **DO NOT** commit actual secrets!
+
+          Use one of:
+          - [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets)
+          - [External Secrets](https://external-secrets.io/)
+          - [Vault](https://www.vaultproject.io/)
+
+          ## Monitoring
+
+          ```bash
+          # Check deployment status
+          kubectl rollout status deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }}
+
+          # View pods
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+
+          # View logs
+          kubectl logs -f deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }}
+          ```
+
+          ## Troubleshooting
+
+          ```bash
+          # Describe deployment
+          kubectl describe deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }}
+
+          # Get events
+          kubectl get events -n ${{ github.event.inputs.namespace }}
+
+          # Debug pod
+          kubectl exec -it deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }} -- /bin/sh
+          ```
+
+          ## Rollback
+
+          ```bash
+          # View history
+          kubectl rollout history deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }}
+
+          # Rollback
+          kubectl rollout undo deployment/${{ github.event.inputs.app_name }} \
+            -n ${{ github.event.inputs.namespace }}
+          ```
+
+          ## CI/CD Integration
+
+          Add to your pipeline:
+
+          ```yaml
+          - name: Deploy to Kubernetes
+            run: |
+              kubectl apply -k k8s/overlays/prod/
+              kubectl rollout status deployment/${{ github.event.inputs.app_name }}
+          ```
+
+          ## Generated By
+
+          - Workflow: Generate Kubernetes Manifests
+          - Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          - GitHub Actions
+          EOF
+
+      - name: Generate Deployment Script
+        run: |
+          mkdir -p scripts
+          
+          cat > scripts/deploy.sh <<'EOF'
+          #!/bin/bash
+          # Kubernetes deployment script
+          
+          set -euo pipefail
+          
+          ENV=${1:-dev}
+          
+          echo "Deploying to: $ENV"
+          
+          # Validate environment
+          if [[ ! "$ENV" =~ ^(dev|staging|prod)$ ]]; then
+            echo "Invalid environment: $ENV"
+            echo "Valid: dev, staging, prod"
+            exit 1
+          fi
+          
+          # Apply manifests
+          kubectl apply -k "k8s/overlays/$ENV/"
+          
+          # Wait for rollout
+          kubectl rollout status \
+            deployment/${{ github.event.inputs.app_name }} \
+            -n "${{ github.event.inputs.namespace }}-$ENV"
+          
+          echo "✓ Deployment complete"
+          EOF
+          
+          chmod +x scripts/deploy.sh
+
+      - name: Commit and Push
+        run: |
+          git add k8s/ scripts/
+          
+          git commit -m "Add Kubernetes manifests
+
+          Generated complete K8s setup:
+          - Base manifests (deployment, service, ingress, etc.)
+          - Kustomize overlays (dev, staging, prod)
+          - HPA configuration
+          - Deployment scripts
+          - Documentation
+          
+          Application: ${{ github.event.inputs.app_name }}
+          Namespace: ${{ github.event.inputs.namespace }}
+          Image: ${{ github.event.inputs.image }}
+          Replicas: ${{ github.event.inputs.replicas }}
+          Port: ${{ github.event.inputs.port }}"
+          
+          git push origin k8s-manifests --force
+
+      - name: Create PR
+        run: |
+          gh pr create \
+            --title "Add Kubernetes manifests for ${{ github.event.inputs.app_name }}" \
+            --body "## Kubernetes Deployment Setup
+
+          Complete K8s manifests generated for **${{ github.event.inputs.app_name }}**.
+
+          ### What's Included
+
+          **Base Manifests** (\`k8s/base/\`):
+          - Deployment with health checks
+          - Service (ClusterIP)
+          - Ingress with TLS
+          - ConfigMap
+          - Secret template
+          - HorizontalPodAutoscaler
+          - Kustomization
+
+          **Overlays** (\`k8s/overlays/\`):
+          - Dev (1 replica)
+          - Staging (2 replicas)
+          - Prod (${{ github.event.inputs.replicas }} replicas)
+
+          **Configuration**:
+          - App: ${{ github.event.inputs.app_name }}
+          - Namespace: ${{ github.event.inputs.namespace }}
+          - Image: ${{ github.event.inputs.image }}
+          - Port: ${{ github.event.inputs.port }}
+
+          ### Quick Deploy
+
+          \`\`\`bash
+          # Deploy to dev
+          kubectl apply -k k8s/overlays/dev/
+
+          # Or use script
+          ./scripts/deploy.sh dev
+          \`\`\`
+
+          ### Security Notes
+
+          - ✅ Non-root container
+          - ✅ Resource limits set
+          - ✅ Health checks configured
+          - ⚠️ Update secret values before deploying
+
+          See \`k8s/README.md\` for full documentation.
+
+          ---
+
+          *Generated by GitHub Actions*" \
+            --base main \
+            --head k8s-manifests
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
