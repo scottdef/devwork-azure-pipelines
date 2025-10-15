@@ -1,0 +1,403 @@
+# ==============================================================================
+# Complete Directory Structure for gold-standard-github-repository Module
+# ==============================================================================
+
+modules/gold-standard-github-repository/
+├── README.md                           # Full documentation
+├── QUICKSTART.md                       # Getting started guide
+├── CHANGELOG.md                        # Version history
+├── LICENSE                             # License file
+├── .gitignore                          # Git ignore rules
+├── .terraform.lock.hcl                 # Provider lock file (committed)
+│
+├── main.tf                             # Main resources
+├── variables.tf                        # Input variables
+├── outputs.tf                          # Output values
+├── versions.tf                         # Provider requirements
+├── locals.tf                           # Local values (if needed)
+├── data.tf                             # Data sources
+│
+├── examples/
+│   ├── simple/
+│   │   ├── main.tf                     # Simple example
+│   │   ├── outputs.tf
+│   │   └── terraform.tfvars.example
+│   │
+│   ├── complete/
+│   │   ├── main.tf                     # Full-featured example
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   ├── terraform.tfvars.example
+│   │   └── README.md
+│   │
+│   ├── template/
+│   │   ├── main.tf                     # Using template repos
+│   │   └── terraform.tfvars.example
+│   │
+│   └── multi-environment/
+│       ├── main.tf                     # Multiple environments
+│       └── terraform.tfvars.example
+│
+├── docs/
+│   ├── advanced-patterns.md            # Advanced usage patterns
+│   ├── security.md                     # Security best practices
+│   ├── migration.md                    # Migration guide
+│   └── architecture.md                 # Architecture decisions
+│
+├── tests/
+│   ├── basic_test.go                   # Terratest basic tests
+│   ├── advanced_test.go                # Advanced feature tests
+│   └── fixtures/
+│       └── basic/
+│           └── main.tf
+│
+└── .github/
+    ├── workflows/
+    │   ├── terraform-validate.yml      # CI validation
+    │   ├── terraform-fmt.yml           # Format checking
+    │   └── terratest.yml               # Automated testing
+    │
+    └── CODEOWNERS                      # Code ownership
+
+# ==============================================================================
+# .gitignore for Terraform Module
+# ==============================================================================
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data
+*.tfvars
+*.tfvars.json
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore transient lock info files
+.terraform.tfstate.lock.info
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+*tfplan*
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Ignore Mac/OSX system files
+.DS_Store
+
+# Ignore Windows system files
+Thumbs.db
+
+# Ignore Linux system files
+*~
+
+# Ignore IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Ignore test cache
+.terraform.lock.hcl
+# Note: Some teams prefer to commit .terraform.lock.hcl
+# Remove this line if you want to track provider versions
+
+# GitHub App private keys
+*.pem
+*.key
+*.p8
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.ppk
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Terraform plugin cache
+.terraform.d/
+plugin-cache/
+
+# Exclude test binaries
+tests/*.test
+
+# Exclude documentation build artifacts
+site/
+docs/_build/
+
+# ==============================================================================
+# CODEOWNERS file
+# ==============================================================================
+
+# Default owners for everything in the repo
+* @platform-engineering-team
+
+# Module core files
+/*.tf @platform-engineering-team @terraform-admins
+
+# Documentation
+/docs/ @platform-engineering-team @technical-writers
+/README.md @platform-engineering-team @technical-writers
+/QUICKSTART.md @platform-engineering-team @technical-writers
+
+# Examples need review from both teams
+/examples/ @platform-engineering-team @developers
+
+# Tests require infrastructure team approval
+/tests/ @platform-engineering-team @qa-team
+
+# CI/CD workflows
+/.github/ @platform-engineering-team @devops-team
+
+# ==============================================================================
+# terraform.tfvars.gitignore
+# ==============================================================================
+# Add this to your .gitignore to prevent accidentally committing secrets
+
+# Never commit actual tfvars files
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Only keep examples
+!terraform.tfvars.example
+!*.tfvars.example
+
+# ==============================================================================
+# Example .terraform.lock.hcl (This SHOULD be committed)
+# ==============================================================================
+
+# This file is maintained automatically by "terraform init".
+# Manual edits may be lost in future updates.
+
+provider "registry.terraform.io/integrations/github" {
+  version     = "6.6.0"
+  constraints = "~> 6.6"
+  hashes = [
+    "h1:example_hash_value_here",
+    "zh:example_hash_value_here",
+  ]
+}
+
+# ==============================================================================
+# Makefile (Optional - for convenience)
+# ==============================================================================
+
+.PHONY: help init validate fmt plan apply destroy clean test docs
+
+help:
+	@echo "Available targets:"
+	@echo "  init      - Initialize Terraform"
+	@echo "  validate  - Validate Terraform configuration"
+	@echo "  fmt       - Format Terraform files"
+	@echo "  plan      - Create Terraform plan"
+	@echo "  apply     - Apply Terraform changes"
+	@echo "  destroy   - Destroy Terraform resources"
+	@echo "  test      - Run Terratest tests"
+	@echo "  docs      - Generate documentation"
+	@echo "  clean     - Clean temporary files"
+
+init:
+	terraform init
+
+validate:
+	terraform validate
+	terraform fmt -check -recursive
+
+fmt:
+	terraform fmt -recursive
+
+plan:
+	terraform plan -out=tfplan
+
+apply:
+	terraform apply tfplan
+
+destroy:
+	terraform destroy
+
+clean:
+	rm -rf .terraform/
+	rm -f tfplan
+	rm -f *.tfstate*
+
+test:
+	cd tests && go test -v -timeout 30m
+
+docs:
+	terraform-docs markdown table --output-file README.md --output-mode inject .
+
+# ==============================================================================
+# Example GitHub Actions Workflow
+# ==============================================================================
+# File: .github/workflows/terraform-validate.yml
+
+name: Terraform Validation
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '.github/workflows/terraform-validate.yml'
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+      
+      - name: Terraform Init
+        run: terraform init -backend=false
+      
+      - name: Terraform Validate
+        run: terraform validate
+      
+      - name: Run tflint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      
+      - name: TFLint
+        run: |
+          tflint --init
+          tflint --recursive
+
+# ==============================================================================
+# README.md Table of Contents
+# ==============================================================================
+
+# Gold Standard GitHub Repository Terraform Module
+
+## Table of Contents
+
+1. [Features](#features)
+2. [Prerequisites](#prerequisites)
+3. [Quick Start](#quick-start)
+4. [Usage Examples](#usage-examples)
+   - [Basic Repository](#basic-example)
+   - [Production Repository](#production-repository)
+   - [From Template](#from-template)
+   - [Multi-Environment](#multi-environment)
+5. [Module Inputs](#module-inputs)
+6. [Module Outputs](#module-outputs)
+7. [Pre-flight Validation](#pre-flight-validation)
+8. [Default Behaviors](#default-behaviors)
+9. [Advanced Configuration](#advanced-configuration)
+10. [GitHub Provider Setup](#github-provider-setup)
+11. [Troubleshooting](#troubleshooting)
+12. [Security Considerations](#security-considerations)
+13. [Best Practices](#best-practices)
+14. [Contributing](#contributing)
+15. [License](#license)
+
+# ==============================================================================
+# File Size Optimization
+# ==============================================================================
+
+# If module files get too large, consider splitting:
+
+# resource_repository.tf      - Repository resource only
+# resource_team.tf             - Team resources
+# resource_environments.tf     - Environment resources
+# resource_ruleset.tf          - Ruleset resources
+# resource_rest_api.tf         - REST API resources
+# resource_webhooks.tf         - Webhook resources
+# resource_deploy_keys.tf      - Deploy key resources
+# resource_collaborators.tf    - Collaborator resources
+
+# This modular approach makes the codebase more maintainable
+
+# ==============================================================================
+# Module Registry Publication
+# ==============================================================================
+
+# To publish to Terraform Registry:
+
+# 1. Tag releases with semantic versioning
+git tag -a v1.0.0 -m "Initial release"
+git push origin v1.0.0
+
+# 2. Create GitHub release from tag
+
+# 3. Registry will auto-detect and publish
+
+# 4. Users can then reference:
+module "gold_standard_repo" {
+  source  = "your-org/gold-standard-github-repository/github"
+  version = "1.0.0"
+  
+  # ... configuration ...
+}
+
+# ==============================================================================
+# Testing Strategy
+# ==============================================================================
+
+# tests/basic_test.go
+
+package test
+
+import (
+	"testing"
+	"github.com/gruntwork-io/terratest/modules/terraform"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestBasicRepository(t *testing.T) {
+	t.Parallel()
+
+	terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
+		TerraformDir: "../examples/simple",
+		Vars: map[string]interface{}{
+			"repository_name": "test-repo",
+			"parent_team_slug": "test-team",
+		},
+	})
+
+	defer terraform.Destroy(t, terraformOptions)
+	terraform.InitAndApply(t, terraformOptions)
+
+	// Validate outputs
+	repoName := terraform.Output(t, terraformOptions, "repository_name")
+	assert.Equal(t, "test-repo", repoName)
+}
+
+# ==============================================================================
+# End of File
+# ==============================================================================

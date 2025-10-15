@@ -1,0 +1,703 @@
+# ==============================================================================
+# GitHub Actions Workflows for gold-standard-github-repository Module
+# ==============================================================================
+#
+# File: .github/workflows/terraform-validation.yml
+#
+# This workflow validates Terraform code on every PR
+#
+# ==============================================================================
+
+name: Terraform Validation
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '.github/workflows/terraform-*.yml'
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Init TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        id: tflint
+        run: tflint --recursive --format compact
+        continue-on-error: true
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### TFLint 🔍\`${{ steps.tflint.outcome }}\`
+
+            <details><summary>Validation Output</summary>
+
+            \`\`\`
+            ${{ steps.validate.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Fail if errors
+        if: steps.fmt.outcome != 'success' || steps.validate.outcome != 'success'
+        run: exit 1
+
+---
+# ==============================================================================
+# File: .github/workflows/terratest.yml
+#
+# Run Terratest integration tests
+#
+# ==============================================================================
+
+name: Terratest
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - 'tests/**'
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Terratest
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        test:
+          - TestBasicRepositoryCreation
+          - TestRepositoryWithSecurityFeatures
+          - TestTeamCreationAndAccess
+          - TestEnvironmentCreation
+          - TestRulesetConfiguration
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download Go modules
+        working-directory: tests
+        run: go mod download
+
+      - name: Run Terratest
+        working-directory: tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ORG: ${{ secrets.GITHUB_ORG }}
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+        run: |
+          go test -v -timeout 30m -run ${{ matrix.test }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terratest-results-${{ matrix.test }}
+          path: tests/*.log
+
+---
+# ==============================================================================
+# File: .github/workflows/security-scan.yml
+#
+# Security scanning for Terraform code
+#
+# ==============================================================================
+
+name: Security Scan
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  tfsec:
+    name: tfsec Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          additional_args: --format sarif --out tfsec.sarif
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+
+  checkov:
+    name: Checkov Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov.sarif
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
+  trivy:
+    name: Trivy IaC Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy.sarif'
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+
+---
+# ==============================================================================
+# File: .github/workflows/documentation.yml
+#
+# Generate and update documentation
+#
+# ==============================================================================
+
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - 'README.md'
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  terraform-docs:
+    name: Generate Terraform Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Render terraform docs
+        uses: terraform-docs/gh-actions@v1.1.0
+        with:
+          working-dir: .
+          output-file: README.md
+          output-method: inject
+          git-push: true
+          git-commit-message: "docs: update terraform-docs"
+
+---
+# ==============================================================================
+# File: .github/workflows/release.yml
+#
+# Automated release process
+#
+# ==============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Validate Terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Generate Changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.3.1
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Usage
+            ```hcl
+            module "gold_standard_repo" {
+              source  = "your-org/gold-standard-github-repository/github"
+              version = "${{ github.ref_name }}"
+              
+              repository_name  = "my-repo"
+              parent_team_slug = "my-team"
+            }
+            ```
+          draft: false
+          prerelease: false
+
+---
+# ==============================================================================
+# File: .github/workflows/example-apply.yml
+#
+# Apply example configurations for testing
+# (Only runs on manual trigger)
+#
+# ==============================================================================
+
+name: Apply Example
+
+on:
+  workflow_dispatch:
+    inputs:
+      example:
+        description: 'Example to apply'
+        required: true
+        type: choice
+        options:
+          - simple
+          - complete
+          - template
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: examples/${{ github.event.inputs.example }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+      - name: Terraform Plan
+        if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: terraform apply tfplan
+        env:
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: terraform destroy -auto-approve
+        env:
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+---
+# ==============================================================================
+# File: .github/workflows/pr-labeler.yml
+#
+# Automatically label PRs based on files changed
+#
+# ==============================================================================
+
+name: PR Labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Label PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Label PRs
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+---
+# ==============================================================================
+# File: .github/labeler.yml
+#
+# Configuration for PR labeling
+#
+# ==============================================================================
+
+# Documentation changes
+documentation:
+  - '**/*.md'
+  - 'docs/**/*'
+
+# Terraform code changes
+terraform:
+  - '**/*.tf'
+  - '**/*.tfvars'
+
+# Test changes
+tests:
+  - 'tests/**/*'
+  - '**/*_test.go'
+
+# CI/CD changes
+ci-cd:
+  - '.github/workflows/**/*'
+
+# Examples
+examples:
+  - 'examples/**/*'
+
+# Security related
+security:
+  - any:
+    - '**/*security*.tf'
+    - '**/*ruleset*.tf'
+
+---
+# ==============================================================================
+# File: .github/workflows/stale.yml
+#
+# Mark stale issues and PRs
+#
+# ==============================================================================
+
+name: Stale
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Mark Stale
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs.'
+          stale-pr-message: 'This PR has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs.'
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          days-before-stale: 60
+          days-before-close: 7
+          exempt-issue-labels: 'pinned,security,enhancement'
+          exempt-pr-labels: 'pinned,security'
+
+---
+# ==============================================================================
+# File: .github/dependabot.yml
+#
+# Automated dependency updates
+#
+# ==============================================================================
+
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Terraform
+  - package-ecosystem: "terraform"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "terraform"
+
+  # Go modules (for tests)
+  - package-ecosystem: "gomod"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "go"
+
+---
+# ==============================================================================
+# File: .github/workflows/module-usage-example.yml
+#
+# Example workflow showing how to use the module in another repository
+# This would be placed in repos that USE the module
+#
+# ==============================================================================
+
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform:
+    name: Terraform Plan/Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          TF_VAR_github_organization: ${{ secrets.GITHUB_ORG }}
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        env:
+          TF_VAR_github_organization: ${{ secrets.GITHUB_ORG }}
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+        continue-on-error: true
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_github_organization: ${{ secrets.GITHUB_ORG }}
+          TF_VAR_github_app_id: ${{ secrets.GITHUB_APP_ID }}
+          TF_VAR_github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          TF_VAR_github_app_pem_file: ${{ secrets.GITHUB_APP_PEM_FILE }}
+
+---
+# ==============================================================================
+# End of CI/CD Workflows
+# ==============================================================================
