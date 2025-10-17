@@ -1,0 +1,20 @@
+# provider.tf
+# GitHub provider configuration
+
+provider "github" {
+  owner = var.github_org
+  # Token via GITHUB_TOKEN env var or use:
+  # token = var.github_token
+}
+
+# Backend configuration for state management
+terraform {
+  backend "s3" {
+    # Uncomment and configure for remote state
+    # bucket         = "your-terraform-state-bucket"
+    # key            = "github/wiki-repo/terraform.tfstate"
+    # region         = "us-east-1"
+    # encrypt        = true
+    # dynamodb_table = "terraform-state-locks"
+  }
+}

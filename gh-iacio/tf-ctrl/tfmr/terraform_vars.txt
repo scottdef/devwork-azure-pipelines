@@ -1,0 +1,5 @@
+# terraform.tfvars
+# Configuration values for wiki repository setup
+
+github_org      = "your-org-name"
+wiki_repo_name  = "org-wiki"

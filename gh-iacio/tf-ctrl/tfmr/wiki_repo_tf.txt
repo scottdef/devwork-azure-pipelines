@@ -1,0 +1,244 @@
+# wiki-repo.tf
+# Wiki repository for org-wide documentation
+# Managed by team-au, write access restricted to team-au-mgrs and wiki-mods
+
+terraform {
+  required_providers {
+    github = {
+      source  = "integrations/github"
+      version = "~> 6.6"
+    }
+  }
+}
+
+# Variables
+variable "github_org" {
+  description = "GitHub organization name"
+  type        = string
+}
+
+variable "wiki_repo_name" {
+  description = "Name of the wiki repository"
+  type        = string
+  default     = "org-wiki"
+}
+
+# Parent team: team-au (owns the repo)
+resource "github_team" "team_au" {
+  name        = "team-au"
+  description = "Australian Team - Repository Owners"
+  privacy     = "closed"
+}
+
+# Subteam: team-au-mgrs (write access)
+resource "github_team" "team_au_mgrs" {
+  name           = "team-au-mgrs"
+  description    = "Australian Team Managers - Wiki Editors"
+  privacy        = "closed"
+  parent_team_id = github_team.team_au.id
+}
+
+# Custom org role: wiki-mods (admin equivalent for wiki)
+resource "github_organization_custom_role" "wiki_mods" {
+  name        = "wiki-mods"
+  description = "Wiki Moderators - Administrative access to wiki repositories"
+  base_role   = "write"
+  permissions = [
+    "manage_settings_wiki",
+    "edit_repo_metadata",
+    "set_social_preview",
+    "manage_settings_pages",
+    "push_protected_branch",
+    "bypass_required_pull_request_reviews",
+    "delete_branch"
+  ]
+}
+
+# Wiki repository
+resource "github_repository" "wiki" {
+  name        = var.wiki_repo_name
+  description = "Organization wiki - centralized documentation"
+  visibility  = "internal"
+
+  # Wiki features
+  has_wiki        = true
+  has_issues      = true
+  has_projects    = false
+  has_discussions = true
+  has_downloads   = true
+
+  # Initialize with README
+  auto_init = true
+
+  # Merge strategy - squash only
+  allow_merge_commit     = false
+  allow_squash_merge     = true
+  allow_rebase_merge     = false
+  allow_auto_merge       = false
+  delete_branch_on_merge = true
+
+  # Squash commit settings
+  squash_merge_commit_title   = "PR_TITLE"
+  squash_merge_commit_message = "PR_BODY"
+
+  # Security
+  vulnerability_alerts = true
+
+  security_and_analysis {
+    secret_scanning {
+      status = "enabled"
+    }
+    secret_scanning_push_protection {
+      status = "enabled"
+    }
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Repository access: team-au as owners (read only, team owns repo)
+resource "github_team_repository" "wiki_team_au" {
+  team_id    = github_team.team_au.id
+  repository = github_repository.wiki.name
+  permission = "push"
+}
+
+# Repository access: team-au-mgrs with write (triage/maintain level)
+resource "github_team_repository" "wiki_team_au_mgrs" {
+  team_id    = github_team.team_au_mgrs.id
+  repository = github_repository.wiki.name
+  permission = "maintain"
+}
+
+# Note: All org members get read access by default for internal repos
+# If you need explicit read-only team access, uncomment and configure:
+# resource "github_team_repository" "wiki_all_members" {
+#   team_id    = data.github_team.all_members.id
+#   repository = github_repository.wiki.name
+#   permission = "pull"
+# }
+
+# Organization ruleset: strong-org-rules
+resource "github_organization_ruleset" "strong_org_rules" {
+  name        = "strong-org-rules"
+  enforcement = "active"
+  target      = "branch"
+
+  conditions {
+    ref_name {
+      include = ["~DEFAULT_BRANCH", "refs/heads/main"]
+      exclude = []
+    }
+
+    repository_name {
+      include = ["~ALL"]
+      exclude = []
+    }
+  }
+
+  # Bypass list: team-au-mgrs and wiki-mods
+  bypass_actors {
+    actor_id    = github_team.team_au_mgrs.id
+    actor_type  = "Team"
+    bypass_mode = "always"
+  }
+
+  bypass_actors {
+    actor_id    = github_organization_custom_role.wiki_mods.id
+    actor_type  = "OrganizationAdmin"
+    bypass_mode = "always"
+  }
+
+  # Rule: Require pull requests with 2 reviews
+  rules {
+    pull_request {
+      required_approving_review_count   = 2
+      dismiss_stale_reviews_on_push     = true
+      require_code_owner_review         = false
+      require_last_push_approval        = false
+      required_review_thread_resolution = true
+    }
+  }
+
+  # Rule: Restrict creations
+  rules {
+    creation = true
+  }
+
+  # Rule: Restrict updates
+  rules {
+    update {
+      allow_fetch_and_merge = false
+    }
+  }
+
+  # Rule: Restrict deletions
+  rules {
+    deletion = true
+  }
+
+  # Rule: Restrict force pushes
+  rules {
+    required_linear_history = true
+  }
+
+  # Rule: Non-fast-forward
+  rules {
+    non_fast_forward = true
+  }
+
+  # No required status checks as specified
+}
+
+# GitHub Actions: Workflow permissions
+resource "github_actions_organization_permissions" "org_actions" {
+  allowed_actions = "selected"
+
+  allowed_actions_config {
+    github_owned_allowed = true
+    verified_allowed     = true
+    patterns_allowed = [
+      "${var.wiki_repo_name}-wiki-custodian-job-*"
+    ]
+  }
+
+  enabled_repositories = "all"
+}
+
+# Repository-specific Actions permissions
+resource "github_repository_actions_permissions" "wiki_actions" {
+  repository = github_repository.wiki.name
+
+  allowed_actions = "selected"
+
+  allowed_actions_config {
+    github_owned_allowed = true
+    verified_allowed     = false
+    patterns_allowed = [
+      "${var.wiki_repo_name}-wiki-custodian-job-*"
+    ]
+  }
+}
+
+# Outputs
+output "wiki_repo_url" {
+  value       = github_repository.wiki.html_url
+  description = "Wiki repository URL"
+}
+
+output "team_au_id" {
+  value       = github_team.team_au.id
+  description = "Team AU ID"
+}
+
+output "team_au_mgrs_id" {
+  value       = github_team.team_au_mgrs.id
+  description = "Team AU Managers ID"
+}
+
+output "wiki_mods_role_id" {
+  value       = github_organization_custom_role.wiki_mods.id
+  description = "Wiki Mods custom role ID"
+}
