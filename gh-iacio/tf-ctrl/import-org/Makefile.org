@@ -1,0 +1,45 @@
+# Organization Settings Management
+# Add these targets to your existing Makefile
+
+.PHONY: import-org show-org plan-org apply-org
+
+# Import existing organization settings
+import-org:
+	@echo "Importing organization settings..."
+	cd terraform && \
+	terraform import github_organization_settings.this $(GITHUB_ORG)
+
+# Show current organization settings in state
+show-org:
+	@cd terraform && \
+	terraform state show github_organization_settings.this 2>/dev/null || \
+	echo "Organization settings not yet imported"
+
+# Plan changes to organization settings only
+plan-org:
+	@cd terraform && \
+	terraform plan -target=github_organization_settings.this
+
+# Apply changes to organization settings only
+apply-org:
+	@cd terraform && \
+	terraform apply -target=github_organization_settings.this
+
+# Get current org settings from GitHub API (for comparison)
+fetch-org-settings:
+	@echo "Fetching current organization settings from GitHub..."
+	@gh api /orgs/$(GITHUB_ORG) | jq '{
+		name: .name,
+		company: .company,
+		blog: .blog,
+		location: .location,
+		email: .email,
+		twitter_username: .twitter_username,
+		description: .description,
+		has_organization_projects: .has_organization_projects,
+		has_repository_projects: .has_repository_projects,
+		default_repository_permission: .default_repository_permission,
+		members_can_create_repositories: .members_can_create_repositories,
+		two_factor_requirement_enabled: .two_factor_requirement_enabled,
+		web_commit_signoff_required: .web_commit_signoff_required
+	}'

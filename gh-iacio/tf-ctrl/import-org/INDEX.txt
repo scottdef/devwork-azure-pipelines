@@ -1,0 +1,502 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║          GITHUB ORGANIZATION SETTINGS TERRAFORM IMPORT PACKAGE            ║
+║                                                                           ║
+║                      Complete Infrastructure as Code                      ║
+║                   Built on Unix Philosophy Principles                     ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+VERSION: 1.0.0
+CREATED: October 2025
+TERRAFORM: ~> 1.9
+GITHUB PROVIDER: ~> 6.6
+
+═══════════════════════════════════════════════════════════════════════════
+
+                              TABLE OF CONTENTS
+
+═══════════════════════════════════════════════════════════════════════════
+
+📖 DOCUMENTATION
+────────────────
+  README.md                     → Start here! Master overview and quick start
+  ORG_SETTINGS_README.md        → Comprehensive guide with examples
+  QUICK_REFERENCE.txt           → One-page cheat sheet for daily use
+  ARCHITECTURE.txt              → System architecture and data flows
+  THIS FILE (INDEX.txt)         → You are here
+
+⚙️  TERRAFORM RESOURCES
+────────────────────────
+  organization.tf               → Main resource definition
+  organization_variables.tf     → Input variables for configuration
+
+🔧 AUTOMATION SCRIPTS
+─────────────────────
+  import-org-settings.sh        → Import existing GitHub org settings
+  end-to-end-example.sh         → Complete workflow demonstration
+
+🛠️  BUILD SYSTEM
+────────────────
+  Makefile.org                  → Make targets for org management
+
+🤖 CI/CD INTEGRATION
+────────────────────
+  org-settings-workflow.yml     → GitHub Actions workflow
+
+🔐 VERIFICATION
+───────────────
+  CHECKSUMS.txt                 → SHA256 checksums of all files
+
+═══════════════════════════════════════════════════════════════════════════
+
+                            QUICK START GUIDE
+
+═══════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Setup Files                                                   │
+└───────────────────────────────────────────────────────────────────────┘
+
+  $ cp organization.tf terraform/
+  $ cp organization_variables.tf terraform/
+  $ chmod +x import-org-settings.sh
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Import Existing Settings                                      │
+└───────────────────────────────────────────────────────────────────────┘
+
+  $ ./import-org-settings.sh your-org-name
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Review and Adjust                                             │
+└───────────────────────────────────────────────────────────────────────┘
+
+  $ cd terraform
+  $ terraform plan
+  $ vim organization.tf        # Adjust to match your needs
+  $ terraform plan             # Review again
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Apply Changes                                                 │
+└───────────────────────────────────────────────────────────────────────┘
+
+  $ terraform apply
+
+═══════════════════════════════════════════════════════════════════════════
+
+                              FILE DESCRIPTIONS
+
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ README.md                                                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Documentation                                                     │
+│ Size: ~9KB                                                              │
+│ Purpose: Master overview and entry point                               │
+│                                                                         │
+│ Contains:                                                               │
+│  • Package overview and what you get                                   │
+│  • Quick start instructions (30 seconds)                               │
+│  • Installation methods (Quick, Complete, GitHub Actions)              │
+│  • Security recommendations                                            │
+│  • Integration guides                                                  │
+│  • Troubleshooting common issues                                       │
+│                                                                         │
+│ Read this first!                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ORG_SETTINGS_README.md                                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Documentation                                                     │
+│ Size: ~7KB                                                              │
+│ Purpose: Comprehensive technical documentation                         │
+│                                                                         │
+│ Contains:                                                               │
+│  • Detailed problem statement                                          │
+│  • Step-by-step implementation guide                                   │
+│  • Understanding the resource in depth                                 │
+│  • Verification methods                                                │
+│  • Common configuration adjustments                                    │
+│  • Integration with existing setups                                    │
+│  • Troubleshooting guide                                               │
+│  • System architecture diagram                                         │
+│  • References and links                                                │
+│                                                                         │
+│ Read this for deep understanding.                                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ QUICK_REFERENCE.txt                                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Documentation                                                     │
+│ Size: ~11KB                                                             │
+│ Purpose: One-page cheat sheet                                          │
+│                                                                         │
+│ Contains:                                                               │
+│  • Import commands                                                     │
+│  • Resource identifier format                                          │
+│  • Verification commands                                               │
+│  • Resource structure example                                          │
+│  • Critical security settings checklist                                │
+│  • Workflow integration commands                                       │
+│  • Required permissions                                                │
+│  • Common issues and solutions                                         │
+│  • File locations                                                      │
+│  • Advanced state manipulation                                         │
+│  • Terraformer limitations                                             │
+│  • Testing commands                                                    │
+│                                                                         │
+│ Print and keep handy for daily reference.                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ARCHITECTURE.txt                                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Documentation                                                     │
+│ Size: ~12KB                                                             │
+│ Purpose: Visual system architecture and data flows                     │
+│                                                                         │
+│ Contains:                                                               │
+│  • Complete system diagram                                             │
+│  • Three operational flows:                                            │
+│    1. Initial import                                                   │
+│    2. Configuration management                                         │
+│    3. GitHub Actions automation                                        │
+│  • File ecosystem diagram                                              │
+│  • Security layers visualization                                       │
+│  • Make targets overview                                               │
+│  • Unix philosophy implementation                                      │
+│                                                                         │
+│ Read this to understand how everything fits together.                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ organization.tf                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Terraform Resource                                                │
+│ Size: ~1.7KB                                                            │
+│ Purpose: Define GitHub organization settings                           │
+│                                                                         │
+│ Contains:                                                               │
+│  • github_organization_settings resource                               │
+│  • Security-first default configuration                                │
+│  • Comments explaining each setting                                    │
+│  • Import command reference                                            │
+│                                                                         │
+│ Key Features:                                                           │
+│  • Default repository permission: "read"                               │
+│  • Member repository creation: disabled                                │
+│  • Advanced security: enabled for all new repos                        │
+│  • Secret scanning: enabled with push protection                       │
+│  • Commit signoff: required                                            │
+│                                                                         │
+│ Customizable for your organization's needs.                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ organization_variables.tf                                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Terraform Variables                                               │
+│ Size: ~1KB                                                              │
+│ Purpose: Input variables for organization resource                     │
+│                                                                         │
+│ Contains:                                                               │
+│  • org_billing_email (required)                                        │
+│  • org_company                                                         │
+│  • org_email                                                           │
+│  • org_twitter                                                         │
+│  • org_location                                                        │
+│  • org_description                                                     │
+│  • org_display_name                                                    │
+│  • org_blog                                                            │
+│                                                                         │
+│ Set these in terraform.tfvars or via environment variables.             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ import-org-settings.sh                                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Bash Script (Executable)                                          │
+│ Size: ~1KB                                                              │
+│ Purpose: Import existing GitHub organization settings                  │
+│                                                                         │
+│ Usage:                                                                  │
+│   ./import-org-settings.sh <org-name>                                  │
+│   GITHUB_ORG=<org-name> ./import-org-settings.sh                       │
+│                                                                         │
+│ What it does:                                                           │
+│  1. Validates organization name is provided                            │
+│  2. Changes to terraform directory                                     │
+│  3. Initializes Terraform if needed                                    │
+│  4. Runs terraform import command                                      │
+│  5. Provides next steps guidance                                       │
+│                                                                         │
+│ Simple, focused, does one thing well.                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ end-to-end-example.sh                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Bash Script (Executable)                                          │
+│ Size: ~9KB                                                              │
+│ Purpose: Complete workflow demonstration                               │
+│                                                                         │
+│ Usage:                                                                  │
+│   ./end-to-end-example.sh <org-name>                                   │
+│                                                                         │
+│ What it does:                                                           │
+│  1. Setup - Verify organization and directories                        │
+│  2. Copy files to terraform directory                                  │
+│  3. Create terraform.tfvars with examples                              │
+│  4. Initialize Terraform                                               │
+│  5. Fetch current settings from GitHub API                             │
+│  6. Import organization settings                                       │
+│  7. Show imported state                                                │
+│  8. Run terraform plan                                                 │
+│  9. Provide next steps instructions                                    │
+│ 10. Generate comparison report                                         │
+│                                                                         │
+│ Educational tool showing the complete process.                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Makefile.org                                                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Makefile                                                          │
+│ Size: ~1.5KB                                                            │
+│ Purpose: Composable make targets for organization management           │
+│                                                                         │
+│ Targets:                                                                │
+│  • import-org           - Import organization settings                 │
+│  • show-org            - Show current state                            │
+│  • plan-org            - Plan changes to org settings only             │
+│  • apply-org           - Apply changes to org settings only            │
+│  • fetch-org-settings  - Get current settings from GitHub API          │
+│                                                                         │
+│ Integration:                                                            │
+│   include Makefile.org                                                  │
+│                                                                         │
+│ Add to your existing Makefile for seamless workflow.                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ org-settings-workflow.yml                                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: GitHub Actions Workflow                                           │
+│ Size: ~5KB                                                              │
+│ Purpose: Automate organization settings management                     │
+│                                                                         │
+│ Triggers:                                                               │
+│  • Manual dispatch (import, plan, apply actions)                       │
+│  • Push to main on org settings file changes                           │
+│                                                                         │
+│ Jobs:                                                                   │
+│  • manage-org-settings - Main workflow                                 │
+│    - Checkout code                                                     │
+│    - Setup Terraform                                                   │
+│    - Import settings (if requested)                                    │
+│    - Run terraform plan                                                │
+│    - Comment plan on PRs                                               │
+│    - Apply changes (on main branch or manual trigger)                  │
+│    - Display current settings in job summary                           │
+│                                                                         │
+│  • security-check - PR security review                                 │
+│    - Generate security checklist                                       │
+│    - Parse and verify security settings                                │
+│                                                                         │
+│ Install: cp org-settings-workflow.yml .github/workflows/               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ CHECKSUMS.txt                                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Type: Verification                                                      │
+│ Purpose: SHA256 checksums for file integrity verification              │
+│                                                                         │
+│ Usage:                                                                  │
+│   sha256sum -c CHECKSUMS.txt                                           │
+│                                                                         │
+│ Verify file integrity after download or transfer.                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════
+
+                            USAGE PATTERNS
+
+═══════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ PATTERN 1: Quick Setup for Individual Developer                       │
+└───────────────────────────────────────────────────────────────────────┘
+
+  1. Read README.md (5 minutes)
+  2. Run ./import-org-settings.sh your-org
+  3. Edit terraform/organization.tf
+  4. terraform plan && terraform apply
+
+  Time investment: 15-20 minutes
+  Best for: Single-person shops, small teams
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ PATTERN 2: Enterprise Integration                                     │
+└───────────────────────────────────────────────────────────────────────┘
+
+  1. Review all documentation
+  2. Run ./end-to-end-example.sh for learning
+  3. Add Makefile.org to existing Makefile
+  4. Install org-settings-workflow.yml
+  5. Configure remote state backend
+  6. Import settings via Make
+  7. Create PR for review
+  8. Merge to apply
+
+  Time investment: 2-3 hours (including review)
+  Best for: Teams, enterprises, compliance needs
+
+┌───────────────────────────────────────────────────────────────────────┐
+│ PATTERN 3: Continuous Management                                      │
+└───────────────────────────────────────────────────────────────────────┘
+
+  Daily workflow:
+  1. Edit organization.tf
+  2. make plan-org
+  3. Review changes
+  4. make apply-org (or commit for PR review)
+
+  Use QUICK_REFERENCE.txt as daily reference
+  Best for: Ongoing infrastructure management
+
+═══════════════════════════════════════════════════════════════════════════
+
+                         LEARNING PATH
+
+═══════════════════════════════════════════════════════════════════════════
+
+📚 Beginner
+───────────
+  Start here → README.md
+  Then       → QUICK_REFERENCE.txt
+  Try        → ./end-to-end-example.sh
+  Practice   → Edit organization.tf and apply
+
+📚 Intermediate
+───────────────
+  Read       → ORG_SETTINGS_README.md
+  Understand → ARCHITECTURE.txt
+  Integrate  → Add Makefile.org to your workflow
+  Automate   → Install GitHub Actions workflow
+
+📚 Advanced
+───────────
+  Master     → All security settings and their implications
+  Customize  → Modify workflows for your CI/CD
+  Extend     → Add custom validation and policies
+  Share      → Contribute improvements back
+
+═══════════════════════════════════════════════════════════════════════════
+
+                         SUPPORT & RESOURCES
+
+═══════════════════════════════════════════════════════════════════════════
+
+📖 Official Documentation
+─────────────────────────
+  • Terraform GitHub Provider
+    https://registry.terraform.io/providers/integrations/github/latest
+
+  • GitHub Organization Settings Resource
+    https://registry.terraform.io/providers/integrations/github/latest/docs/resources/organization_settings
+
+  • GitHub REST API - Organizations
+    https://docs.github.com/en/rest/orgs/orgs
+
+  • Terraform Import
+    https://www.terraform.io/cli/import
+
+🔍 Quick Debugging
+──────────────────
+  • Check token permissions: gh auth status
+  • View current org settings: gh api /orgs/YOUR-ORG | jq
+  • Show Terraform state: terraform state show github_organization_settings.this
+  • Validate syntax: terraform validate
+  • Format code: terraform fmt
+
+💡 Tips & Tricks
+────────────────
+  • Always run terraform plan before apply
+  • Keep security settings restrictive by default
+  • Use remote state for team collaboration
+  • Enable detailed logging: TF_LOG=DEBUG
+  • Test changes in a staging org first
+
+═══════════════════════════════════════════════════════════════════════════
+
+                         PHILOSOPHY & PRINCIPLES
+
+═══════════════════════════════════════════════════════════════════════════
+
+This package embodies the Unix philosophy as practiced by Rob Pike and Ken
+Thompson at Bell Labs:
+
+  1. Make each program do one thing well
+     → Each script, each file has a singular, focused purpose
+
+  2. Expect the output of every program to become the input to another
+     → Composable through pipes, Make, and workflows
+
+  3. Design and build software to be tried early
+     → end-to-end-example.sh lets you experiment safely
+
+  4. Use tools in preference to unskilled help to lighten a programming task
+     → Automation over manual processes
+
+  5. Write programs that work together
+     → Terraform + GitHub API + Make + Actions = Seamless workflow
+
+═══════════════════════════════════════════════════════════════════════════
+
+                              MANIFESTO
+
+  We believe infrastructure should be:
+    • Declarative    - Describe what you want, not how
+    • Version-controlled - All changes tracked in git
+    • Reviewed      - PRs for infrastructure changes
+    • Tested        - Plan before apply
+    • Automated     - CI/CD for infrastructure
+    • Secure        - Security by default
+    • Simple        - Easy to understand and modify
+    • Composable    - Build complex from simple parts
+
+  This package delivers on these principles.
+
+═══════════════════════════════════════════════════════════════════════════
+
+                         ACKNOWLEDGMENTS
+
+  Built on the shoulders of giants:
+    • Rob Pike & Ken Thompson - Unix philosophy, Plan 9
+    • HashiCorp - Terraform
+    • GitHub - APIs and platform
+    • The open source community - Standing together
+
+═══════════════════════════════════════════════════════════════════════════
+
+           "Simplicity is the ultimate sophistication."
+                        — Leonardo da Vinci
+
+           "Perfection is achieved not when there is nothing
+            more to add, but when there is nothing left to
+            take away."
+                        — Antoine de Saint-Exupéry
+
+═══════════════════════════════════════════════════════════════════════════
+
+                              END OF INDEX
+
+          Thank you for using this package. Build amazing things.
+          Keep it simple. Keep it powerful. Keep it Unix.
+
+═══════════════════════════════════════════════════════════════════════════

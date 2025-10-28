@@ -1,0 +1,154 @@
+name: Manage Organization Settings
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - import
+          - plan
+          - apply
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/organization.tf'
+      - 'terraform/organization_variables.tf'
+      - '.github/workflows/org-settings.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GITHUB_ORG: ${{ github.repository_owner }}
+
+jobs:
+  manage-org-settings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.9
+
+      - name: Configure GitHub Token
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.ORG_ADMIN_TOKEN }}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Import Organization Settings
+        if: github.event.inputs.action == 'import' || github.event_name == 'workflow_dispatch'
+        working-directory: ./terraform
+        run: |
+          terraform import -input=false \
+            github_organization_settings.this \
+            ${{ env.GITHUB_ORG }} || echo "Already imported or error"
+        continue-on-error: true
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ./terraform
+        run: |
+          terraform plan \
+            -target=github_organization_settings.this \
+            -input=false \
+            -no-color \
+            -out=org-tfplan
+        continue-on-error: false
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Organization Settings Plan 📋
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: output
+            })
+
+      - name: Terraform Apply
+        if: |
+          github.event.inputs.action == 'apply' || 
+          (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        working-directory: ./terraform
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            org-tfplan
+
+      - name: Fetch Current Settings
+        if: always()
+        run: |
+          echo "## Current Organization Settings" >> $GITHUB_STEP_SUMMARY
+          gh api /orgs/${{ env.GITHUB_ORG }} | jq -r '
+            "| Setting | Value |",
+            "|---------|-------|",
+            "| Name | \(.name // "N/A") |",
+            "| Company | \(.company // "N/A") |",
+            "| Location | \(.location // "N/A") |",
+            "| Email | \(.email // "N/A") |",
+            "| Default Permission | \(.default_repository_permission) |",
+            "| Members Can Create Repos | \(.members_can_create_repositories) |",
+            "| 2FA Required | \(.two_factor_requirement_enabled) |",
+            "| Commit Signoff Required | \(.web_commit_signoff_required) |"
+          ' >> $GITHUB_STEP_SUMMARY
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+
+  security-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Security Review
+        run: |
+          echo "## Security Review Checklist" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the following before approving:" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Default permissions are restrictive (read/none)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Members cannot create public repositories" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Advanced security enabled for new repos" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Secret scanning and push protection enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Commit signoff required" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] 2FA requirement enabled (if applicable)" >> $GITHUB_STEP_SUMMARY
+          
+          # Parse organization.tf for security settings
+          if grep -q 'default_repository_permission.*=.*"read"' terraform/organization.tf; then
+            echo "✅ Default permission set to read" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  Default permission not set to read" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if grep -q 'members_can_create_public_repositories.*=.*false' terraform/organization.tf; then
+            echo "✅ Public repository creation disabled" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  Public repository creation may be enabled" >> $GITHUB_STEP_SUMMARY
+          fi

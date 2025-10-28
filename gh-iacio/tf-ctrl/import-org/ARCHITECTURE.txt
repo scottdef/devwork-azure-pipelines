@@ -1,0 +1,270 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║   GITHUB ORGANIZATION SETTINGS MANAGEMENT ARCHITECTURE                    ║
+║                                                                           ║
+║   Terraform + GitHub Actions + Make = Infrastructure as Code Bliss       ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+                            THE COMPLETE SYSTEM
+                            ───────────────────
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          GITHUB ORGANIZATION                            │
+│                          ──────────────────                             │
+│                                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │
+│  │   Profile    │  │   Security   │  │   Features   │                │
+│  │              │  │              │  │              │                │
+│  │ • Name       │  │ • 2FA        │  │ • Projects   │                │
+│  │ • Email      │  │ • Signoff    │  │ • Pages      │                │
+│  │ • Location   │  │ • Scanning   │  │ • Discussions│                │
+│  │ • Company    │  │ • Dependabot │  │ • Wikis      │                │
+│  └──────────────┘  └──────────────┘  └──────────────┘                │
+│                                                                         │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+                                 │ GitHub API
+                                 │ (admin:org scope)
+                                 │
+                ┌────────────────▼────────────────┐
+                │                                 │
+                │   TERRAFORM STATE               │
+                │   ────────────────              │
+                │                                 │
+                │   github_organization_settings  │
+                │            .this                │
+                │                                 │
+                └────────────────┬────────────────┘
+                                 │
+                                 │ terraform plan/apply
+                                 │
+┌────────────────────────────────▼────────────────────────────────────────┐
+│                       INFRASTRUCTURE AS CODE                            │
+│                       ────────────────────────                          │
+│                                                                         │
+│   ┌──────────────────────────────────────────────────────────────┐    │
+│   │  organization.tf                                              │    │
+│   │  ──────────────────                                           │    │
+│   │                                                               │    │
+│   │  resource "github_organization_settings" "this" {            │    │
+│   │    billing_email = var.org_billing_email                     │    │
+│   │    default_repository_permission = "read"                    │    │
+│   │    members_can_create_repositories = false                   │    │
+│   │    advanced_security_enabled_for_new_repositories = true     │    │
+│   │    ...                                                        │    │
+│   │  }                                                            │    │
+│   └──────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│   ┌──────────────────────────────────────────────────────────────┐    │
+│   │  organization_variables.tf                                    │    │
+│   │  ─────────────────────────                                    │    │
+│   │                                                               │    │
+│   │  variable "org_billing_email" { ... }                        │    │
+│   │  variable "org_company" { ... }                              │    │
+│   │  ...                                                          │    │
+│   └──────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+                           OPERATIONAL FLOWS
+                           ─────────────────
+
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  FLOW 1: INITIAL IMPORT                                               │
+└───────────────────────────────────────────────────────────────────────┘
+
+    Developer                  Scripts                 Terraform
+        │                         │                         │
+        │  ./import-org-settings.sh                        │
+        ├────────────────────────>│                         │
+        │                         │  terraform import       │
+        │                         ├────────────────────────>│
+        │                         │                         │
+        │                         │   [Queries GitHub API]  │
+        │                         │                         │
+        │                         │  Writes to state        │
+        │                         │<────────────────────────┤
+        │                         │                         │
+        │  Import complete        │                         │
+        │<────────────────────────┤                         │
+        │                         │                         │
+
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  FLOW 2: CONFIGURATION MANAGEMENT                                     │
+└───────────────────────────────────────────────────────────────────────┘
+
+    Developer              Terraform               GitHub
+        │                     │                       │
+        │  Edit organization.tf                      │
+        │  make plan-org      │                       │
+        ├────────────────────>│                       │
+        │                     │  Query current state  │
+        │                     ├──────────────────────>│
+        │                     │  Return settings      │
+        │                     │<──────────────────────┤
+        │                     │                       │
+        │  Show diff          │                       │
+        │<────────────────────┤                       │
+        │                     │                       │
+        │  make apply-org     │                       │
+        ├────────────────────>│                       │
+        │                     │  Update settings      │
+        │                     ├──────────────────────>│
+        │                     │  Confirm changes      │
+        │                     │<──────────────────────┤
+        │  Applied!           │                       │
+        │<────────────────────┤                       │
+        │                     │                       │
+
+
+┌───────────────────────────────────────────────────────────────────────┐
+│  FLOW 3: GITHUB ACTIONS AUTOMATION                                    │
+└───────────────────────────────────────────────────────────────────────┘
+
+   Developer          GitHub          Actions          Terraform
+       │                │                │                 │
+       │  git push       │                │                 │
+       ├───────────────>│                │                 │
+       │                │  Trigger       │                 │
+       │                ├───────────────>│                 │
+       │                │                │  Init           │
+       │                │                ├────────────────>│
+       │                │                │  Plan           │
+       │                │                ├────────────────>│
+       │                │  Post comment  │                 │
+       │                │<───────────────┤                 │
+       │                │                │                 │
+       │  Review plan   │                │                 │
+       │  Merge PR      │                │                 │
+       ├───────────────>│                │                 │
+       │                │  Trigger       │                 │
+       │                ├───────────────>│                 │
+       │                │                │  Apply          │
+       │                │                ├────────────────>│
+       │                │                │  Update GitHub  │
+       │                │<───────────────┴─────────────────┘
+       │                │
+       │  Settings updated!
+       │                │
+
+
+                              FILE ECOSYSTEM
+                              ──────────────
+
+
+           ┌─────────────────────────────────────────────┐
+           │         TERRAFORM FILES                     │
+           │         ──────────────                      │
+           │                                             │
+           │  organization.tf ─────────┐                │
+           │  organization_variables.tf │                │
+           │                           │                │
+           └───────────────────────────┼─────────────────┘
+                                       │
+                                       │
+           ┌───────────────────────────┼─────────────────┐
+           │         AUTOMATION                          │
+           │         ──────────                          │
+           │                           │                │
+           │  Makefile.org ────────────┤                │
+           │  import-org-settings.sh   │                │
+           │  end-to-end-example.sh    │                │
+           │  org-settings-workflow.yml│                │
+           │                           │                │
+           └───────────────────────────┼─────────────────┘
+                                       │
+                                       │
+           ┌───────────────────────────┼─────────────────┐
+           │         DOCUMENTATION                       │
+           │         ─────────────                       │
+           │                           │                │
+           │  README.md ───────────────┤                │
+           │  ORG_SETTINGS_README.md   │                │
+           │  QUICK_REFERENCE.txt      │                │
+           │                                             │
+           └─────────────────────────────────────────────┘
+
+
+                          SECURITY LAYERS
+                          ───────────────
+
+
+    ┌───────────────────────────────────────────────────────┐
+    │  GITHUB TOKEN AUTHENTICATION                          │
+    │  • admin:org scope                                    │
+    │  • Organization owner role                            │
+    └─────────────────────┬─────────────────────────────────┘
+                          │
+    ┌─────────────────────▼─────────────────────────────────┐
+    │  TERRAFORM STATE SECURITY                             │
+    │  • Remote backend (S3, Terraform Cloud)               │
+    │  • State locking                                      │
+    │  • Encryption at rest                                 │
+    └─────────────────────┬─────────────────────────────────┘
+                          │
+    ┌─────────────────────▼─────────────────────────────────┐
+    │  ORGANIZATION SETTINGS ENFORCEMENT                    │
+    │  • default_repository_permission = "read"             │
+    │  • members_can_create_repositories = false            │
+    │  • advanced_security_enabled = true                   │
+    │  • secret_scanning_enabled = true                     │
+    │  • web_commit_signoff_required = true                 │
+    └───────────────────────────────────────────────────────┘
+
+
+                        MAKE TARGETS OVERVIEW
+                        ─────────────────────
+
+
+        ┌──────────────────────────────────────────────┐
+        │  make import-org                             │
+        │  Import existing organization settings       │
+        └──────────────────────────────────────────────┘
+                            │
+        ┌───────────────────▼──────────────────────────┐
+        │  make show-org                               │
+        │  Display current state                       │
+        └──────────────────────────────────────────────┘
+                            │
+        ┌───────────────────▼──────────────────────────┐
+        │  make fetch-org-settings                     │
+        │  Get live settings from GitHub API           │
+        └──────────────────────────────────────────────┘
+                            │
+        ┌───────────────────▼──────────────────────────┐
+        │  make plan-org                               │
+        │  Preview changes                             │
+        └──────────────────────────────────────────────┘
+                            │
+        ┌───────────────────▼──────────────────────────┐
+        │  make apply-org                              │
+        │  Apply configuration changes                 │
+        └──────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════
+
+                     THE UNIX PHILOSOPHY IN ACTION
+
+  ┌───────────────────────────────────────────────────────────────┐
+  │  "Write programs that do one thing and do it well."          │
+  │                                        — Doug McIlroy         │
+  └───────────────────────────────────────────────────────────────┘
+
+  • organization.tf          → Declares desired state
+  • import-org-settings.sh   → Imports existing state
+  • Makefile.org             → Provides composable commands
+  • GitHub Actions           → Automates the workflow
+  • Plain text everywhere    → Human and machine readable
+
+═══════════════════════════════════════════════════════════════════════
+
+
+              Built with the spirit of Bell Labs
+              Simple. Composable. Powerful.
+
+              Rob Pike and Ken Thompson would approve.

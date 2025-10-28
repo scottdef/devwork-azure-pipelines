@@ -1,0 +1,173 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│ GITHUB ORGANIZATION SETTINGS - QUICK REFERENCE                      │
+│ Terraform Import & Management                                       │
+└─────────────────────────────────────────────────────────────────────┘
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ IMPORT COMMANDS                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  terraform import github_organization_settings.this <org-name>
+
+  # Using script
+  ./import-org-settings.sh acme-corp
+  
+  # Using make
+  make import-org GITHUB_ORG=acme-corp
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ RESOURCE IDENTIFIER                                               ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  Import ID: Organization login name (NOT numeric ID)
+  
+  Example: "acme-corp" ✓
+  Example: "12345678" ✗
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ VERIFICATION COMMANDS                                             ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  # Show Terraform state
+  terraform state show github_organization_settings.this
+  
+  # Fetch from GitHub API
+  gh api /orgs/acme-corp | jq
+  
+  # Compare settings
+  make fetch-org-settings
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ RESOURCE STRUCTURE                                                ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  resource "github_organization_settings" "this" {
+    billing_email = "billing@acme.com"
+    
+    # Identity
+    name        = "Acme Corporation"
+    company     = "Acme Corp"
+    email       = "hello@acme.com"
+    location    = "San Francisco"
+    blog        = "https://blog.acme.com"
+    
+    # Security (RECOMMENDED)
+    default_repository_permission = "read"
+    members_can_create_repositories = false
+    web_commit_signoff_required = true
+    
+    # Advanced Security
+    advanced_security_enabled_for_new_repositories = true
+    secret_scanning_enabled_for_new_repositories = true
+    dependabot_alerts_enabled_for_new_repositories = true
+  }
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ CRITICAL SECURITY SETTINGS                                        ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  ✓ default_repository_permission = "read"
+  ✓ members_can_create_repositories = false
+  ✓ members_can_create_public_repositories = false
+  ✓ members_can_fork_private_repositories = false
+  ✓ web_commit_signoff_required = true
+  ✓ advanced_security_enabled_for_new_repositories = true
+  ✓ secret_scanning_enabled_for_new_repositories = true
+  ✓ secret_scanning_push_protection_enabled... = true
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ WORKFLOW INTEGRATION                                              ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  # Manual trigger
+  gh workflow run org-settings.yml -f action=import
+  gh workflow run org-settings.yml -f action=plan
+  gh workflow run org-settings.yml -f action=apply
+  
+  # Auto-trigger on push to main
+  git add terraform/organization.tf
+  git commit -m "Update org settings"
+  git push origin main
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ REQUIRED PERMISSIONS                                              ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  GitHub Token Scopes:
+  - admin:org (read/write org settings)
+  - read:org (read org metadata)
+  
+  Organization Role:
+  - Owner (to modify org settings)
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ COMMON ISSUES                                                     ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  Q: Resource already exists in state?
+  A: terraform state rm github_organization_settings.this
+  
+  Q: Authentication error?
+  A: gh auth refresh -s admin:org
+  
+  Q: Settings not applying?
+  A: Check your GitHub plan (some features require Enterprise)
+  
+  Q: Import shows all changes?
+  A: Normal. Adjust organization.tf to match current state.
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ FILE LOCATIONS                                                    ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  terraform/organization.tf              # Resource definition
+  terraform/organization_variables.tf    # Input variables
+  import-org-settings.sh                 # Import script
+  Makefile.org                          # Make targets
+  .github/workflows/org-settings.yml    # Automation workflow
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ ADVANCED: STATE MANIPULATION                                      ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  # Remove from state (doesn't delete in GitHub)
+  terraform state rm github_organization_settings.this
+  
+  # View raw state
+  terraform state pull | jq '.resources[] | 
+    select(.type=="github_organization_settings")'
+  
+  # Move to module
+  terraform state mv github_organization_settings.this \
+    module.organization.github_organization_settings.this
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ TERRAFORMER LIMITATION                                            ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  ⚠️  terraformer does NOT support github_organization_settings
+  
+  Must be manually created and imported.
+  
+  Other unsupported resources:
+  - github_organization_ruleset
+  - github_repository_ruleset
+  - github_organization_custom_role
+
+╔═══════════════════════════════════════════════════════════════════╗
+║ TESTING                                                           ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+  # Plan only (no changes)
+  terraform plan -target=github_organization_settings.this
+  
+  # Apply to specific resource
+  terraform apply -target=github_organization_settings.this
+  
+  # Destroy (removes from state, not GitHub)
+  terraform destroy -target=github_organization_settings.this
+
+───────────────────────────────────────────────────────────────────
+ Rob Pike & Ken Thompson would approve of this simple, composable,
+ Unix-philosophy approach to infrastructure as code.
+───────────────────────────────────────────────────────────────────
