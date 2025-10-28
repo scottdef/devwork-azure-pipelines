@@ -1,0 +1,507 @@
+name: Organization Settings Drift Detection
+
+on:
+  schedule:
+    # Run hourly at minute 0
+    - cron: '0 * * * *'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      create_issue:
+        description: 'Create issue even if no drift detected (for testing)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  TF_VERSION: '1.5.0'
+  WORKING_DIR: '.'
+
+jobs:
+  detect-drift:
+    name: Detect Organization Settings Drift
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        run: terraform init
+      
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        run: |
+          terraform plan -detailed-exitcode -no-color -out=tfplan 2>&1 | tee plan_output.txt
+        continue-on-error: true
+      
+      - name: Check for Organization Settings Changes
+        id: check_changes
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # Check if plan detected changes (exit code 2)
+          if [ "${{ steps.plan.outcome }}" == "failure" ] && [ "${{ steps.plan.outputs.exitcode }}" == "2" ]; then
+            # Check if organization_settings resource has changes
+            if grep -q "github_organization_settings.main" plan_output.txt; then
+              echo "drift_detected=true" >> $GITHUB_OUTPUT
+              echo "✓ Drift detected in organization_settings"
+            else
+              echo "drift_detected=false" >> $GITHUB_OUTPUT
+              echo "✓ Changes detected but not in organization_settings"
+            fi
+          else
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+            echo "✓ No drift detected"
+          fi
+      
+      - name: Create Drift Comparison Script
+        if: steps.check_changes.outputs.drift_detected == 'true' || github.event.inputs.create_issue == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          cat > compare_drift.py << 'EOFPYTHON'
+          #!/usr/bin/env python3
+          """
+          GitHub Organization Settings Drift Comparison Tool
+          Compares terraform resource definition against live GitHub state
+          """
+          import json
+          import sys
+          from datetime import datetime
+
+          def load_json_file(filepath):
+              """Load JSON from file"""
+              try:
+                  with open(filepath, 'r') as f:
+                      return json.load(f)
+              except FileNotFoundError:
+                  print(f"Error: {filepath} not found", file=sys.stderr)
+                  return None
+              except json.JSONDecodeError as e:
+                  print(f"Error parsing {filepath}: {e}", file=sys.stderr)
+                  return None
+
+          def normalize_value(value):
+              """Normalize values for comparison"""
+              if value is None or value == "":
+                  return None
+              if isinstance(value, bool):
+                  return value
+              if isinstance(value, str):
+                  return value.strip()
+              return value
+
+          def compare_settings(resource_state, data_source_state):
+              """
+              Compare resource state with data source state
+              Returns dict of differences
+              """
+              differences = {}
+              
+              # List of all organization_settings arguments
+              # Based on github provider v6.6 schema
+              settings_fields = [
+                  'billing_email',
+                  'company',
+                  'blog',
+                  'email',
+                  'twitter_username',
+                  'location',
+                  'name',
+                  'description',
+                  'has_organization_projects',
+                  'has_repository_projects',
+                  'default_repository_permission',
+                  'members_can_create_repositories',
+                  'members_can_create_public_repositories',
+                  'members_can_create_private_repositories',
+                  'members_can_create_internal_repositories',
+                  'members_allowed_repository_creation_type',
+                  'members_can_create_pages',
+                  'members_can_create_public_pages',
+                  'members_can_create_private_pages',
+                  'members_can_fork_private_repositories',
+                  'web_commit_signoff_required',
+                  'advanced_security_enabled_for_new_repositories',
+                  'secret_scanning_enabled_for_new_repositories',
+                  'secret_scanning_push_protection_enabled_for_new_repositories',
+                  'dependabot_alerts_enabled_for_new_repositories',
+                  'dependabot_security_updates_enabled_for_new_repositories',
+                  'dependency_graph_enabled_for_new_repositories'
+              ]
+              
+              for field in settings_fields:
+                  resource_val = normalize_value(resource_state.get(field))
+                  datasource_val = normalize_value(data_source_state.get(field))
+                  
+                  if resource_val != datasource_val:
+                      differences[field] = {
+                          'terraform_config': resource_val,
+                          'github_actual': datasource_val,
+                          'drift_type': 'modified' if resource_val is not None else 'unset_in_config'
+                      }
+              
+              return differences
+
+          def format_markdown_report(differences, org_name):
+              """Format differences as GitHub-flavored markdown"""
+              report = []
+              report.append("# 🚨 Organization Settings Drift Detected")
+              report.append("")
+              report.append(f"**Organization**: `{org_name}`")
+              report.append(f"**Detection Time**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+              report.append(f"**Drift Count**: {len(differences)} setting(s) out of sync")
+              report.append("")
+              report.append("---")
+              report.append("")
+              
+              if not differences:
+                  report.append("✅ No drift detected - all settings match Terraform configuration")
+                  return "\n".join(report)
+              
+              report.append("## 📊 Drift Summary")
+              report.append("")
+              report.append("| Setting | Terraform Config | GitHub Actual | Status |")
+              report.append("|---------|------------------|---------------|--------|")
+              
+              for field, diff in sorted(differences.items()):
+                  tf_val = f"`{diff['terraform_config']}`" if diff['terraform_config'] is not None else "❌ Not Set"
+                  gh_val = f"`{diff['github_actual']}`" if diff['github_actual'] is not None else "❌ Not Set"
+                  status = "⚠️ Drift"
+                  report.append(f"| `{field}` | {tf_val} | {gh_val} | {status} |")
+              
+              report.append("")
+              report.append("---")
+              report.append("")
+              report.append("## 🔍 Detailed Drift Analysis")
+              report.append("")
+              
+              # Group by category
+              categories = {
+                  'Profile Information': [
+                      'billing_email', 'company', 'blog', 'email', 
+                      'twitter_username', 'location', 'name', 'description'
+                  ],
+                  'Repository Permissions': [
+                      'default_repository_permission',
+                      'members_can_create_repositories',
+                      'members_can_create_public_repositories',
+                      'members_can_create_private_repositories',
+                      'members_can_create_internal_repositories',
+                      'members_allowed_repository_creation_type'
+                  ],
+                  'Pages Settings': [
+                      'members_can_create_pages',
+                      'members_can_create_public_pages',
+                      'members_can_create_private_pages'
+                  ],
+                  'Project Settings': [
+                      'has_organization_projects',
+                      'has_repository_projects'
+                  ],
+                  'Security Settings': [
+                      'advanced_security_enabled_for_new_repositories',
+                      'secret_scanning_enabled_for_new_repositories',
+                      'secret_scanning_push_protection_enabled_for_new_repositories',
+                      'dependabot_alerts_enabled_for_new_repositories',
+                      'dependabot_security_updates_enabled_for_new_repositories',
+                      'dependency_graph_enabled_for_new_repositories'
+                  ],
+                  'Other Settings': [
+                      'members_can_fork_private_repositories',
+                      'web_commit_signoff_required'
+                  ]
+              }
+              
+              for category, fields in categories.items():
+                  category_diffs = {k: v for k, v in differences.items() if k in fields}
+                  if not category_diffs:
+                      continue
+                  
+                  report.append(f"### {category}")
+                  report.append("")
+                  
+                  for field, diff in sorted(category_diffs.items()):
+                      report.append(f"#### `{field}`")
+                      report.append("")
+                      report.append("```diff")
+                      report.append(f"- Terraform Config: {diff['terraform_config']}")
+                      report.append(f"+ GitHub Actual:    {diff['github_actual']}")
+                      report.append("```")
+                      report.append("")
+                      
+                      # Add context/explanation
+                      if diff['drift_type'] == 'unset_in_config':
+                          report.append("⚠️ **Warning**: This setting is not defined in Terraform but has a value in GitHub.")
+                          report.append("")
+              
+              report.append("---")
+              report.append("")
+              report.append("## 🔧 Remediation")
+              report.append("")
+              report.append("### Option 1: Apply Terraform Configuration (Recommended)")
+              report.append("")
+              report.append("```bash")
+              report.append("# Review the changes")
+              report.append("make plan")
+              report.append("")
+              report.append("# Apply to sync GitHub with Terraform")
+              report.append("make apply")
+              report.append("```")
+              report.append("")
+              report.append("### Option 2: Update Terraform Configuration")
+              report.append("")
+              report.append("If the GitHub values are correct, update your `terraform.tfvars`:")
+              report.append("")
+              report.append("```hcl")
+              for field, diff in sorted(differences.items()):
+                  if diff['github_actual'] is not None:
+                      if isinstance(diff['github_actual'], bool):
+                          report.append(f"{field} = {str(diff['github_actual']).lower()}")
+                      elif isinstance(diff['github_actual'], str):
+                          report.append(f'{field} = "{diff["github_actual"]}"')
+                      else:
+                          report.append(f"{field} = {diff['github_actual']}")
+              report.append("```")
+              report.append("")
+              report.append("Then run:")
+              report.append("```bash")
+              report.append("make plan  # Verify no changes")
+              report.append("```")
+              report.append("")
+              report.append("---")
+              report.append("")
+              report.append("## 📚 Additional Information")
+              report.append("")
+              report.append("- **Workflow**: `.github/workflows/drift-detection.yml`")
+              report.append("- **Schedule**: Hourly drift detection")
+              report.append("- **Documentation**: See [README.md](../blob/main/README.md)")
+              report.append("")
+              report.append("---")
+              report.append("")
+              report.append("*This issue was automatically generated by the Organization Settings Drift Detection workflow.*")
+              
+              return "\n".join(report)
+
+          def main():
+              # Load both state files
+              resource_state = load_json_file('resource_state.json')
+              datasource_state = load_json_file('datasource_state.json')
+              org_name = load_json_file('org_name.json')
+              
+              if not resource_state or not datasource_state:
+                  sys.exit(1)
+              
+              # Compare states
+              differences = compare_settings(resource_state, datasource_state)
+              
+              # Generate markdown report
+              report = format_markdown_report(differences, org_name.get('name', 'Unknown'))
+              
+              # Write report to file
+              with open('drift_report.md', 'w') as f:
+                  f.write(report)
+              
+              # Output summary
+              if differences:
+                  print(f"Drift detected: {len(differences)} setting(s) out of sync")
+                  sys.exit(1)
+              else:
+                  print("No drift detected")
+                  sys.exit(0)
+
+          if __name__ == '__main__':
+              main()
+          EOFPYTHON
+          
+          chmod +x compare_drift.py
+      
+      - name: Add Organization Settings Data Source
+        if: steps.check_changes.outputs.drift_detected == 'true' || github.event.inputs.create_issue == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # Create temporary file with data source
+          cat > drift_check_data_source.tf << 'EOF'
+          # Temporary data source for drift detection
+          # This file is auto-generated by the drift detection workflow
+          data "github_organization_settings" "current" {
+            # Fetches current state from GitHub API
+          }
+
+          # Output for comparison
+          output "current_org_settings" {
+            value     = data.github_organization_settings.current
+            sensitive = false
+          }
+          EOF
+          
+          echo "✓ Created data source for drift comparison"
+      
+      - name: Terraform Refresh and Extract States
+        if: steps.check_changes.outputs.drift_detected == 'true' || github.event.inputs.create_issue == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_ORG_ADMIN_TOKEN }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        run: |
+          # Refresh state to include data source
+          terraform init -upgrade
+          terraform apply -refresh-only -auto-approve
+          
+          # Extract resource state
+          terraform state show -json github_organization_settings.main | \
+            jq '.values' > resource_state.json
+          
+          # Extract data source state
+          terraform state show -json 'data.github_organization_settings.current' | \
+            jq '.values' > datasource_state.json
+          
+          # Get org name for report
+          echo "{\"name\": \"$GITHUB_OWNER\"}" > org_name.json
+          
+          echo "✓ Extracted states for comparison"
+      
+      - name: Setup Python
+        if: steps.check_changes.outputs.drift_detected == 'true' || github.event.inputs.create_issue == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Compare and Generate Drift Report
+        id: compare
+        if: steps.check_changes.outputs.drift_detected == 'true' || github.event.inputs.create_issue == 'true'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          python3 compare_drift.py
+          DRIFT_EXIT_CODE=$?
+          
+          if [ $DRIFT_EXIT_CODE -eq 1 ]; then
+            echo "has_drift=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_drift=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+      
+      - name: Create or Update Drift Issue
+        if: steps.compare.outputs.has_drift == 'true' || github.event.inputs.create_issue == 'true'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const fs = require('fs');
+            const driftReport = fs.readFileSync('drift_report.md', 'utf8');
+            
+            // Look for existing open drift issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'drift-detection,organization-settings',
+              per_page: 100
+            });
+            
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes('Organization Settings Drift Detected')
+            );
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: driftReport
+              });
+              
+              // Add comment about update
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `🔄 Drift report updated at ${new Date().toUTCString()}\n\nWorkflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+              
+              console.log(`Updated existing issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 Organization Settings Drift Detected',
+                body: driftReport,
+                labels: ['drift-detection', 'organization-settings', 'terraform']
+              });
+              
+              console.log(`Created new issue #${issue.data.number}`);
+            }
+      
+      - name: Close Drift Issue if No Drift
+        if: steps.compare.outputs.has_drift == 'false' && steps.check_changes.outputs.drift_detected == 'false'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            // Look for existing open drift issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'drift-detection,organization-settings',
+              per_page: 100
+            });
+            
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes('Organization Settings Drift Detected')
+            );
+            
+            if (existingIssue) {
+              // Close the issue with a comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `✅ Drift resolved! Organization settings now match Terraform configuration.\n\nResolved at: ${new Date().toUTCString()}\nWorkflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+              
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                state: 'closed'
+              });
+              
+              console.log(`Closed drift issue #${existingIssue.number}`);
+            }
+      
+      - name: Cleanup Temporary Files
+        if: always()
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          rm -f drift_check_data_source.tf
+          rm -f compare_drift.py
+          rm -f resource_state.json
+          rm -f datasource_state.json
+          rm -f org_name.json
+          rm -f drift_report.md
+          rm -f plan_output.txt
+          rm -f tfplan

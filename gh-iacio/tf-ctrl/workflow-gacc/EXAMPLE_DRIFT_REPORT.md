@@ -1,0 +1,188 @@
+# 🚨 Organization Settings Drift Detected
+
+**Organization**: `example-org`
+**Detection Time**: 2025-10-28 12:30:00 UTC
+**Drift Count**: 5 setting(s) out of sync
+
+---
+
+## 📊 Drift Summary
+
+| Setting | Terraform Config | GitHub Actual | Status |
+|---------|------------------|---------------|--------|
+| `default_repository_permission` | `read` | `write` | ⚠️ Drift |
+| `members_can_create_repositories` | `false` | `true` | ⚠️ Drift |
+| `members_can_create_public_repositories` | `false` | `true` | ⚠️ Drift |
+| `secret_scanning_enabled_for_new_repositories` | `true` | `false` | ⚠️ Drift |
+| `web_commit_signoff_required` | `false` | `true` | ⚠️ Drift |
+
+---
+
+## 🔍 Detailed Drift Analysis
+
+### Repository Permissions
+
+#### `default_repository_permission`
+
+```diff
+- Terraform Config: read
++ GitHub Actual:    write
+```
+
+#### `members_can_create_repositories`
+
+```diff
+- Terraform Config: False
++ GitHub Actual:    True
+```
+
+⚠️ **Security Impact**: Members can create repositories without governance oversight. This bypasses Infrastructure as Code controls and may lead to repository sprawl.
+
+#### `members_can_create_public_repositories`
+
+```diff
+- Terraform Config: False
++ GitHub Actual:    True
+```
+
+⚠️ **Security Impact**: Members can create public repositories, potentially exposing sensitive code or intellectual property.
+
+### Security Settings
+
+#### `secret_scanning_enabled_for_new_repositories`
+
+```diff
+- Terraform Config: True
++ GitHub Actual:    False
+```
+
+🔴 **Critical Security Impact**: New repositories are created without secret scanning enabled, increasing risk of credential leaks.
+
+### Other Settings
+
+#### `web_commit_signoff_required`
+
+```diff
+- Terraform Config: False
++ GitHub Actual:    True
+```
+
+ℹ️ **Note**: DCO (Developer Certificate of Origin) is enabled in GitHub but not reflected in Terraform configuration.
+
+---
+
+## 🔧 Remediation
+
+### Option 1: Apply Terraform Configuration (Recommended)
+
+This will sync GitHub with your Terraform-managed configuration:
+
+```bash
+# Review the changes
+make plan
+
+# Apply to sync GitHub with Terraform
+make apply
+```
+
+**What will happen**:
+- `default_repository_permission` will be set to `read`
+- `members_can_create_repositories` will be disabled
+- `members_can_create_public_repositories` will be disabled
+- `secret_scanning_enabled_for_new_repositories` will be enabled
+- `web_commit_signoff_required` will be disabled
+
+### Option 2: Update Terraform Configuration
+
+If the GitHub values are correct and should be the source of truth, update your `terraform.tfvars`:
+
+```hcl
+default_repository_permission = "write"
+members_can_create_repositories = true
+members_can_create_public_repositories = true
+secret_scanning_enabled_for_new_repositories = false
+web_commit_signoff_required = true
+```
+
+Then verify:
+```bash
+make plan  # Should show no changes
+```
+
+### Option 3: Investigate Before Acting
+
+If you didn't make these changes, investigate:
+
+1. **Check GitHub Audit Log**:
+   ```
+   Organization Settings → Audit log
+   Filter by: action:org.update_member_*
+   ```
+
+2. **Review recent admin activity**:
+   ```bash
+   # Via GitHub CLI
+   gh api /orgs/YOUR_ORG/audit-log --jq '.[] | select(.action | startswith("org.update"))'
+   ```
+
+3. **Identify who made changes**:
+   Look for `actor` field in audit log entries
+
+---
+
+## 📚 Additional Information
+
+- **Workflow**: `.github/workflows/drift-detection.yml`
+- **Schedule**: Hourly drift detection
+- **Documentation**: See [README.md](../blob/main/README.md)
+- **Drift Detection Guide**: See [DRIFT_DETECTION.md](../blob/main/DRIFT_DETECTION.md)
+
+### Why Drift Happens
+
+Common causes of configuration drift:
+1. ❌ Manual changes via GitHub UI (most common)
+2. ❌ Changes via GitHub API/CLI outside Terraform
+3. ❌ Multiple Terraform workspaces with different configs
+4. ❌ Terraform state out of sync
+5. ✅ Intentional emergency changes (document in issue)
+
+### Best Practices
+
+- ✅ All changes should go through Terraform
+- ✅ Use pull requests for config changes
+- ✅ Apply changes via CI/CD only
+- ✅ Disable manual access to organization settings
+- ✅ Regular drift detection (this workflow)
+
+---
+
+## 🚨 Security Review Required
+
+The following drifted settings have **security implications**:
+
+1. **members_can_create_public_repositories**: `false` → `true`
+   - Risk: Data exposure, IP leakage
+   - Action: Revert immediately via Terraform
+
+2. **secret_scanning_enabled_for_new_repositories**: `true` → `false`
+   - Risk: Credential leaks in new repos
+   - Action: **CRITICAL** - Re-enable immediately
+
+### Recommended Immediate Actions
+
+```bash
+# 1. Apply terraform to remediate (quickest)
+make apply
+
+# 2. Or manually revert critical settings in GitHub UI:
+#    - Organization Settings → Member privileges → Repository creation: OFF
+#    - Code security and analysis → Enable secret scanning for new repos: ON
+
+# 3. Review audit logs for unauthorized changes
+```
+
+---
+
+*This issue was automatically generated by the Organization Settings Drift Detection workflow.*
+*Last updated: 2025-10-28 12:30:00 UTC*
+*Workflow run: [View Details](https://github.com/example-org/example-repo/actions/runs/123456789)*
