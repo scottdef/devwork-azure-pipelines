@@ -1,0 +1,70 @@
+# ============================================================================
+# Example terraform.tfvars for GitHub Organization Settings
+# ============================================================================
+# Copy this to terraform.tfvars and customize for your organization
+# Never commit terraform.tfvars with real values to version control
+
+# REQUIRED - Must be set
+org_billing_email = "billing@example.com"
+
+# Organization Profile (Optional but recommended)
+org_company          = "Example Corp"
+org_name             = "Example Engineering"
+org_description      = "Engineering organization for Example Corp"
+org_blog_url         = "https://engineering.example.com"
+org_email            = "engineering@example.com"
+org_twitter_username = "exampleeng"
+org_location         = "San Francisco, CA"
+
+# Repository Permissions - Restrictive Enterprise Defaults
+# Principle: Least privilege by default, explicit grants via teams/IaC
+default_repository_permission            = "read"   # Members get read-only by default
+members_can_create_repositories          = false    # Only admins/IaC creates repos
+members_can_create_public_repositories   = false    # No public repos without approval
+members_can_create_private_repositories  = false    # Controlled via IaC
+members_can_create_internal_repositories = false    # Enterprise Cloud only
+members_allowed_repository_creation_type = "none"   # Complete lockdown
+
+# GitHub Pages - Disabled by Default
+members_can_create_pages         = false
+members_can_create_public_pages  = false
+members_can_create_private_pages = false
+
+# Fork Settings - Disabled to prevent data leakage
+members_can_fork_private_repositories = false
+
+# Project Boards - Enabled
+has_organization_projects = true
+has_repository_projects   = true
+
+# Commit Signoff - Optional DCO compliance
+web_commit_signoff_required = false
+
+# Security Features - ALL ENABLED for new repos
+# This is the "secure by default" stance
+advanced_security_enabled_for_new_repositories                = false   # Requires GH Enterprise
+secret_scanning_enabled_for_new_repositories                  = true
+secret_scanning_push_protection_enabled_for_new_repositories  = true
+dependabot_alerts_enabled_for_new_repositories                = true
+dependabot_security_updates_enabled_for_new_repositories      = true
+dependency_graph_enabled_for_new_repositories                 = true
+
+# ============================================================================
+# Alternative Configuration Examples
+# ============================================================================
+
+# Example 1: More permissive for small teams
+# default_repository_permission = "write"
+# members_can_create_private_repositories = true
+# members_allowed_repository_creation_type = "private"
+
+# Example 2: Open source organization
+# members_can_create_public_repositories = true
+# members_can_create_pages = true
+# members_can_create_public_pages = true
+# members_allowed_repository_creation_type = "all"
+
+# Example 3: GitHub Enterprise Cloud with internal repos
+# members_can_create_internal_repositories = true
+# members_allowed_repository_creation_type = "internal"
+# advanced_security_enabled_for_new_repositories = true
