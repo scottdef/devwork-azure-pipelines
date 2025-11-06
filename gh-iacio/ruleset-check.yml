@@ -1,0 +1,271 @@
+name: Branch Ruleset Compliance Check
+
+on:
+  schedule:
+    # Run daily at 0800 UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+          terraform_wrapper: false
+
+      - name: Write Terraform config
+        env:
+          ORG: ${{ github.repository_owner }}
+        run: |
+          cat > check.tf <<'EOF'
+          terraform {
+            required_providers {
+              github = {
+                source  = "integrations/github"
+                version = "~> 6.0"
+              }
+            }
+          }
+
+          provider "github" {
+            owner = var.org
+          }
+
+          variable "org" {
+            type = string
+          }
+
+          data "github_organization_rulesets" "all" {
+          }
+
+          output "rulesets" {
+            value = data.github_organization_rulesets.all.rulesets
+          }
+
+          output "main_protection_exists" {
+            value = contains(
+              [for r in data.github_organization_rulesets.all.rulesets : r.name],
+              "main-protection"
+            )
+          }
+          EOF
+
+      - name: Terraform init
+        run: terraform init
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan -var="org=${{ github.repository_owner }}" -out=tfplan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check ruleset exists
+        id: check
+        run: |
+          set -euo pipefail
+          
+          # Get the output
+          exists=$(terraform output -raw main_protection_exists)
+          
+          echo "exists=$exists" >> $GITHUB_OUTPUT
+          
+          if [ "$exists" = "true" ]; then
+            echo "✓ main-protection ruleset exists"
+            
+            # Get ruleset details
+            terraform output -json rulesets | \
+              jq '.[] | select(.name == "main-protection")' > /tmp/ruleset.json
+            
+            echo "Ruleset details:"
+            cat /tmp/ruleset.json | jq '.'
+          else
+            echo "✗ main-protection ruleset NOT FOUND"
+            
+            # List existing rulesets
+            echo "Existing rulesets:"
+            terraform output -json rulesets | jq -r '.[] | "- \(.name) (id: \(.id))"'
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate issue body
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          cat > /tmp/issue.md <<'EOF'
+          ## 🚨 Missing Organization Branch Ruleset
+
+          **Ruleset Name:** `main-protection`  
+          **Organization:** `${{ github.repository_owner }}`  
+          **Detection Time:** `$(date -u +%Y-%m-%dT%H:%M:%SZ)`
+
+          ### Status
+          The required organization-level branch ruleset **main-protection** does not exist.
+
+          ### Expected Configuration
+          A branch ruleset named `main-protection` should exist at the organization level with:
+          - Protection for `main` branches across all repositories
+          - Enforcement level: Active or Evaluate
+          - Required rules (customize as needed):
+            - Require pull request reviews
+            - Require status checks to pass
+            - Require branches to be up to date
+            - Block force pushes
+            - Restrict deletions
+
+          ### Current State
+```json
+          $(terraform output -json rulesets | jq '.')
+```
+
+          ### Remediation
+
+          **Option 1: Create via GitHub UI**
+          1. Go to Organization Settings → Repository → Repository rulesets
+          2. Click "New ruleset" → "New branch ruleset"
+          3. Name it `main-protection`
+          4. Configure target branches and rules
+          5. Set enforcement level and save
+
+          **Option 2: Create via Terraform**
+```hcl
+          resource "github_organization_ruleset" "main_protection" {
+            name        = "main-protection"
+            target      = "branch"
+            enforcement = "active"
+
+            conditions {
+              ref_name {
+                include = ["~DEFAULT_BRANCH"]
+                exclude = []
+              }
+            }
+
+            rules {
+              pull_request {
+                required_approving_review_count = 1
+              }
+              required_status_checks {
+                required_check {
+                  context = "ci/build"
+                }
+              }
+              non_fast_forward = true
+              deletion         = true
+            }
+          }
+```
+
+          **Option 3: Create via gh CLI**
+```bash
+          # Create ruleset JSON
+          cat > ruleset.json <<'RULESET'
+          {
+            "name": "main-protection",
+            "target": "branch",
+            "enforcement": "active",
+            "conditions": {
+              "ref_name": {
+                "include": ["~DEFAULT_BRANCH"],
+                "exclude": []
+              }
+            },
+            "rules": [
+              {"type": "pull_request", "parameters": {"required_approving_review_count": 1}},
+              {"type": "required_status_checks", "parameters": {"required_status_checks": []}},
+              {"type": "non_fast_forward"},
+              {"type": "deletion"}
+            ]
+          }
+          RULESET
+
+          # Apply ruleset
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /orgs/${{ github.repository_owner }}/rulesets \
+            --input ruleset.json
+```
+
+          ### References
+          - [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [GitHub Docs: Branch Rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
+
+          ---
+          *Auto-generated by Branch Ruleset Compliance Check*
+          EOF
+
+      - name: Check for existing issue
+        if: steps.check.outputs.exists == 'false'
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          issue=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "compliance,branch-protection" \
+            --state open \
+            --search "Missing Organization Branch Ruleset in:title" \
+            --json number \
+            --jq '.[0].number // empty')
+          
+          if [ -n "$issue" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "number=$issue" >> $GITHUB_OUTPUT
+            echo "Found existing issue: #$issue"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update existing issue
+        if: steps.check.outputs.exists == 'false' && steps.existing.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ steps.existing.outputs.number }} \
+            --repo "${{ github.repository }}" \
+            --body "🔄 **Rechecked:** $(date -u +%Y-%m-%dT%H:%M:%SZ) - Ruleset still missing"
+
+      - name: Create new issue
+        if: steps.check.outputs.exists == 'false' && steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🚨 Missing Organization Branch Ruleset: main-protection" \
+            --body-file /tmp/issue.md \
+            --label "compliance,branch-protection,security,automated"
+
+      - name: Close issue if fixed
+        if: steps.check.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          issue=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "compliance,branch-protection" \
+            --state open \
+            --search "Missing Organization Branch Ruleset in:title" \
+            --json number \
+            --jq '.[0].number // empty')
+          
+          if [ -n "$issue" ]; then
+            gh issue close $issue \
+              --repo "${{ github.repository }}" \
+              --comment "✅ Resolved: main-protection ruleset now exists. Detected at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Closed issue #$issue - ruleset now exists"
+          fi
