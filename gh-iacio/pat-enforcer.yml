@@ -1,0 +1,383 @@
+name: PAT Policy Enforcer
+
+on:
+  schedule:
+    # Run daily at 0900 UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  # Requires org admin permissions for PAT settings
+
+jobs:
+  enforce-pat-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current PAT settings
+        id: current
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          
+          # Get organization PAT settings
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/orgs/${ORG}/personal-access-tokens" \
+            > /tmp/pat_settings.json
+          
+          echo "Current PAT settings:"
+          cat /tmp/pat_settings.json | jq '.'
+          
+          # Extract current values
+          fg_policy=$(jq -r '.fine_grained_personal_access_tokens_policy // "none"' /tmp/pat_settings.json)
+          fg_expiry=$(jq -r '.fine_grained_token_expiration_policy_days // 0' /tmp/pat_settings.json)
+          classic_expiry=$(jq -r '.personal_access_token_expiration_policy_days // 0' /tmp/pat_settings.json)
+          
+          echo "fg_policy=$fg_policy" >> $GITHUB_OUTPUT
+          echo "fg_expiry=$fg_expiry" >> $GITHUB_OUTPUT
+          echo "classic_expiry=$classic_expiry" >> $GITHUB_OUTPUT
+          
+          echo "Fine-grained policy: $fg_policy"
+          echo "Fine-grained expiry: $fg_expiry days"
+          echo "Classic expiry: $classic_expiry days"
+
+      - name: Check fine-grained token restriction
+        id: check_fg_restriction
+        run: |
+          policy="${{ steps.current.outputs.fg_policy }}"
+          
+          if [ "$policy" != "restricted" ]; then
+            echo "compliant=false" >> $GITHUB_OUTPUT
+            echo "current=$policy" >> $GITHUB_OUTPUT
+            echo "❌ Fine-grained tokens policy is '$policy', should be 'restricted'"
+          else
+            echo "compliant=true" >> $GITHUB_OUTPUT
+            echo "current=$policy" >> $GITHUB_OUTPUT
+            echo "✓ Fine-grained tokens policy is correctly set to 'restricted'"
+          fi
+
+      - name: Check fine-grained token expiration
+        id: check_fg_expiry
+        run: |
+          expiry="${{ steps.current.outputs.fg_expiry }}"
+          
+          if [ "$expiry" != "30" ]; then
+            echo "compliant=false" >> $GITHUB_OUTPUT
+            echo "current=$expiry" >> $GITHUB_OUTPUT
+            echo "❌ Fine-grained token expiration is $expiry days, should be 30"
+          else
+            echo "compliant=true" >> $GITHUB_OUTPUT
+            echo "current=$expiry" >> $GITHUB_OUTPUT
+            echo "✓ Fine-grained token expiration is correctly set to 30 days"
+          fi
+
+      - name: Check classic token expiration
+        id: check_classic_expiry
+        run: |
+          expiry="${{ steps.current.outputs.classic_expiry }}"
+          
+          if [ "$expiry" != "30" ]; then
+            echo "compliant=false" >> $GITHUB_OUTPUT
+            echo "current=$expiry" >> $GITHUB_OUTPUT
+            echo "❌ Classic token expiration is $expiry days, should be 30"
+          else
+            echo "compliant=true" >> $GITHUB_OUTPUT
+            echo "current=$expiry" >> $GITHUB_OUTPUT
+            echo "✓ Classic token expiration is correctly set to 30 days"
+          fi
+
+      - name: Fix fine-grained token restriction
+        if: steps.check_fg_restriction.outputs.compliant == 'false'
+        id: fix_fg_restriction
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          
+          echo "Updating fine-grained token policy to 'restricted'..."
+          
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/orgs/${ORG}/personal-access-tokens" \
+            -f fine_grained_personal_access_tokens_policy='restricted' \
+            > /tmp/update_result.json
+          
+          new_policy=$(jq -r '.fine_grained_personal_access_tokens_policy' /tmp/update_result.json)
+          
+          if [ "$new_policy" = "restricted" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✓ Successfully updated to 'restricted'"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "✗ Failed to update policy"
+            exit 1
+          fi
+
+      - name: Fix fine-grained token expiration
+        if: steps.check_fg_expiry.outputs.compliant == 'false'
+        id: fix_fg_expiry
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          
+          echo "Updating fine-grained token expiration to 30 days..."
+          
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/orgs/${ORG}/personal-access-tokens" \
+            -F fine_grained_token_expiration_policy_days=30 \
+            > /tmp/update_result.json
+          
+          new_expiry=$(jq -r '.fine_grained_token_expiration_policy_days' /tmp/update_result.json)
+          
+          if [ "$new_expiry" = "30" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✓ Successfully updated to 30 days"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "✗ Failed to update expiration"
+            exit 1
+          fi
+
+      - name: Fix classic token expiration
+        if: steps.check_classic_expiry.outputs.compliant == 'false'
+        id: fix_classic_expiry
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          
+          echo "Updating classic token expiration to 30 days..."
+          
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/orgs/${ORG}/personal-access-tokens" \
+            -F personal_access_token_expiration_policy_days=30 \
+            > /tmp/update_result.json
+          
+          new_expiry=$(jq -r '.personal_access_token_expiration_policy_days' /tmp/update_result.json)
+          
+          if [ "$new_expiry" = "30" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✓ Successfully updated to 30 days"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "✗ Failed to update expiration"
+            exit 1
+          fi
+
+      - name: Generate issue body
+        if: |
+          steps.check_fg_restriction.outputs.compliant == 'false' ||
+          steps.check_fg_expiry.outputs.compliant == 'false' ||
+          steps.check_classic_expiry.outputs.compliant == 'false'
+        run: |
+          cat > /tmp/issue.md <<'EOF'
+          ## 🔐 PAT Policy Enforcement Action
+
+          **Timestamp:** `$(date -u +%Y-%m-%dT%H:%M:%SZ)`  
+          **Organization:** `${{ github.repository_owner }}`
+
+          ### Actions Taken
+
+          EOF
+          
+          # Fine-grained restriction
+          if [ "${{ steps.check_fg_restriction.outputs.compliant }}" = "false" ]; then
+            cat >> /tmp/issue.md <<FGRESTRICT
+          #### Fine-Grained Token Restriction Policy
+
+          **Previous Value:** \`${{ steps.check_fg_restriction.outputs.current }}\`  
+          **New Value:** \`restricted\`  
+          **Status:** $([ "${{ steps.fix_fg_restriction.outputs.success }}" = "true" ] && echo "✅ Automatically Fixed" || echo "❌ Failed to Fix")
+
+          **Impact:** Fine-grained personal access tokens now require explicit approval before use.
+
+          FGRESTRICT
+          fi
+          
+          # Fine-grained expiration
+          if [ "${{ steps.check_fg_expiry.outputs.compliant }}" = "false" ]; then
+            cat >> /tmp/issue.md <<FGEXPIRY
+          #### Fine-Grained Token Expiration
+
+          **Previous Value:** \`${{ steps.check_fg_expiry.outputs.current }} days\`  
+          **New Value:** \`30 days\`  
+          **Status:** $([ "${{ steps.fix_fg_expiry.outputs.success }}" = "true" ] && echo "✅ Automatically Fixed" || echo "❌ Failed to Fix")
+
+          **Impact:** All new fine-grained tokens will expire after 30 days maximum.
+
+          FGEXPIRY
+          fi
+          
+          # Classic expiration
+          if [ "${{ steps.check_classic_expiry.outputs.compliant }}" = "false" ]; then
+            cat >> /tmp/issue.md <<CLASSICEXPIRY
+          #### Classic Token Expiration
+
+          **Previous Value:** \`${{ steps.check_classic_expiry.outputs.current }} days\`  
+          **New Value:** \`30 days\`  
+          **Status:** $([ "${{ steps.fix_classic_expiry.outputs.success }}" = "true" ] && echo "✅ Automatically Fixed" || echo "❌ Failed to Fix")
+
+          **Impact:** All new classic tokens will expire after 30 days maximum.
+
+          CLASSICEXPIRY
+          fi
+          
+          cat >> /tmp/issue.md <<'FOOTER'
+
+          ### Current Settings
+```json
+          $(cat /tmp/pat_settings.json | jq '{
+            fine_grained_policy: .fine_grained_personal_access_tokens_policy,
+            fine_grained_expiry_days: .fine_grained_token_expiration_policy_days,
+            classic_expiry_days: .personal_access_token_expiration_policy_days,
+            classic_allowed: .personal_access_tokens_allowed
+          }')
+```
+
+          ### Policy Rationale
+
+          **Why Restricted?**
+          - Prevents unauthorized token creation
+          - Requires explicit org admin approval
+          - Reduces attack surface for compromised accounts
+          - Enables centralized token governance
+
+          **Why 30 Days?**
+          - Limits exposure window for leaked tokens
+          - Forces regular token rotation
+          - Aligns with security best practices
+          - Reduces dormant credential risk
+
+          ### Verification
+```bash
+          # Check current settings
+          gh api /orgs/${{ github.repository_owner }}/personal-access-tokens | \
+            jq '{
+              fine_grained_policy: .fine_grained_personal_access_tokens_policy,
+              fine_grained_expiry: .fine_grained_token_expiration_policy_days,
+              classic_expiry: .personal_access_token_expiration_policy_days
+            }'
+```
+
+          ### User Impact
+
+          - **New tokens:** Must be created with 30-day or shorter expiration
+          - **Fine-grained tokens:** Require org admin approval before use
+          - **Existing tokens:** Not affected by this change
+          - **Token renewal:** Users will need to regenerate tokens monthly
+
+          ### Next Steps
+
+          1. ✅ Review this automated change
+          2. ✅ Notify organization members about new policy
+          3. ✅ Update internal documentation
+          4. ✅ Monitor for token approval requests
+          5. ✅ Close this issue once reviewed
+
+          ### Audit Trail
+
+          - **Workflow Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - **Actor:** GitHub Actions (automated)
+          - **Authorization:** PAT_ADMIN_TOKEN secret
+
+          ---
+          *Auto-generated by PAT Policy Enforcer*
+          FOOTER
+
+      - name: Create issue
+        if: |
+          steps.check_fg_restriction.outputs.compliant == 'false' ||
+          steps.check_fg_expiry.outputs.compliant == 'false' ||
+          steps.check_classic_expiry.outputs.compliant == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Generate unique title with timestamp
+          timestamp=$(date -u +%Y%m%d-%H%M)
+          
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🔐 PAT Policy Auto-Enforcement - $timestamp" \
+            --body-file /tmp/issue.md \
+            --label "security,pat-policy,automated,enforcement"
+          
+          echo "Issue created for enforcement action"
+
+      - name: Verify all settings
+        id: verify
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          
+          echo "Verifying final state..."
+          
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/orgs/${ORG}/personal-access-tokens" \
+            > /tmp/final_settings.json
+          
+          fg_policy=$(jq -r '.fine_grained_personal_access_tokens_policy' /tmp/final_settings.json)
+          fg_expiry=$(jq -r '.fine_grained_token_expiration_policy_days' /tmp/final_settings.json)
+          classic_expiry=$(jq -r '.personal_access_token_expiration_policy_days' /tmp/final_settings.json)
+          
+          echo "### Final State" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value | Compliant |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Fine-grained Policy | $fg_policy | $([ "$fg_policy" = "restricted" ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fine-grained Expiry | $fg_expiry days | $([ "$fg_expiry" = "30" ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Classic Expiry | $classic_expiry days | $([ "$classic_expiry" = "30" ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if all compliant
+          if [ "$fg_policy" = "restricted" ] && [ "$fg_expiry" = "30" ] && [ "$classic_expiry" = "30" ]; then
+            echo "all_compliant=true" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All policies are compliant**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "all_compliant=false" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Some policies remain non-compliant - manual intervention required**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if not compliant
+        if: steps.verify.outputs.all_compliant == 'false'
+        run: |
+          echo "❌ PAT policy enforcement failed"
+          echo "Some settings could not be automatically corrected"
+          echo "Manual intervention required"
+          exit 1
+
+      - name: Success summary
+        if: steps.verify.outputs.all_compliant == 'true'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<'EOF'
+          
+          ### 🎯 Enforcement Complete
+          
+          All PAT policies are now compliant with security requirements:
+          - ✅ Fine-grained tokens restricted
+          - ✅ Fine-grained tokens expire in 30 days
+          - ✅ Classic tokens expire in 30 days
+          
+          No manual action required.
+          EOF
