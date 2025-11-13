@@ -1,0 +1,32 @@
+kickbutt-compliance/
+├── .github/
+│   └── workflows/
+│       ├── control-org-settings.yml      ← Check org 2FA, permissions
+│       ├── control-repo-visibility.yml    ← Check public/private repos
+│       ├── control-repo-rulesets.yml      ← Check branch protection
+│       ├── control-org-custom-role.yml    ← Check custom roles
+│       └── update-trust-center.yml        ← Update site hourly
+│
+├── scripts/
+│   └── generate-trust-center.sh           ← Query GitHub API, generate JSON
+│
+├── trust-center/
+│   ├── index.html                         ← Main trust center page
+│   ├── style.css                          ← Vanta-inspired dark theme
+│   ├── status.js                          ← Load and display statuses
+│   └── status.json.example                ← Sample data for testing
+│
+├── README.md                              ← Main documentation
+├── QUICKSTART.md                          ← 5-minute setup guide
+├── DEPLOYMENT.md                          ← Detailed deployment steps
+├── ARCHITECTURE.md                        ← Technical deep-dive
+├── PACKAGE-README.md                      ← This package overview
+├── Makefile                               ← Convenient commands
+├── .gitignore                             ← Git ignore rules
+└── STRUCTURE.txt                          ← This file
+
+Total Files: 17
+Total Lines: ~2,500
+Dependencies: bash, git, jq, gh CLI
+External Services: 0
+Cost: $0 (GitHub Actions free tier)

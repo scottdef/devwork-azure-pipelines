@@ -1,0 +1,85 @@
+name: Control - Organization Settings
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-org-settings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || sudo apt-get install gh -y
+          gh --version
+
+      - name: Authenticate
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Check organization settings
+        id: check
+        run: |
+          set -e
+          echo "🔍 Checking organization settings..."
+          ORG="${{ github.repository_owner }}"
+          
+          # Get organization data
+          org_data=$(gh api "/orgs/${ORG}" 2>/dev/null || echo "{}")
+          
+          if [ "$org_data" = "{}" ]; then
+            echo "::error::Failed to fetch organization data"
+            exit 1
+          fi
+          
+          errors=0
+          
+          # Check if 2FA is required (Enterprise Cloud feature)
+          two_factor=$(echo "$org_data" | jq -r '.two_factor_requirement_enabled // "false"')
+          if [ "$two_factor" != "true" ]; then
+            echo "::warning::Two-factor authentication is not enforced"
+            ((errors++))
+          else
+            echo "✅ Two-factor authentication is required"
+          fi
+          
+          # Check default repository permission
+          default_perm=$(echo "$org_data" | jq -r '.default_repository_permission // "read"')
+          if [ "$default_perm" = "admin" ] || [ "$default_perm" = "write" ]; then
+            echo "::warning::Default repository permission is too permissive: $default_perm"
+            ((errors++))
+          else
+            echo "✅ Default repository permission is acceptable: $default_perm"
+          fi
+          
+          # Check member repo creation settings
+          can_create_public=$(echo "$org_data" | jq -r '.members_can_create_public_repositories // false')
+          if [ "$can_create_public" = "true" ]; then
+            echo "::warning::Members can create public repositories"
+          else
+            echo "✅ Public repository creation is restricted"
+          fi
+          
+          echo "errors=$errors" >> $GITHUB_OUTPUT
+          
+          if [ $errors -gt 0 ]; then
+            echo "::error::Found $errors configuration issues"
+            exit 1
+          fi
+          
+          echo "✅ All organization settings are compliant"
+
+      - name: Report status
+        if: always()
+        run: |
+          if [ "${{ steps.check.outcome }}" = "success" ]; then
+            echo "✅ Control passed: Organization settings are compliant"
+          else
+            echo "❌ Control failed: Organization settings need attention"
+          fi

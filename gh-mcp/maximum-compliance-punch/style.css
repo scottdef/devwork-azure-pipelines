@@ -1,0 +1,249 @@
+:root {
+    --primary-bg: #0d1117;
+    --secondary-bg: #161b22;
+    --card-bg: #1c2128;
+    --border-color: #30363d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --success: #238636;
+    --warning: #d29922;
+    --error: #da3633;
+    --info: #58a6ff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    background-color: var(--primary-bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+header {
+    background-color: var(--secondary-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 2rem 0;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Main Content */
+main {
+    padding: 3rem 0;
+}
+
+section {
+    margin-bottom: 3rem;
+}
+
+h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+}
+
+.section-desc {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+/* Status Overview */
+.status-overview {
+    display: flex;
+    justify-content: center;
+}
+
+.status-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    min-width: 400px;
+}
+
+.status-indicator {
+    margin: 2rem 0;
+}
+
+.status-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.status-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.status-operational { color: var(--success); }
+.status-degraded { color: var(--warning); }
+.status-failed { color: var(--error); }
+
+.last-updated {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+}
+
+/* Controls Table */
+.controls-table {
+    width: 100%;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+
+.controls-table thead {
+    background-color: var(--secondary-bg);
+}
+
+.controls-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.controls-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.controls-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.controls-table tbody tr:hover {
+    background-color: var(--secondary-bg);
+}
+
+.control-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.control-status.success {
+    background-color: rgba(35, 134, 54, 0.15);
+    color: var(--success);
+}
+
+.control-status.failure {
+    background-color: rgba(218, 54, 51, 0.15);
+    color: var(--error);
+}
+
+.control-status.pending {
+    background-color: rgba(88, 166, 255, 0.15);
+    color: var(--info);
+}
+
+.control-status.unknown {
+    background-color: rgba(139, 148, 158, 0.15);
+    color: var(--text-secondary);
+}
+
+.control-link {
+    color: var(--info);
+    text-decoration: none;
+}
+
+.control-link:hover {
+    text-decoration: underline;
+}
+
+.loading {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem !important;
+}
+
+/* Info Section */
+.info-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.info-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.info-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.info-card p {
+    color: var(--text-secondary);
+}
+
+/* Footer */
+footer {
+    background-color: var(--secondary-bg);
+    border-top: 1px solid var(--border-color);
+    padding: 2rem 0;
+    text-align: center;
+    margin-top: 4rem;
+}
+
+footer p {
+    color: var(--text-secondary);
+    margin: 0.5rem 0;
+}
+
+.footer-note {
+    font-size: 0.85rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .status-card {
+        min-width: 100%;
+    }
+    
+    .controls-table {
+        font-size: 0.9rem;
+    }
+    
+    .controls-table th,
+    .controls-table td {
+        padding: 0.75rem 0.5rem;
+    }
+}

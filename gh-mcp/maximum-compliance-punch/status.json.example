@@ -1,0 +1,30 @@
+{
+  "overall_status": "operational",
+  "generated_at": "2025-11-13T12:00:00Z",
+  "controls": [
+    {
+      "name": "control-org-settings.yml",
+      "status": "success",
+      "last_run": "2025-11-13T11:45:00Z",
+      "run_url": "https://github.com/your-org/kickbutt-compliance/actions/runs/123456789"
+    },
+    {
+      "name": "control-repo-visibility.yml",
+      "status": "success",
+      "last_run": "2025-11-13T11:47:00Z",
+      "run_url": "https://github.com/your-org/kickbutt-compliance/actions/runs/123456790"
+    },
+    {
+      "name": "control-repo-rulesets.yml",
+      "status": "failure",
+      "last_run": "2025-11-13T11:50:00Z",
+      "run_url": "https://github.com/your-org/kickbutt-compliance/actions/runs/123456791"
+    },
+    {
+      "name": "control-org-custom-role.yml",
+      "status": "success",
+      "last_run": "2025-11-13T11:52:00Z",
+      "run_url": "https://github.com/your-org/kickbutt-compliance/actions/runs/123456792"
+    }
+  ]
+}

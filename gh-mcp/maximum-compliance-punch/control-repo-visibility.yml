@@ -1,0 +1,92 @@
+name: Control - Repository Visibility
+
+on:
+  schedule:
+    - cron: '5 */6 * * *'  # Every 6 hours at minute 5
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-repo-visibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || sudo apt-get install gh -y
+          gh --version
+
+      - name: Authenticate
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Check repository visibility
+        id: check
+        run: |
+          set -e
+          echo "🔍 Checking repository visibility settings..."
+          ORG="${{ github.repository_owner }}"
+          
+          # Get all repositories
+          repos=$(gh api "/orgs/${ORG}/repos?per_page=100" --paginate --jq '.[]' 2>/dev/null || echo "[]")
+          
+          if [ "$repos" = "[]" ]; then
+            echo "::warning::No repositories found or unable to fetch"
+            exit 0
+          fi
+          
+          # Count public vs private
+          total=$(echo "$repos" | jq -s 'length')
+          public_count=$(echo "$repos" | jq -s '[.[] | select(.private == false)] | length')
+          private_count=$(echo "$repos" | jq -s '[.[] | select(.private == true)] | length')
+          
+          echo "📊 Repository visibility statistics:"
+          echo "  Total: $total"
+          echo "  Public: $public_count"
+          echo "  Private: $private_count"
+          
+          errors=0
+          
+          # Check if more than 10% are public
+          if [ $total -gt 0 ]; then
+            public_percentage=$((public_count * 100 / total))
+            
+            if [ $public_percentage -gt 10 ]; then
+              echo "::warning::$public_percentage% of repositories are public (threshold: 10%)"
+              ((errors++))
+            else
+              echo "✅ Public repository percentage is acceptable: $public_percentage%"
+            fi
+          fi
+          
+          # Check for sensitive repos that shouldn't be public
+          sensitive_public=$(echo "$repos" | jq -s '[.[] | select(.private == false) | select(.name | test("secret|config|infrastructure|terraform|vault|credentials"; "i"))] | length')
+          
+          if [ $sensitive_public -gt 0 ]; then
+            echo "::error::Found $sensitive_public sensitive repositories that are public"
+            echo "$repos" | jq -s '[.[] | select(.private == false) | select(.name | test("secret|config|infrastructure|terraform|vault|credentials"; "i")) | .name]'
+            ((errors++))
+          else
+            echo "✅ No sensitive repositories are public"
+          fi
+          
+          echo "errors=$errors" >> $GITHUB_OUTPUT
+          
+          if [ $errors -gt 0 ]; then
+            echo "::error::Found $errors visibility issues"
+            exit 1
+          fi
+          
+          echo "✅ All repository visibility checks passed"
+
+      - name: Report status
+        if: always()
+        run: |
+          if [ "${{ steps.check.outcome }}" = "success" ]; then
+            echo "✅ Control passed: Repository visibility is compliant"
+          else
+            echo "❌ Control failed: Repository visibility needs attention"
+          fi

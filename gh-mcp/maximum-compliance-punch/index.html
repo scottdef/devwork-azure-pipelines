@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kickbutt Compliance - Trust Center</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🛡️ Kickbutt Compliance</h1>
+            <p class="subtitle">Enterprise Trust Center</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="status-overview">
+            <div class="status-card" id="overall-status">
+                <h2>Overall Status</h2>
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-icon">⏳</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <p class="last-updated" id="last-updated">Last updated: Never</p>
+            </div>
+        </section>
+
+        <section class="controls-section">
+            <h2>Security Controls</h2>
+            <p class="section-desc">Continuous automated compliance checks running on GitHub Enterprise Cloud</p>
+            
+            <table class="controls-table" id="controls-table">
+                <thead>
+                    <tr>
+                        <th>Control</th>
+                        <th>Status</th>
+                        <th>Last Run</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="controls-tbody">
+                    <!-- Dynamically populated -->
+                    <tr>
+                        <td colspan="4" class="loading">Loading control statuses...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="info-section">
+            <div class="info-card">
+                <h3>📋 About Our Controls</h3>
+                <p>Our security controls are enforced through automated GitHub Actions workflows that run continuously. Each control represents a critical security policy that is automatically verified and enforced across our GitHub Enterprise Cloud organization.</p>
+            </div>
+            
+            <div class="info-card">
+                <h3>🔄 Update Frequency</h3>
+                <p>This trust center updates automatically every hour. All control checks run on demand and through scheduled workflows to ensure continuous compliance.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Powered by GitHub Actions | Built with ❤️ by DevOps</p>
+            <p class="footer-note">Generated: <span id="generation-time">--</span></p>
+        </div>
+    </footer>
+
+    <script src="status.js"></script>
+</body>
+</html>
