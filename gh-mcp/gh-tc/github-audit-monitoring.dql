@@ -1,0 +1,221 @@
+// ============================================================================
+// GitHub Audit Log Security Monitoring - DQL Queries
+// ============================================================================
+// Purpose: Monitor critical GitHub audit events and extract as metrics
+// Target Events:
+//   - org_credential_authorization.grant
+//   - personal_access_token.request_created
+//   - personal_access_token.access_granted
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// QUERY 1: GitHub Audit Log Event Detection
+// ----------------------------------------------------------------------------
+// Description: Filters GitHub audit logs for security-critical events
+// Usage: Main detection query for OpenPipeline processor
+// ----------------------------------------------------------------------------
+
+fetch logs
+| filter log.source == "github_audit_log" // Adjust to match your GitHub audit log source
+    or log.source == "github"
+    or contains(log.source, "audit")
+
+// Pre-filter for GitHub audit events to improve performance
+| filter matchesPhrase(content, "*org_credential_authorization*")
+    or matchesPhrase(content, "*personal_access_token*")
+    or matchesPhrase(content, "*.grant*")
+    or matchesPhrase(content, "*.request_created*")
+    or matchesPhrase(content, "*.access_granted*")
+
+// Parse the event action field from GitHub audit logs
+// GitHub audit logs typically use JSON format with an "action" field
+| parse content, "\"action\"" SPACE? ":" SPACE? "\"" LD:event_action "\""
+
+// Alternative parsing for different log formats
+| parse content, "'action'" SPACE? ":" SPACE? "'" LD:event_action_alt "'"
+| parse content, "action=" LD:event_action_param
+
+// Consolidate event action into single field
+| fieldsAdd github_event = coalesce(event_action, event_action_alt, event_action_param)
+
+// Filter for specific security events
+| filter github_event == "org_credential_authorization.grant"
+    or github_event == "personal_access_token.request_created"
+    or github_event == "personal_access_token.access_granted"
+
+// Parse additional context fields for enrichment
+| parse content, "\"actor\"" SPACE? ":" SPACE? "\"" LD:actor_login "\""
+| parse content, "\"org\"" SPACE? ":" SPACE? "\"" LD:organization "\""
+| parse content, "\"created_at\"" SPACE? ":" SPACE? "\"" LD:event_timestamp "\""
+| parse content, "\"actor_ip\"" SPACE? ":" SPACE? "\"" LD:source_ip "\""
+| parse content, "\"user\"" SPACE? ":" SPACE? "\"" LD:target_user "\""
+
+// Create event severity classification
+| fieldsAdd event_severity = 
+    if(github_event == "org_credential_authorization.grant", "HIGH",
+    if(github_event == "personal_access_token.request_created", "MEDIUM",
+    if(github_event == "personal_access_token.access_granted", "HIGH", "UNKNOWN")))
+
+// Create alert priority based on event type
+| fieldsAdd alert_priority = 
+    if(github_event == "org_credential_authorization.grant", "P1",
+    if(github_event == "personal_access_token.access_granted", "P1",
+    if(github_event == "personal_access_token.request_created", "P2", "P3")))
+
+// Create event category for metric extraction
+| fieldsAdd event_category = "github_security_event"
+
+// Fields for output and metric extraction
+| fields timestamp, 
+    github_event, 
+    event_severity, 
+    alert_priority,
+    event_category,
+    actor_login, 
+    organization, 
+    target_user,
+    source_ip,
+    event_timestamp,
+    content
+
+// Sort by most recent events
+| sort timestamp desc
+
+
+// ----------------------------------------------------------------------------
+// QUERY 2: GitHub Audit Event Summary by Type
+// ----------------------------------------------------------------------------
+// Description: Provides count summary of each event type for dashboards
+// Usage: Monitoring dashboard visualization
+// ----------------------------------------------------------------------------
+
+fetch logs, from: -1h
+| filter log.source == "github_audit_log" or log.source == "github"
+
+// Parse event action
+| parse content, "\"action\"" SPACE? ":" SPACE? "\"" LD:event_action "\""
+
+// Filter for target events
+| filter event_action == "org_credential_authorization.grant"
+    or event_action == "personal_access_token.request_created"
+    or event_action == "personal_access_token.access_granted"
+
+// Parse organization
+| parse content, "\"org\"" SPACE? ":" SPACE? "\"" LD:organization "\""
+
+// Summarize counts
+| summarize event_count = count(), 
+    by: {event_action, organization}
+| sort event_count desc
+
+
+// ----------------------------------------------------------------------------
+// QUERY 3: GitHub Audit Events by Actor
+// ----------------------------------------------------------------------------
+// Description: Track which users are performing sensitive actions
+// Usage: Investigation and user behavior analysis
+// ----------------------------------------------------------------------------
+
+fetch logs, from: -24h
+| filter log.source == "github_audit_log" or log.source == "github"
+
+// Parse event and actor
+| parse content, "\"action\"" SPACE? ":" SPACE? "\"" LD:event_action "\""
+| parse content, "\"actor\"" SPACE? ":" SPACE? "\"" LD:actor_login "\""
+| parse content, "\"actor_ip\"" SPACE? ":" SPACE? "\"" LD:source_ip "\""
+
+// Filter for security events
+| filter event_action == "org_credential_authorization.grant"
+    or event_action == "personal_access_token.request_created"
+    or event_action == "personal_access_token.access_granted"
+
+// Summarize by actor
+| summarize 
+    total_events = count(),
+    unique_ips = countDistinct(source_ip),
+    event_types = collectDistinct(event_action),
+    by: {actor_login}
+| sort total_events desc
+
+
+// ----------------------------------------------------------------------------
+// QUERY 4: GitHub Audit Events - Anomaly Detection
+// ----------------------------------------------------------------------------
+// Description: Detect unusual patterns in token/credential events
+// Usage: Security monitoring for abnormal activity
+// ----------------------------------------------------------------------------
+
+fetch logs, from: -24h
+| filter log.source == "github_audit_log" or log.source == "github"
+
+// Parse fields
+| parse content, "\"action\"" SPACE? ":" SPACE? "\"" LD:event_action "\""
+| parse content, "\"actor\"" SPACE? ":" SPACE? "\"" LD:actor_login "\""
+| parse content, "\"org\"" SPACE? ":" SPACE? "\"" LD:organization "\""
+
+// Filter for security events
+| filter event_action == "org_credential_authorization.grant"
+    or event_action == "personal_access_token.request_created"
+    or event_action == "personal_access_token.access_granted"
+
+// Group by actor and event type
+| summarize event_count = count(), by: {actor_login, event_action, organization}
+
+// Flag anomalies (more than 5 events of same type in 24h)
+| filter event_count > 5
+| sort event_count desc
+
+
+// ----------------------------------------------------------------------------
+// QUERY 5: Real-time GitHub Security Event Stream
+// ----------------------------------------------------------------------------
+// Description: Live stream of security events for real-time monitoring
+// Usage: Security operations center (SOC) dashboard
+// ----------------------------------------------------------------------------
+
+fetch logs, from: now()-5m
+| filter log.source == "github_audit_log" or log.source == "github"
+
+// Parse all relevant fields
+| parse content, "\"action\"" SPACE? ":" SPACE? "\"" LD:event_action "\""
+| parse content, "\"actor\"" SPACE? ":" SPACE? "\"" LD:actor "\""
+| parse content, "\"org\"" SPACE? ":" SPACE? "\"" LD:org "\""
+| parse content, "\"created_at\"" SPACE? ":" SPACE? "\"" LD:created_at "\""
+| parse content, "\"actor_ip\"" SPACE? ":" SPACE? "\"" LD:ip "\""
+
+// Filter for critical events
+| filter event_action == "org_credential_authorization.grant"
+    or event_action == "personal_access_token.request_created"
+    or event_action == "personal_access_token.access_granted"
+
+// Add urgency flag
+| fieldsAdd is_critical = 
+    event_action == "org_credential_authorization.grant" 
+    or event_action == "personal_access_token.access_granted"
+
+// Display most recent events first
+| sort timestamp desc
+| limit 100
+
+
+// ============================================================================
+// METRIC EXTRACTION PATTERNS
+// ============================================================================
+// These patterns are used in OpenPipeline Processors to extract metrics
+// from the detected events
+// ============================================================================
+
+// Pattern 1: Counter metric for each event type
+// Metric Name: github.audit.event.count
+// Dimensions: event_action, organization, severity
+// Description: Count of each event type occurrence
+
+// Pattern 2: Gauge metric for active events
+// Metric Name: github.audit.active_events
+// Dimensions: event_action, actor
+// Description: Number of active security events by actor
+
+// Pattern 3: Counter metric for high-severity events
+// Metric Name: github.audit.high_severity.count
+// Dimensions: organization, event_action
+// Description: Count of high-severity events requiring immediate attention

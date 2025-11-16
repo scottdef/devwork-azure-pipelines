@@ -1,0 +1,440 @@
+// ============================================================================
+// Dynatrace Alerting Configuration
+// GitHub Audit Log Security Events
+// ============================================================================
+// Purpose: Alert audit-response-team on critical GitHub events
+// Alert Destination: on-call audit-response-team
+// Problem Handling: Manual closure required
+// ============================================================================
+
+{
+  "version": "1.0",
+  "alertingProfile": {
+    "name": "github-audit-security-alerts",
+    "description": "Critical alerts for GitHub audit log security events",
+    "enabled": true,
+    "metadata": {
+      "owner": "audit-response-team",
+      "priority": "P1",
+      "sla": "15min-response"
+    },
+    "rules": [
+      {
+        "id": "alert-credential-grant",
+        "name": "GitHub Organization Credential Authorization Granted",
+        "enabled": true,
+        "severity": "CRITICAL",
+        "alertCondition": {
+          "type": "METRIC_THRESHOLD",
+          "metricSelector": "github.audit.credential_grant.count:splitBy(\"organization\",\"actor\")",
+          "threshold": {
+            "value": 1,
+            "operator": "GREATER_THAN_OR_EQUAL"
+          },
+          "evaluationWindow": "1m",
+          "violatingSamples": 1,
+          "dealertingSamples": 5
+        },
+        "description": "An organization credential authorization has been granted. This is a high-risk event that requires immediate investigation.",
+        "alertTemplate": {
+          "title": "GitHub Critical: Organization Credential Authorization Granted",
+          "body": "Event: org_credential_authorization.grant\nOrganization: {organization}\nActor: {actor}\nTimestamp: {timestamp}\nSeverity: CRITICAL\n\nAction Required: Immediate investigation by audit-response-team"
+        },
+        "problemCreation": {
+          "enabled": true,
+          "problemTitle": "GitHub Security: Credential Authorization Grant Detected",
+          "problemSeverity": "AVAILABILITY",
+          "requireManualClosure": true,
+          "impactLevel": "SERVICES"
+        },
+        "tags": [
+          "github:security",
+          "event:credential_grant",
+          "severity:critical",
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "alert-token-grant",
+        "name": "GitHub Personal Access Token Granted",
+        "enabled": true,
+        "severity": "CRITICAL",
+        "alertCondition": {
+          "type": "METRIC_THRESHOLD",
+          "metricSelector": "github.audit.token_grant.count:splitBy(\"organization\",\"actor\")",
+          "threshold": {
+            "value": 1,
+            "operator": "GREATER_THAN_OR_EQUAL"
+          },
+          "evaluationWindow": "1m",
+          "violatingSamples": 1,
+          "dealertingSamples": 5
+        },
+        "description": "A personal access token has been granted. This event requires validation to ensure proper authorization.",
+        "alertTemplate": {
+          "title": "GitHub Critical: Personal Access Token Granted",
+          "body": "Event: personal_access_token.access_granted\nOrganization: {organization}\nActor: {actor}\nTimestamp: {timestamp}\nSeverity: CRITICAL\n\nAction Required: Validate token grant authorization"
+        },
+        "problemCreation": {
+          "enabled": true,
+          "problemTitle": "GitHub Security: Personal Access Token Granted",
+          "problemSeverity": "AVAILABILITY",
+          "requireManualClosure": true,
+          "impactLevel": "SERVICES"
+        },
+        "tags": [
+          "github:security",
+          "event:token_grant",
+          "severity:critical",
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "alert-token-request",
+        "name": "GitHub Personal Access Token Requested",
+        "enabled": true,
+        "severity": "WARNING",
+        "alertCondition": {
+          "type": "METRIC_THRESHOLD",
+          "metricSelector": "github.audit.token_request.count:splitBy(\"organization\",\"actor\")",
+          "threshold": {
+            "value": 1,
+            "operator": "GREATER_THAN_OR_EQUAL"
+          },
+          "evaluationWindow": "5m",
+          "violatingSamples": 1,
+          "dealertingSamples": 10
+        },
+        "description": "A personal access token has been requested. Monitor for subsequent grant event.",
+        "alertTemplate": {
+          "title": "GitHub Warning: Personal Access Token Requested",
+          "body": "Event: personal_access_token.request_created\nOrganization: {organization}\nActor: {actor}\nTimestamp: {timestamp}\nSeverity: WARNING\n\nAction Required: Monitor for token grant event"
+        },
+        "problemCreation": {
+          "enabled": true,
+          "problemTitle": "GitHub Security: Personal Access Token Request",
+          "problemSeverity": "CUSTOM_ALERT",
+          "requireManualClosure": true,
+          "impactLevel": "INFRASTRUCTURE"
+        },
+        "tags": [
+          "github:security",
+          "event:token_request",
+          "severity:warning",
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "alert-multiple-events",
+        "name": "Multiple GitHub Security Events Detected",
+        "enabled": true,
+        "severity": "CRITICAL",
+        "alertCondition": {
+          "type": "METRIC_THRESHOLD",
+          "metricSelector": "github.audit.security_events.total:splitBy(\"organization\")",
+          "threshold": {
+            "value": 5,
+            "operator": "GREATER_THAN_OR_EQUAL"
+          },
+          "evaluationWindow": "15m",
+          "violatingSamples": 1,
+          "dealertingSamples": 10
+        },
+        "description": "Multiple security events detected in short time window. Possible security incident in progress.",
+        "alertTemplate": {
+          "title": "GitHub CRITICAL: Multiple Security Events Detected",
+          "body": "Multiple GitHub audit security events detected\nOrganization: {organization}\nEvent Count: {event_count}\nTime Window: 15 minutes\nSeverity: CRITICAL\n\nAction Required: IMMEDIATE investigation - possible security incident"
+        },
+        "problemCreation": {
+          "enabled": true,
+          "problemTitle": "GitHub Security Incident: Multiple Events Detected",
+          "problemSeverity": "ERROR",
+          "requireManualClosure": true,
+          "impactLevel": "ENVIRONMENT"
+        },
+        "tags": [
+          "github:security",
+          "event:multiple",
+          "severity:critical",
+          "incident:possible",
+          "team:audit-response"
+        ]
+      }
+    ]
+  },
+  "notificationConfiguration": {
+    "name": "audit-response-team-notifications",
+    "description": "Notification settings for audit response team",
+    "enabled": true,
+    "channels": [
+      {
+        "id": "pagerduty-oncall",
+        "type": "PAGERDUTY",
+        "enabled": true,
+        "config": {
+          "serviceKey": "${PAGERDUTY_SERVICE_KEY}",
+          "serviceName": "audit-response-team",
+          "severity": "critical",
+          "escalationPolicy": "audit-response-oncall",
+          "customFields": {
+            "dedup_key": "{event_type}_{organization}_{actor}",
+            "client": "Dynatrace",
+            "client_url": "{dt_problem_url}"
+          }
+        },
+        "alertFilters": [
+          "severity:critical",
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "slack-audit-channel",
+        "type": "SLACK",
+        "enabled": true,
+        "config": {
+          "webhookUrl": "${SLACK_WEBHOOK_URL}",
+          "channel": "#audit-response-team",
+          "username": "Dynatrace GitHub Audit Monitor",
+          "messageTemplate": {
+            "text": "🚨 *GitHub Security Alert* 🚨",
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": "GitHub Audit Event Detected"
+                }
+              },
+              {
+                "type": "section",
+                "fields": [
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Event Type:*\n{event_type}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Severity:*\n{severity}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Organization:*\n{organization}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Actor:*\n{actor}"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Timestamp:* {timestamp}\n*Source IP:* {source_ip}"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View in Dynatrace"
+                    },
+                    "url": "{dt_problem_url}",
+                    "style": "primary"
+                  },
+                  {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View in GitHub"
+                    },
+                    "url": "https://github.com/organizations/{organization}/settings/audit-log"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "alertFilters": [
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "email-oncall",
+        "type": "EMAIL",
+        "enabled": true,
+        "config": {
+          "recipients": [
+            "audit-response-oncall@company.com",
+            "security-team@company.com"
+          ],
+          "subject": "[URGENT] GitHub Security Event: {event_type}",
+          "body": "A GitHub audit security event has been detected.\n\nEvent Details:\n- Type: {event_type}\n- Severity: {severity}\n- Organization: {organization}\n- Actor: {actor}\n- Source IP: {source_ip}\n- Timestamp: {timestamp}\n\nDynatrace Problem: {dt_problem_url}\nGitHub Audit Log: https://github.com/organizations/{organization}/settings/audit-log\n\nThis alert requires manual investigation and closure.\n\nAudit Response Team - Please investigate immediately."
+        },
+        "alertFilters": [
+          "severity:critical",
+          "team:audit-response"
+        ]
+      },
+      {
+        "id": "webhook-siem",
+        "type": "WEBHOOK",
+        "enabled": true,
+        "config": {
+          "url": "${SIEM_WEBHOOK_URL}",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer ${SIEM_API_TOKEN}"
+          },
+          "payload": {
+            "event_type": "{event_type}",
+            "severity": "{severity}",
+            "organization": "{organization}",
+            "actor": "{actor}",
+            "source_ip": "{source_ip}",
+            "timestamp": "{timestamp}",
+            "dynatrace_problem_id": "{problem_id}",
+            "dynatrace_problem_url": "{dt_problem_url}",
+            "event_category": "github_audit_security",
+            "requires_investigation": true
+          }
+        },
+        "alertFilters": [
+          "team:audit-response"
+        ]
+      }
+    ]
+  },
+  "problemConfiguration": {
+    "name": "github-audit-problem-settings",
+    "description": "Problem creation and management for GitHub audit events",
+    "enabled": true,
+    "settings": {
+      "autoClosing": {
+        "enabled": false,
+        "reason": "GitHub audit security events require manual investigation and closure"
+      },
+      "merging": {
+        "enabled": false,
+        "reason": "Each audit event should be tracked as separate problem for audit trail"
+      },
+      "deduplication": {
+        "enabled": true,
+        "window": "5m",
+        "key": "{event_type}_{organization}_{actor}"
+      },
+      "enrichment": {
+        "enabled": true,
+        "addTags": true,
+        "addLogs": true,
+        "addMetrics": true
+      },
+      "lifecycle": {
+        "states": [
+          "OPEN",
+          "INVESTIGATING",
+          "RESOLVED"
+        ],
+        "requireManualClosure": true,
+        "requireResolutionNote": true,
+        "retentionDays": 90
+      },
+      "customFields": [
+        {
+          "key": "investigation_status",
+          "label": "Investigation Status",
+          "type": "text",
+          "required": false
+        },
+        {
+          "key": "resolution_notes",
+          "label": "Resolution Notes",
+          "type": "textarea",
+          "required": true
+        },
+        {
+          "key": "authorized",
+          "label": "Event Authorized",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "investigator",
+          "label": "Assigned Investigator",
+          "type": "text",
+          "required": false
+        }
+      ]
+    }
+  }
+}
+
+
+// ============================================================================
+// Alert Rule DQL Queries
+// ============================================================================
+// These DQL queries can be used directly in custom alert conditions
+
+// Query 1: Detect credential grant events
+fetch metrics
+| filter metricKey == "github.audit.credential_grant.count"
+| summarize value = sum(value), by: {organization, actor}
+| filter value >= 1
+
+
+// Query 2: Detect token grant events
+fetch metrics
+| filter metricKey == "github.audit.token_grant.count"
+| summarize value = sum(value), by: {organization, actor}
+| filter value >= 1
+
+
+// Query 3: Detect multiple events (possible incident)
+fetch metrics
+| filter metricKey == "github.audit.security_events.total"
+| summarize value = sum(value), by: {organization}
+| filter value >= 5
+
+
+// Query 4: Detect high-frequency token requests (anomaly)
+fetch metrics
+| filter metricKey == "github.audit.token_request.count"
+| summarize value = sum(value), by: {actor}
+| filter value >= 10
+
+
+// ============================================================================
+// Dashboard Integration
+// ============================================================================
+
+{
+  "dashboard": {
+    "name": "GitHub Audit Security Dashboard",
+    "tiles": [
+      {
+        "name": "Critical Events - Last 24h",
+        "type": "data-explorer",
+        "query": "fetch metrics | filter metricKey in ('github.audit.credential_grant.count', 'github.audit.token_grant.count') | summarize value = sum(value), by: {event_type, organization}"
+      },
+      {
+        "name": "Events by Organization",
+        "type": "pie-chart",
+        "query": "fetch metrics | filter metricKey == 'github.audit.security_events.total' | summarize value = sum(value), by: {organization}"
+      },
+      {
+        "name": "Top Actors",
+        "type": "table",
+        "query": "fetch metrics | filter metricKey == 'github.audit.security_events.total' | summarize event_count = sum(value), by: {actor, organization} | sort event_count desc | limit 10"
+      },
+      {
+        "name": "Active Problems",
+        "type": "problems-list",
+        "filter": "tag:team:audit-response AND problemStatus:OPEN"
+      }
+    ]
+  }
+}

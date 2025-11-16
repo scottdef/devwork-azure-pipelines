@@ -1,0 +1,233 @@
+// ============================================================================
+// OpenPipeline Processor Configuration
+// GitHub Audit Log Metric Extraction
+// ============================================================================
+// Purpose: Extract metrics from GitHub audit log events for alerting
+// Target Metrics:
+//   - github.audit.credential_grant.count
+//   - github.audit.token_request.count
+//   - github.audit.token_grant.count
+// ============================================================================
+
+{
+  "version": "1.0",
+  "processingPipeline": {
+    "name": "github-audit-security-events",
+    "description": "Extract security metrics from GitHub audit logs",
+    "enabled": true,
+    "processors": [
+      {
+        "id": "github-audit-event-parser",
+        "type": "log-processor",
+        "enabled": true,
+        "config": {
+          "source": {
+            "log.source": "github_audit_log"
+          },
+          "dqlQuery": "fetch logs | filter log.source == 'github_audit_log' | parse content, '\"action\"' SPACE? ':' SPACE? '\"' LD:event_action '\"'",
+          "extractFields": [
+            "event_action",
+            "actor",
+            "organization",
+            "created_at",
+            "actor_ip",
+            "user"
+          ]
+        }
+      },
+      {
+        "id": "metric-extractor-credential-grant",
+        "type": "metric-extraction",
+        "enabled": true,
+        "dependsOn": "github-audit-event-parser",
+        "config": {
+          "metricKey": "github.audit.credential_grant.count",
+          "metricType": "counter",
+          "condition": "event_action == 'org_credential_authorization.grant'",
+          "dimensions": {
+            "event_type": "org_credential_authorization.grant",
+            "organization": "{organization}",
+            "actor": "{actor}",
+            "severity": "HIGH",
+            "event_category": "github_security_event"
+          },
+          "value": 1,
+          "unit": "count"
+        }
+      },
+      {
+        "id": "metric-extractor-token-request",
+        "type": "metric-extraction",
+        "enabled": true,
+        "dependsOn": "github-audit-event-parser",
+        "config": {
+          "metricKey": "github.audit.token_request.count",
+          "metricType": "counter",
+          "condition": "event_action == 'personal_access_token.request_created'",
+          "dimensions": {
+            "event_type": "personal_access_token.request_created",
+            "organization": "{organization}",
+            "actor": "{actor}",
+            "severity": "MEDIUM",
+            "event_category": "github_security_event"
+          },
+          "value": 1,
+          "unit": "count"
+        }
+      },
+      {
+        "id": "metric-extractor-token-grant",
+        "type": "metric-extraction",
+        "enabled": true,
+        "dependsOn": "github-audit-event-parser",
+        "config": {
+          "metricKey": "github.audit.token_grant.count",
+          "metricType": "counter",
+          "condition": "event_action == 'personal_access_token.access_granted'",
+          "dimensions": {
+            "event_type": "personal_access_token.access_granted",
+            "organization": "{organization}",
+            "actor": "{actor}",
+            "severity": "HIGH",
+            "event_category": "github_security_event"
+          },
+          "value": 1,
+          "unit": "count"
+        }
+      },
+      {
+        "id": "metric-aggregator-security-events",
+        "type": "metric-aggregation",
+        "enabled": true,
+        "config": {
+          "aggregationWindow": "1m",
+          "metrics": [
+            "github.audit.credential_grant.count",
+            "github.audit.token_request.count",
+            "github.audit.token_grant.count"
+          ],
+          "aggregationType": "sum",
+          "outputMetric": "github.audit.security_events.total",
+          "dimensions": {
+            "event_category": "github_security_event"
+          }
+        }
+      }
+    ]
+  }
+}
+
+
+// ============================================================================
+// Alternative OpenPipeline Configuration using DQL Processing Rules
+// ============================================================================
+// This approach uses DQL-based processing rules for more complex extraction
+
+{
+  "version": "1.0",
+  "processingPipeline": {
+    "name": "github-audit-dql-processor",
+    "description": "DQL-based metric extraction for GitHub audit events",
+    "enabled": true,
+    "dqlProcessingRule": {
+      "enabled": true,
+      "dqlQuery": "fetch logs | filter log.source == 'github_audit_log' | parse content, '\"action\"' SPACE? ':' SPACE? '\"' LD:event_action '\"' | filter event_action == 'org_credential_authorization.grant' or event_action == 'personal_access_token.request_created' or event_action == 'personal_access_token.access_granted'",
+      "metricExtraction": {
+        "enabled": true,
+        "extractionRules": [
+          {
+            "metricKey": "github.audit.event.detected",
+            "condition": "isNotNull(event_action)",
+            "value": 1,
+            "dimensions": {
+              "event_type": "{event_action}",
+              "organization": "{organization}",
+              "actor": "{actor}"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+
+// ============================================================================
+// Metric Selector Definitions
+// ============================================================================
+// Use these selectors in alerting rules and dashboards
+
+// Selector 1: All GitHub security events
+// metricSelector: github.audit.*.count
+
+// Selector 2: High-severity events only
+// metricSelector: github.audit.credential_grant.count, github.audit.token_grant.count
+
+// Selector 3: Events by organization
+// metricSelector: github.audit.*.count:filter(eq(organization,"{your-org-name}"))
+
+// Selector 4: Events by specific actor
+// metricSelector: github.audit.*.count:filter(eq(actor,"{username}"))
+
+
+// ============================================================================
+// OpenPipeline Configuration Notes
+// ============================================================================
+
+/*
+DEPLOYMENT INSTRUCTIONS:
+
+1. Navigate to Dynatrace UI > Settings > Log Monitoring > Log processing
+2. Create new processing rule with name "GitHub Audit Security Events"
+3. Set matcher to: log.source == "github_audit_log"
+4. Add DQL processor with the main query from github-audit-monitoring.dql
+5. Configure metric extraction for each event type
+6. Set retention period for metrics (recommended: 35 days minimum)
+
+VERIFICATION STEPS:
+
+1. Check logs are being ingested:
+   fetch logs | filter log.source == "github_audit_log" | limit 10
+
+2. Verify parsing is working:
+   fetch logs | filter log.source == "github_audit_log" 
+   | parse content, '"action"' SPACE? ':' SPACE? '"' LD:event_action '"'
+   | filter isNotNull(event_action) | limit 10
+
+3. Confirm metrics are being extracted:
+   timeseries avg(github.audit.credential_grant.count), by: {organization}
+
+4. Test metric selector:
+   fetch metrics | filter metricKey == "github.audit.credential_grant.count"
+
+METRIC RETENTION:
+
+- Set retention to at least 35 days for compliance
+- Consider longer retention (90-365 days) for security audit requirements
+- Enable metric archival for long-term storage if required
+
+PERFORMANCE OPTIMIZATION:
+
+- Use pre-filtering with matchesPhrase() to reduce processing load
+- Index frequently queried dimensions (organization, actor)
+- Set appropriate aggregation windows (1m for real-time, 5m for standard)
+- Monitor DPM (Data Points per Minute) consumption
+
+TROUBLESHOOTING:
+
+Issue: Metrics not appearing
+- Verify log source name matches configuration
+- Check DQL query syntax in processing rule
+- Ensure event_action field is being parsed correctly
+- Review processing rule execution statistics
+
+Issue: High cardinality warnings
+- Limit number of unique dimension values
+- Consider aggregating low-frequency actors
+- Use metric splitting for high-cardinality dimensions
+
+Issue: Processing delays
+- Reduce complexity of DQL queries
+- Increase processing rule priority
+- Check ingestion lag in Settings > Log Monitoring
+*/
