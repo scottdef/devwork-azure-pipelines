@@ -1,0 +1,42 @@
+# AWS Configuration
+aws_region     = "us-east-1"
+aws_account_id = "123456789012"  # Replace with your AWS account ID
+
+# Project Configuration
+environment  = "prod"
+project_name = "bedrock-dynatrace"
+
+# Dynatrace Configuration
+dynatrace_url       = "https://abc12345.live.dynatrace.com"  # Replace with your Dynatrace environment URL
+dynatrace_api_token = "dt0c01.****"                          # Replace with your Dynatrace API token
+
+# Firehose Configuration
+firehose_stream_name    = "bedrock-to-dynatrace"
+firehose_buffer_size    = 1    # 1-5 MB
+firehose_buffer_interval = 60   # 60-900 seconds
+
+# Logging Configuration
+log_retention_days         = 7     # CloudWatch Logs retention
+failed_logs_retention_days = 30    # S3 failed logs retention
+
+# Feature Flags
+enable_lambda_transformation = true   # Enable Lambda transformation
+enable_bedrock_logging       = true   # Auto-configure Bedrock logging
+enable_large_data_delivery   = false  # Enable S3 for large data (images, embeddings)
+
+# Bedrock Logging Options
+log_text_data      = true   # Log text prompts and completions
+log_image_data     = false  # Log image data (requires large_data_delivery)
+log_embedding_data = false  # Log embedding data (requires large_data_delivery)
+
+# Lambda Configuration
+lambda_memory_size = 256  # MB
+lambda_timeout     = 60   # seconds
+
+# Additional Tags
+tags = {
+  Project     = "Bedrock Logging"
+  Owner       = "Platform Team"
+  CostCenter  = "Engineering"
+  Compliance  = "Required"
+}

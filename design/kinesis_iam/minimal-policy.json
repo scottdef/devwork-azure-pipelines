@@ -1,0 +1,100 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "MinimalBedrockLogging",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:*ModelInvocationLoggingConfiguration"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MinimalCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:DescribeLogGroups",
+        "logs:PutRetentionPolicy",
+        "logs:CreateLogStream",
+        "logs:PutSubscriptionFilter",
+        "logs:DeleteSubscriptionFilter",
+        "logs:DescribeSubscriptionFilters",
+        "logs:TagLogGroup"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:/aws/bedrock/*",
+        "arn:aws:logs:*:*:log-group:/aws/kinesisfirehose/*",
+        "arn:aws:logs:*:*:log-group:/aws/lambda/*"
+      ]
+    },
+    {
+      "Sid": "MinimalFirehose",
+      "Effect": "Allow",
+      "Action": [
+        "firehose:CreateDeliveryStream",
+        "firehose:DeleteDeliveryStream",
+        "firehose:DescribeDeliveryStream",
+        "firehose:UpdateDestination",
+        "firehose:TagDeliveryStream"
+      ],
+      "Resource": "arn:aws:firehose:*:*:deliverystream/*bedrock*"
+    },
+    {
+      "Sid": "MinimalS3",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:PutBucketVersioning",
+        "s3:PutBucketTagging",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetBucket*",
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::*bedrock*"
+    },
+    {
+      "Sid": "MinimalLambda",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:TagResource"
+      ],
+      "Resource": "arn:aws:lambda:*:*:function:*bedrock*"
+    },
+    {
+      "Sid": "MinimalIAM",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:CreatePolicy",
+        "iam:DeletePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:PassRole",
+        "iam:TagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/*bedrock*",
+        "arn:aws:iam::*:role/*firehose*",
+        "arn:aws:iam::*:role/*cloudwatch*",
+        "arn:aws:iam::*:role/*lambda*",
+        "arn:aws:iam::*:policy/*bedrock*"
+      ]
+    }
+  ]
+}
