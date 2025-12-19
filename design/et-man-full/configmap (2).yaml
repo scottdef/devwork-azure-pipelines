@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: easytrade-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "easytrade.labels" . | nindent 4 }}
+data:
+  # Database configuration
+  DB_HOST: {{ .Values.database.name | quote }}
+  DB_PORT: {{ .Values.database.service.port | quote }}
+  DB_NAME: {{ .Values.database.env.databaseName | quote }}
+  
+  # Service URLs
+  BROKER_SERVICE_URL: "http://{{ .Values.brokerService.name }}:{{ .Values.brokerService.service.port }}"
+  ACCOUNTSERVICE_URL: "http://{{ .Values.accountService.name }}:{{ .Values.accountService.service.port }}"
+  LOGINSERVICE_URL: "http://{{ .Values.loginService.name }}:{{ .Values.loginService.service.port }}"
+  PRICINGSERVICE_URL: "http://{{ .Values.pricingService.name }}:{{ .Values.pricingService.service.port }}"
+  OFFERSERVICE_URL: "http://{{ .Values.offerService.name }}:{{ .Values.offerService.service.port }}"
+  FEATURE_FLAG_SERVICE_URL: "http://{{ .Values.featureFlagService.name }}:{{ .Values.featureFlagService.service.port }}"
+  
+  # Frontend configuration
+  PROXY_HOST: {{ .Values.frontendreverseproxy.name | quote }}
+  PROXY_PORT: {{ .Values.frontendreverseproxy.service.port | quote }}
+  
+  # Feature flag configuration
+  FEATURE_FLAG_CACHE_DURATION_S: {{ .Values.brokerService.env.featureFlagCacheDuration | quote }}
+  
+  # Problem pattern configuration
+  HIGH_CPU_USAGE_REQUEST_DELAY_MS: {{ .Values.brokerService.env.highCpuUsageRequestDelay | quote }}
+  HIGH_CPU_USAGE_CONCURRENCY: {{ .Values.brokerService.env.highCpuUsageConcurrency | quote }}

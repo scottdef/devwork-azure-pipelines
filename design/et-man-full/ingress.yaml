@@ -1,0 +1,103 @@
+{{- if .Values.ingress.loadBalancer.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: easytrade-lb
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    {{- if .Values.ingress.loadBalancer.internalSubnet }}
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: {{ .Values.ingress.loadBalancer.internalSubnet | quote }}
+    {{- end }}
+  labels:
+    {{- include "easytrade.labels" . | nindent 4 }}
+spec:
+  type: LoadBalancer
+  selector:
+    app: {{ .Values.frontendreverseproxy.name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.ingress.istio.enabled }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: easytrade-gateway
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    istio: {{ .Values.ingress.istio.gateway.selector }}
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        {{- range .Values.ingress.istio.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        {{- range .Values.ingress.istio.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      tls:
+        mode: SIMPLE
+        credentialName: easytrade-tls-credential
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: easytrade-vs
+  namespace: {{ .Values.global.namespace }}
+spec:
+  hosts:
+    {{- range .Values.ingress.istio.hosts }}
+    - {{ . | quote }}
+    {{- end }}
+  gateways:
+    - easytrade-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/feature-flag-service"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: {{ .Values.featureFlagService.name }}.{{ .Values.global.namespace }}.svc.cluster.local
+            port:
+              number: {{ .Values.featureFlagService.service.port }}
+      timeout: 30s
+    
+    - match:
+        - uri:
+            prefix: "/broker-service"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: {{ .Values.brokerService.name }}.{{ .Values.global.namespace }}.svc.cluster.local
+            port:
+              number: {{ .Values.brokerService.service.port }}
+      timeout: 60s
+    
+    - route:
+        - destination:
+            host: {{ .Values.frontendreverseproxy.name }}.{{ .Values.global.namespace }}.svc.cluster.local
+            port:
+              number: {{ .Values.frontendreverseproxy.service.port }}
+{{- end }}

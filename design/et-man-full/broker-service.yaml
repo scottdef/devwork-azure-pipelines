@@ -1,0 +1,90 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broker-service
+  namespace: easytrade
+  labels:
+    app: broker-service
+    app.kubernetes.io/name: easytrade
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broker-service
+  template:
+    metadata:
+      labels:
+        app: broker-service
+        app.kubernetes.io/name: easytrade
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: broker-service
+          image: europe-docker.pkg.dev/dynatrace-demoability/docker/easytrade/broker-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: MSSQL_HOST
+              value: "db"
+            - name: MSSQL_PORT
+              value: "1433"
+            - name: MSSQL_USER
+              value: "sa"
+            - name: MSSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: easytrade-db-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_DB
+              value: "TradeManagement"
+            - name: PRICING_SERVICE_URL
+              value: "http://pricingservice:8080"
+            - name: FEATURE_FLAG_SERVICE_URL
+              value: "http://feature-flag-service:8080"
+            - name: ACCOUNTSERVICE_URL
+              value: "http://accountservice:8089"
+            - name: FEATURE_FLAG_CACHE_DURATION_S
+              value: "30"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-service
+  namespace: easytrade
+  labels:
+    app: broker-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: broker-service

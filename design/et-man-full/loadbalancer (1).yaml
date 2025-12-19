@@ -1,0 +1,27 @@
+---
+# Internal LoadBalancer for private AKS access
+apiVersion: v1
+kind: Service
+metadata:
+  name: easytrade-lb
+  namespace: easytrade
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    # Optionally specify internal subnet
+    # service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "aks-internal-subnet"
+  labels:
+    app.kubernetes.io/name: easytrade
+    app.kubernetes.io/component: loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontendreverseproxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP

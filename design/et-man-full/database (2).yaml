@@ -1,0 +1,98 @@
+{{- if .Values.database.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: easytrade-db-secret
+  namespace: {{ .Values.global.namespace }}
+type: Opaque
+stringData:
+  SA_PASSWORD: {{ .Values.database.env.saPassword | quote }}
+  DB_USER: "sa"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.database.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.database.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.database.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.database.name }}
+    {{- range $key, $val := .Values.labels }}
+    {{ $key }}: {{ $val }}
+    {{- end }}
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.database.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.database.name }}
+        {{- range $key, $val := .Values.labels }}
+        {{ $key }}: {{ $val }}
+        {{- end }}
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+        - name: mssql
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
+          imagePullPolicy: {{ .Values.database.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.database.service.port }}
+              name: mssql
+          env:
+            - name: ACCEPT_EULA
+              value: {{ .Values.database.env.acceptEula | quote }}
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: easytrade-db-secret
+                  key: SA_PASSWORD
+          resources:
+            {{- toYaml .Values.database.resources | nindent 12 }}
+          volumeMounts:
+            - name: mssqldb
+              mountPath: /var/opt/mssql
+          livenessProbe:
+            {{- toYaml .Values.database.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.database.readinessProbe | nindent 12 }}
+      volumes:
+        - name: mssqldb
+          persistentVolumeClaim:
+            claimName: db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.database.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.database.name }}
+spec:
+  type: {{ .Values.database.service.type }}
+  ports:
+    - port: {{ .Values.database.service.port }}
+      targetPort: {{ .Values.database.service.port }}
+      protocol: TCP
+      name: mssql
+  selector:
+    app: {{ .Values.database.name }}
+{{- end }}

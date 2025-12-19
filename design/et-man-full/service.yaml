@@ -1,0 +1,24 @@
+{{- range $serviceName, $serviceConfig := .Values }}
+{{- if and (kindIs "map" $serviceConfig) (hasKey $serviceConfig "enabled") $serviceConfig.enabled (hasKey $serviceConfig "service") (ne $serviceName "global") (ne $serviceName "database") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceConfig.name }}
+  namespace: {{ $.Values.global.namespace }}
+  labels:
+    app: {{ $serviceConfig.name }}
+    {{- range $key, $val := $.Values.labels }}
+    {{ $key }}: {{ $val }}
+    {{- end }}
+spec:
+  type: {{ $serviceConfig.service.type }}
+  ports:
+    - port: {{ $serviceConfig.service.port }}
+      targetPort: {{ $serviceConfig.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ $serviceConfig.name }}
+{{- end }}
+{{- end }}

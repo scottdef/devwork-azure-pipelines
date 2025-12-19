@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: easytrade-config
+  namespace: easytrade
+  labels:
+    app.kubernetes.io/name: easytrade
+    app.kubernetes.io/component: configuration
+data:
+  # Database configuration
+  DB_HOST: "db"
+  DB_PORT: "1433"
+  DB_NAME: "TradeManagement"
+  
+  # Service URLs
+  BROKER_SERVICE_URL: "http://broker-service:8080"
+  ACCOUNTSERVICE_URL: "http://accountservice:8089"
+  LOGINSERVICE_URL: "http://loginservice:8080"
+  PRICINGSERVICE_URL: "http://pricingservice:8080"
+  OFFERSERVICE_URL: "http://offerservice:8087"
+  FEATURE_FLAG_SERVICE_URL: "http://feature-flag-service:8080"
+  
+  # Frontend configuration
+  PROXY_HOST: "frontendreverseproxy"
+  PROXY_PORT: "80"
+  
+  # Feature flag configuration
+  FEATURE_FLAG_CACHE_DURATION_S: "30"
+  
+  # High CPU usage configuration (for problem patterns)
+  HIGH_CPU_USAGE_REQUEST_DELAY_MS: "1000"
+  HIGH_CPU_USAGE_CONCURRENCY: "4"

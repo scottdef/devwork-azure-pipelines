@@ -1,0 +1,478 @@
+# Default values for easytrade
+# This is a YAML-formatted file.
+
+global:
+  namespace: easytrade
+  imageRegistry: europe-docker.pkg.dev/dynatrace-demoability/docker/easytrade
+  imagePullPolicy: Always
+  imageTag: latest
+
+# Labels applied to all resources
+labels:
+  app.kubernetes.io/name: easytrade
+  app.kubernetes.io/managed-by: helm
+
+# Database configuration
+database:
+  enabled: true
+  name: db
+  image:
+    repository: mcr.microsoft.com/mssql/server
+    tag: "2022-latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 1433
+  
+  env:
+    acceptEula: "Y"
+    saPassword: "yourStrong(!)Password"
+    databaseName: "TradeManagement"
+  
+  persistence:
+    enabled: true
+    storageClass: managed-csi
+    size: 10Gi
+  
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  
+  livenessProbe:
+    tcpSocket:
+      port: 1433
+    initialDelaySeconds: 45
+    periodSeconds: 10
+  
+  readinessProbe:
+    tcpSocket:
+      port: 1433
+    initialDelaySeconds: 30
+    periodSeconds: 5
+
+# Frontend Reverse Proxy (NGINX)
+frontendreverseproxy:
+  enabled: true
+  name: frontendreverseproxy
+  replicaCount: 2
+  
+  image:
+    repository: frontendreverseproxy
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Frontend
+frontend:
+  enabled: true
+  name: frontend
+  replicaCount: 2
+  
+  image:
+    repository: frontend
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  env:
+    proxyHost: frontendreverseproxy
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Broker Service
+brokerService:
+  enabled: true
+  name: broker-service
+  replicaCount: 2
+  
+  image:
+    repository: broker-service
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  env:
+    featureFlagCacheDuration: "30"
+    highCpuUsageRequestDelay: "1000"
+    highCpuUsageConcurrency: "4"
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+  
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 45
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 5
+
+# Account Service
+accountService:
+  enabled: true
+  name: accountservice
+  replicaCount: 2
+  
+  image:
+    repository: accountservice
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8089
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+  
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 8089
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 8089
+    initialDelaySeconds: 20
+    periodSeconds: 5
+
+# Login Service
+loginService:
+  enabled: true
+  name: loginservice
+  replicaCount: 2
+  
+  image:
+    repository: loginservice
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+
+# Pricing Service
+pricingService:
+  enabled: true
+  name: pricingservice
+  replicaCount: 2
+  
+  image:
+    repository: pricingservice
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+
+# Offer Service
+offerService:
+  enabled: true
+  name: offerservice
+  replicaCount: 2
+  
+  image:
+    repository: offerservice
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8087
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+
+# Feature Flag Service
+featureFlagService:
+  enabled: true
+  name: feature-flag-service
+  replicaCount: 1
+  
+  image:
+    repository: feature-flag-service
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Content Creator
+contentCreator:
+  enabled: true
+  name: contentcreator
+  replicaCount: 1
+  
+  image:
+    repository: contentcreator
+    tag: latest
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Manager
+manager:
+  enabled: true
+  name: manager
+  replicaCount: 1
+  
+  image:
+    repository: manager
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Engine
+engine:
+  enabled: true
+  name: engine
+  replicaCount: 1
+  
+  image:
+    repository: engine
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Credit Card Order Service
+creditCardOrderService:
+  enabled: true
+  name: credit-card-order-service
+  replicaCount: 1
+  
+  image:
+    repository: credit-card-order-service
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Factory
+factory:
+  enabled: true
+  name: factory
+  replicaCount: 1
+  
+  image:
+    repository: factory
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Third Party Service
+thirdPartyService:
+  enabled: true
+  name: thirdpartyservice
+  replicaCount: 1
+  
+  image:
+    repository: thirdpartyservice
+    tag: latest
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Headless Load Generator (optional)
+loadGenerator:
+  enabled: false
+  name: headless-loadgen
+  replicaCount: 0
+  
+  image:
+    repository: headless-loadgen
+    tag: latest
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Ingress configuration
+ingress:
+  enabled: false
+  loadBalancer:
+    enabled: false
+    internal: true
+    # internalSubnet: "aks-internal-subnet"
+  
+  istio:
+    enabled: false
+    gateway:
+      selector: aks-istio-ingressgateway-internal
+    hosts:
+      - "easytrade.internal.company.com"
+
+# Network Policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Service Monitor (for Prometheus)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+
+# Problem Patterns CronJobs
+problemPatterns:
+  enabled: false
+  schedule: "0 8 * * *"  # Daily at 8 AM UTC
+  patterns:
+    - db_not_responding
+    - ergo_aggregator_slowdown
+    - factory_crisis
+    - high_cpu_usage

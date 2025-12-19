@@ -1,0 +1,122 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: easytrade-gateway
+  namespace: easytrade
+spec:
+  selector:
+    istio: aks-istio-ingressgateway-internal
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "easytrade.internal.company.com"
+        - "*"
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "easytrade.internal.company.com"
+      tls:
+        mode: SIMPLE
+        credentialName: easytrade-tls-credential
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: easytrade-vs
+  namespace: easytrade
+spec:
+  hosts:
+    - "easytrade.internal.company.com"
+    - "*"
+  gateways:
+    - easytrade-gateway
+  http:
+    # Feature Flag Service API
+    - match:
+        - uri:
+            prefix: "/feature-flag-service"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: feature-flag-service.easytrade.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+    
+    # Broker Service API
+    - match:
+        - uri:
+            prefix: "/broker-service"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: broker-service.easytrade.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 60s
+    
+    # Account Service API
+    - match:
+        - uri:
+            prefix: "/accountservice"
+      rewrite:
+        uri: "/"
+      route:
+        - destination:
+            host: accountservice.easytrade.svc.cluster.local
+            port:
+              number: 8089
+      timeout: 30s
+    
+    # Default route to frontend
+    - route:
+        - destination:
+            host: frontendreverseproxy.easytrade.svc.cluster.local
+            port:
+              number: 80
+---
+# Peer Authentication for mTLS
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: easytrade-mtls
+  namespace: easytrade
+spec:
+  mtls:
+    mode: STRICT
+---
+# Destination Rule for traffic policy
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: easytrade-destination
+  namespace: easytrade
+spec:
+  host: "*.easytrade.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: UPGRADE
+        http1MaxPendingRequests: 100
+        maxRequestsPerConnection: 2
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 50
+      minHealthPercent: 40

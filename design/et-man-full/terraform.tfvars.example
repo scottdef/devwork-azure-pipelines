@@ -1,0 +1,46 @@
+# terraform/terraform.tfvars.example
+# Example Terraform variables - copy to terraform.tfvars and customize
+
+# Azure Configuration
+subscription_id      = "your-subscription-id-here"
+resource_group_name = "prod-cus-platform-base-rg-001"
+cluster_name        = "prod-cus-aks-sre-lab-003"
+acr_name           = "prod-central-image-repo"
+
+# EasyTrade Configuration
+namespace            = "easytrade"
+database_sa_password = "yourStrong(!)Password"
+use_acr_images      = true
+deploy_via_helm     = false
+
+# Resource Limits
+resource_quota = {
+  requests_cpu    = "16"
+  requests_memory = "32Gi"
+  limits_cpu      = "32"
+  limits_memory   = "64Gi"
+  pvc_count       = "10"
+  loadbalancers   = "2"
+}
+
+limit_range = {
+  default_cpu            = "1"
+  default_memory         = "1Gi"
+  default_request_cpu    = "100m"
+  default_request_memory = "128Mi"
+}
+
+# Feature Flags
+enable_istio            = true
+enable_monitoring       = false
+enable_autoscaling      = false
+enable_network_policies = false
+
+# Tags
+tags = {
+  Environment = "production"
+  ManagedBy   = "terraform"
+  Application = "easytrade"
+  Team        = "platform-engineering"
+  CostCenter  = "engineering"
+}

@@ -1,0 +1,185 @@
+name: Deploy EasyTrade to AKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - 'helm/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+        default: 'dev'
+      deployment_type:
+        description: 'Deployment method'
+        required: true
+        type: choice
+        options:
+          - manifests
+          - helm
+        default: 'manifests'
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  RESOURCE_GROUP: prod-cus-platform-base-rg-001
+  CLUSTER_NAME: prod-cus-aks-sre-lab-003
+  ACR_NAME: prod-central-image-repo
+  ACR_LOGIN_SERVER: prodcentralimagerepo.azurecr.io
+  NAMESPACE: easytrade
+
+jobs:
+  validate:
+    name: Validate Manifests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+      
+      - name: Validate Kubernetes manifests
+        run: |
+          # Validate all YAML files
+          for file in kubernetes/**/*.yaml; do
+            echo "Validating $file..."
+            kubectl --dry-run=client apply -f "$file" || exit 1
+          done
+      
+      - name: Validate Helm chart
+        run: |
+          # Install Helm
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          
+          # Lint Helm chart
+          helm lint ./helm/easytrade
+
+  deploy:
+    name: Deploy to AKS
+    runs-on: ubuntu-24.04
+    needs: validate
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+      
+      - name: Setup kubelogin
+        uses: azure/use-kubelogin@v1.2
+        with:
+          kubelogin-version: 'v0.1.4'
+      
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ env.RESOURCE_GROUP }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          admin: 'false'
+          use-kubelogin: 'true'
+      
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label namespace ${{ env.NAMESPACE }} istio-injection=enabled --overwrite
+      
+      - name: Deploy with Manifests
+        if: github.event.inputs.deployment_type == 'manifests' || github.event.inputs.deployment_type == ''
+        run: |
+          # Update image references to use ACR
+          find ./kubernetes -name "*.yaml" -type f -exec \
+            sed -i "s|europe-docker.pkg.dev/dynatrace-demoability/docker/easytrade|${{ env.ACR_LOGIN_SERVER }}/easytrade|g" {} \;
+          
+          # Deploy database first
+          kubectl -n ${{ env.NAMESPACE }} apply -f ./kubernetes/database.yaml
+          
+          # Wait for database
+          kubectl -n ${{ env.NAMESPACE }} wait --for=condition=ready pod -l app=db --timeout=300s
+          
+          # Deploy services
+          kubectl -n ${{ env.NAMESPACE }} apply -f ./kubernetes/services/
+          
+          # Wait for rollout
+          kubectl -n ${{ env.NAMESPACE }} wait --for=condition=available --timeout=600s deployment --all
+      
+      - name: Deploy with Helm
+        if: github.event.inputs.deployment_type == 'helm'
+        run: |
+          # Install Helm
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          
+          # Deploy
+          helm upgrade --install easytrade ./helm/easytrade \
+            --namespace ${{ env.NAMESPACE }} \
+            --set global.imageRegistry=${{ env.ACR_LOGIN_SERVER }} \
+            --wait \
+            --timeout 10m
+      
+      - name: Verify deployment
+        run: |
+          echo "=== Pods ==="
+          kubectl -n ${{ env.NAMESPACE }} get pods -o wide
+          
+          echo ""
+          echo "=== Services ==="
+          kubectl -n ${{ env.NAMESPACE }} get svc
+          
+          echo ""
+          echo "=== Recent Events ==="
+          kubectl -n ${{ env.NAMESPACE }} get events --sort-by='.lastTimestamp' | tail -10
+      
+      - name: Run smoke tests
+        run: |
+          # Port-forward and test
+          kubectl -n ${{ env.NAMESPACE }} port-forward svc/frontendreverseproxy 8080:80 &
+          PF_PID=$!
+          sleep 5
+          
+          # Test health endpoint
+          curl -sf http://localhost:8080/ > /dev/null && echo "✓ Health check passed" || exit 1
+          
+          # Cleanup
+          kill $PF_PID || true
+
+  notify:
+    name: Notify Status
+    runs-on: ubuntu-24.04
+    needs: deploy
+    if: always()
+    steps:
+      - name: Deployment Status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✓ Deployment successful"
+          else
+            echo "✗ Deployment failed"
+            exit 1
+          fi

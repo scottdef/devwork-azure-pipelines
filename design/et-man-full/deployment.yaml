@@ -1,0 +1,96 @@
+{{- range $serviceName, $serviceConfig := .Values }}
+{{- if and (kindIs "map" $serviceConfig) (hasKey $serviceConfig "enabled") $serviceConfig.enabled (hasKey $serviceConfig "name") (ne $serviceName "global") (ne $serviceName "database") (ne $serviceName "ingress") (ne $serviceName "networkPolicy") (ne $serviceName "podDisruptionBudget") (ne $serviceName "autoscaling") (ne $serviceName "serviceMonitor") (ne $serviceName "problemPatterns") (ne $serviceName "labels") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $serviceConfig.name }}
+  namespace: {{ $.Values.global.namespace }}
+  labels:
+    app: {{ $serviceConfig.name }}
+    {{- range $key, $val := $.Values.labels }}
+    {{ $key }}: {{ $val }}
+    {{- end }}
+spec:
+  replicas: {{ $serviceConfig.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $serviceConfig.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $serviceConfig.name }}
+        {{- range $key, $val := $.Values.labels }}
+        {{ $key }}: {{ $val }}
+        {{- end }}
+    spec:
+      containers:
+        - name: {{ $serviceConfig.name }}
+          image: "{{ $.Values.global.imageRegistry }}/{{ $serviceConfig.image.repository }}:{{ $serviceConfig.image.tag | default $.Values.global.imageTag }}"
+          imagePullPolicy: {{ $serviceConfig.image.pullPolicy | default $.Values.global.imagePullPolicy }}
+          {{- if $serviceConfig.service }}
+          ports:
+            - containerPort: {{ $serviceConfig.service.port }}
+              name: http
+          {{- end }}
+          {{- if $serviceConfig.env }}
+          env:
+            {{- if eq $serviceName "brokerService" }}
+            - name: MSSQL_HOST
+              value: "db"
+            - name: MSSQL_PORT
+              value: "1433"
+            - name: MSSQL_USER
+              value: "sa"
+            - name: MSSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: easytrade-db-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_DB
+              value: "TradeManagement"
+            - name: PRICING_SERVICE_URL
+              value: "http://pricingservice:8080"
+            - name: FEATURE_FLAG_SERVICE_URL
+              value: "http://feature-flag-service:8080"
+            - name: ACCOUNTSERVICE_URL
+              value: "http://accountservice:8089"
+            - name: FEATURE_FLAG_CACHE_DURATION_S
+              value: {{ $serviceConfig.env.featureFlagCacheDuration | quote }}
+            - name: HIGH_CPU_USAGE_REQUEST_DELAY_MS
+              value: {{ $serviceConfig.env.highCpuUsageRequestDelay | quote }}
+            - name: HIGH_CPU_USAGE_CONCURRENCY
+              value: {{ $serviceConfig.env.highCpuUsageConcurrency | quote }}
+            {{- else if or (eq $serviceName "accountService") (eq $serviceName "loginService") (eq $serviceName "pricingService") (eq $serviceName "offerService") (eq $serviceName "contentCreator") }}
+            - name: MSSQL_HOST
+              value: "db"
+            - name: MSSQL_PORT
+              value: "1433"
+            - name: MSSQL_USER
+              value: "sa"
+            - name: MSSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: easytrade-db-secret
+                  key: SA_PASSWORD
+            - name: MSSQL_DB
+              value: "TradeManagement"
+            {{- else if eq $serviceName "frontend" }}
+            - name: PROXY_HOST
+              value: {{ $serviceConfig.env.proxyHost }}
+            {{- end }}
+          {{- end }}
+          {{- if $serviceConfig.resources }}
+          resources:
+            {{- toYaml $serviceConfig.resources | nindent 12 }}
+          {{- end }}
+          {{- if $serviceConfig.livenessProbe }}
+          livenessProbe:
+            {{- toYaml $serviceConfig.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if $serviceConfig.readinessProbe }}
+          readinessProbe:
+            {{- toYaml $serviceConfig.readinessProbe | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}

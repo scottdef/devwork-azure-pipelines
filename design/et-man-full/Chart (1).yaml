@@ -1,0 +1,25 @@
+apiVersion: v2
+name: easytrade
+description: A Helm chart for Dynatrace EasyTrade demo application
+type: application
+version: 1.0.0
+appVersion: "latest"
+
+maintainers:
+  - name: Platform Team
+    email: platform-team@company.com
+
+keywords:
+  - easytrade
+  - dynatrace
+  - demo
+  - microservices
+  - trading
+
+home: https://github.com/Dynatrace/easytrade
+sources:
+  - https://github.com/Dynatrace/easytrade
+
+annotations:
+  category: Application
+  licenses: MIT

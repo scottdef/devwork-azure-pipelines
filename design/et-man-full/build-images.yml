@@ -1,0 +1,191 @@
+name: Build and Push Images to ACR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/**'
+      - '.github/workflows/build-images.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to build (or "all")'
+        required: true
+        type: choice
+        options:
+          - all
+          - broker-service
+          - accountservice
+          - loginservice
+          - pricingservice
+          - offerservice
+          - feature-flag-service
+          - frontend
+          - frontendreverseproxy
+          - contentcreator
+        default: 'all'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: prod-central-image-repo
+  ACR_LOGIN_SERVER: prodcentralimagerepo.azurecr.io
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-24.04
+    
+    strategy:
+      matrix:
+        service:
+          - broker-service
+          - accountservice
+          - loginservice
+          - pricingservice
+          - offerservice
+          - feature-flag-service
+          - frontend
+          - frontendreverseproxy
+          - contentcreator
+          - manager
+          - engine
+          - credit-card-order-service
+          - factory
+          - thirdpartyservice
+          - headless-loadgen
+      fail-fast: false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Login to ACR
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+      
+      - name: Import image from upstream
+        run: |
+          echo "Importing ${{ matrix.service }} from upstream registry..."
+          
+          az acr import \
+            --name ${{ env.ACR_NAME }} \
+            --source europe-docker.pkg.dev/dynatrace-demoability/docker/easytrade/${{ matrix.service }}:latest \
+            --image easytrade/${{ matrix.service }}:latest \
+            --image easytrade/${{ matrix.service }}:${{ github.sha }} \
+            --force
+      
+      - name: Verify image
+        run: |
+          az acr repository show-tags \
+            --name ${{ env.ACR_NAME }} \
+            --repository easytrade/${{ matrix.service }} \
+            --output table
+      
+      - name: Scan image for vulnerabilities
+        continue-on-error: true
+        run: |
+          # Enable Defender for Containers scanning
+          az acr task run \
+            --registry ${{ env.ACR_NAME }} \
+            --name quickscan \
+            --arg IMAGE=easytrade/${{ matrix.service }}:${{ github.sha }} \
+            || echo "Image scanning not configured"
+
+  tag-stable:
+    name: Tag Stable Release
+    runs-on: ubuntu-24.04
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Tag images as stable
+        run: |
+          SERVICES=(
+            "broker-service"
+            "accountservice"
+            "loginservice"
+            "pricingservice"
+            "offerservice"
+            "feature-flag-service"
+            "frontend"
+            "frontendreverseproxy"
+            "contentcreator"
+            "manager"
+            "engine"
+            "credit-card-order-service"
+            "factory"
+            "thirdpartyservice"
+            "headless-loadgen"
+          )
+          
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "Tagging $SERVICE as stable..."
+            az acr import \
+              --name ${{ env.ACR_NAME }} \
+              --source ${{ env.ACR_LOGIN_SERVER }}/easytrade/${SERVICE}:${{ github.sha }} \
+              --image easytrade/${SERVICE}:stable \
+              --force
+          done
+      
+      - name: Create release notes
+        run: |
+          echo "## Images Built" > release-notes.md
+          echo "" >> release-notes.md
+          echo "Commit: \`${{ github.sha }}\`" >> release-notes.md
+          echo "Tagged as: \`stable\` and \`${{ github.sha }}\`" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "All EasyTrade services have been built and pushed to ACR." >> release-notes.md
+          
+          cat release-notes.md
+
+  cleanup-old-images:
+    name: Cleanup Old Images
+    runs-on: ubuntu-24.04
+    needs: tag-stable
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Remove old untagged images
+        continue-on-error: true
+        run: |
+          # Keep last 10 images, remove older untagged manifests
+          az acr repository show-manifests \
+            --name ${{ env.ACR_NAME }} \
+            --repository easytrade/broker-service \
+            --orderby time_desc \
+            --query "[10:].digest" \
+            --output tsv | \
+          while read digest; do
+            az acr repository delete \
+              --name ${{ env.ACR_NAME }} \
+              --image easytrade/broker-service@$digest \
+              --yes || true
+          done
