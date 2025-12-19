@@ -1,0 +1,333 @@
+# Efficient Terraform Deployment
+# File: .github/workflows/deploy-terraform-optimized.yml
+# Most efficient approach: Terraform with caching, planning, and state management
+
+name: 🏗️ Terraform Deploy (Optimized)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'helm/**'
+  
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+  
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action'
+        type: choice
+        options: ['plan', 'apply', 'destroy']
+        default: 'plan'
+      environment:
+        description: 'Environment'
+        type: choice
+        options: ['dev', 'staging', 'prod']
+        default: 'dev'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TF_VERSION: 1.6.0
+  TF_WORKING_DIR: ./terraform
+  BACKEND_RG: prod-cus-platform-terraform-rg-001
+  BACKEND_SA: prodcusterraformst001
+  BACKEND_CONTAINER: tfstate
+
+jobs:
+  terraform-plan:
+    name: 📋 Plan (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-24.04
+    outputs:
+      tfplan_exists: ${{ steps.plan.outputs.tfplan_exists }}
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      - name: Terraform Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.TF_WORKING_DIR }}/.terraform
+            ${{ env.TF_WORKING_DIR }}/.terraform.lock.hcl
+          key: ${{ runner.os }}-terraform-${{ hashFiles('terraform/**/*.tf') }}
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Get ACR Credentials
+        id: acr
+        run: |
+          USERNAME=$(az acr credential show -n prod-central-image-repo --query username -o tsv)
+          PASSWORD=$(az acr credential show -n prod-central-image-repo --query passwords[0].value -o tsv)
+          echo "::add-mask::$PASSWORD"
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+      
+      - name: Generate tfvars
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          cat > terraform.auto.tfvars <<EOF
+          azure_subscription_id  = "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          resource_group_name    = "prod-cus-platform-base-rg-001"
+          aks_cluster_name       = "prod-cus-aks-sre-lab-003"
+          namespace              = "kubernetes-dashboard"
+          environment            = "$ENVIRONMENT"
+          dashboard_chart_version = "7.14.0"
+          replicas               = $([ "$ENVIRONMENT" = "prod" ] && echo "2" || echo "1")
+          acr_server             = "prod-central-image-repo.azurecr.io"
+          acr_username           = "${{ steps.acr.outputs.username }}"
+          acr_password           = "${{ steps.acr.outputs.password }}"
+          use_acr                = true
+          create_loadbalancer    = false
+          
+          tags = {
+            Environment = "$ENVIRONMENT"
+            ManagedBy   = "terraform"
+            Repository  = "${{ github.repository }}"
+            Workflow    = "${{ github.workflow }}"
+          }
+          EOF
+      
+      - name: Terraform Init
+        run: |
+          cat > backend.tf <<EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ env.BACKEND_RG }}"
+              storage_account_name = "${{ env.BACKEND_SA }}"
+              container_name       = "${{ env.BACKEND_CONTAINER }}"
+              key                  = "dashboard-${{ github.event.inputs.environment || 'dev' }}.tfstate"
+            }
+          }
+          EOF
+          
+          terraform init \
+            -backend-config="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+      
+      - name: Terraform Validate
+        run: terraform validate
+      
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -out=tfplan -no-color | tee plan.txt
+          
+          # Check if plan has changes
+          if grep -q "No changes" plan.txt; then
+            echo "tfplan_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "tfplan_exists=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.event.inputs.environment || 'dev' }}
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan
+            ${{ env.TF_WORKING_DIR }}/plan.txt
+          retention-days: 5
+      
+      - name: Comment PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan.txt', 'utf8');
+            const output = `### Terraform Plan - ${{ github.event.inputs.environment || 'dev' }}
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`terraform
+            ${plan}
+            \`\`\`
+            
+            </details>
+            
+            *Triggered by @${{ github.actor }}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  terraform-apply:
+    name: 🚀 Apply (${{ github.event.inputs.environment || 'dev' }})
+    needs: terraform-plan
+    if: |
+      needs.terraform-plan.outputs.tfplan_exists == 'true' &&
+      (github.event.inputs.action == 'apply' || 
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      - name: Restore Terraform Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.TF_WORKING_DIR }}/.terraform
+            ${{ env.TF_WORKING_DIR }}/.terraform.lock.hcl
+          key: ${{ runner.os }}-terraform-${{ hashFiles('terraform/**/*.tf') }}
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.event.inputs.environment || 'dev' }}
+          path: ${{ env.TF_WORKING_DIR }}
+      
+      - name: Terraform Init
+        run: |
+          cat > backend.tf <<EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ env.BACKEND_RG }}"
+              storage_account_name = "${{ env.BACKEND_SA }}"
+              container_name       = "${{ env.BACKEND_CONTAINER }}"
+              key                  = "dashboard-${{ github.event.inputs.environment || 'dev' }}.tfstate"
+            }
+          }
+          EOF
+          
+          terraform init \
+            -backend-config="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+      
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+      
+      - name: Terraform Output
+        id: output
+        run: |
+          terraform output -json > outputs.json
+          
+          NAMESPACE=$(terraform output -raw namespace)
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+      
+      - name: Upload Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ github.event.inputs.environment || 'dev' }}
+          path: ${{ env.TF_WORKING_DIR }}/outputs.json
+          retention-days: 30
+      
+      - name: Verify Deployment
+        run: |
+          # Setup kubectl
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          
+          # Connect
+          az aks get-credentials \
+            --resource-group prod-cus-platform-base-rg-001 \
+            --name prod-cus-aks-sre-lab-003
+          kubelogin convert-kubeconfig -l azurecli
+          
+          # Verify
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ steps.output.outputs.namespace }} \
+            --timeout=300s
+          
+          kubectl get all -n ${{ steps.output.outputs.namespace }}
+      
+      - name: Generate Summary
+        run: |
+          echo "### 🎉 Terraform Apply Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** ${{ steps.output.outputs.namespace }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat outputs.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  terraform-destroy:
+    name: 🗑️ Destroy (${{ github.event.inputs.environment }})
+    if: github.event.inputs.action == 'destroy'
+    runs-on: ubuntu-24.04
+    environment: ${{ github.event.inputs.environment }}-destroy
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Terraform Init & Destroy
+        run: |
+          cat > backend.tf <<EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ env.BACKEND_RG }}"
+              storage_account_name = "${{ env.BACKEND_SA }}"
+              container_name       = "${{ env.BACKEND_CONTAINER }}"
+              key                  = "dashboard-${{ github.event.inputs.environment }}.tfstate"
+            }
+          }
+          EOF
+          
+          terraform init
+          terraform destroy -auto-approve
+          
+          echo "### ⚠️ Resources Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY

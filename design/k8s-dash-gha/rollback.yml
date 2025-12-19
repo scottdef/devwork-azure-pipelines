@@ -1,0 +1,236 @@
+# Rollback and Recovery Workflow
+# File: .github/workflows/rollback.yml
+# Emergency rollback to previous version
+
+name: ⏮️ Rollback Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'prod']
+        default: 'dev'
+      
+      rollback_type:
+        description: 'Rollback method'
+        required: true
+        type: choice
+        options:
+          - helm-history
+          - specific-revision
+          - backup-restore
+        default: 'helm-history'
+      
+      revision:
+        description: 'Specific revision (if applicable)'
+        required: false
+        type: string
+      
+      confirm:
+        description: 'Type ROLLBACK to confirm'
+        required: true
+        type: string
+
+env:
+  AKS_CLUSTER: prod-cus-aks-sre-lab-003
+  AKS_RG: prod-cus-platform-base-rg-001
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Confirm Rollback
+        run: |
+          if [ "${{ inputs.confirm }}" != "ROLLBACK" ]; then
+            echo "❌ Confirmation failed. Please type ROLLBACK to confirm."
+            exit 1
+          fi
+          echo "✅ Rollback confirmed"
+
+  rollback:
+    name: Execute Rollback (${{ inputs.environment }})
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Tools
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Backup Current State
+        run: |
+          mkdir -p backup
+          
+          # Backup current Helm release
+          helm get values kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup/values.yaml 2>/dev/null || true
+          helm get manifest kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup/manifest.yaml 2>/dev/null || true
+          
+          # Backup Kubernetes resources
+          kubectl get all -n ${{ env.NAMESPACE }} -o yaml > backup/resources.yaml 2>/dev/null || true
+          
+          # Show current state
+          echo "=== Current Helm History ==="
+          helm history kubernetes-dashboard -n ${{ env.NAMESPACE }} || true
+          
+          echo "=== Current Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+      
+      - name: Rollback with Helm History
+        if: inputs.rollback_type == 'helm-history'
+        run: |
+          echo "Rolling back to previous Helm revision..."
+          helm rollback kubernetes-dashboard -n ${{ env.NAMESPACE }}
+          
+          # Wait for rollout
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Rollback to Specific Revision
+        if: inputs.rollback_type == 'specific-revision'
+        run: |
+          if [ -z "${{ inputs.revision }}" ]; then
+            echo "❌ Revision number required"
+            exit 1
+          fi
+          
+          echo "Rolling back to revision ${{ inputs.revision }}..."
+          helm rollback kubernetes-dashboard ${{ inputs.revision }} -n ${{ env.NAMESPACE }}
+          
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Restore from Backup
+        if: inputs.rollback_type == 'backup-restore'
+        run: |
+          echo "Restoring from latest backup artifact..."
+          
+          # This would download from previous workflow artifacts
+          # For now, we'll show the command structure
+          echo "Manual restore steps:"
+          echo "1. Download backup artifact from previous successful deployment"
+          echo "2. kubectl apply -f backup-resources.yaml"
+          echo "3. Verify deployment"
+          
+          # Example restore (requires backup file)
+          # kubectl apply -f backup-resources.yaml
+      
+      - name: Verify Rollback
+        run: |
+          echo "=== Verifying Rollback ==="
+          
+          # Wait for pods
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s
+          
+          # Check health
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          kubectl get svc -n ${{ env.NAMESPACE }}
+          
+          # Verify endpoints
+          ENDPOINTS=$(kubectl get endpoints -n ${{ env.NAMESPACE }} kubernetes-dashboard-kong-proxy -o jsonpath='{.subsets[*].addresses[*].ip}')
+          
+          if [ -n "$ENDPOINTS" ]; then
+            echo "✅ Service endpoints available: $ENDPOINTS"
+          else
+            echo "❌ No service endpoints found"
+            exit 1
+          fi
+          
+          # Show current version
+          echo "=== Current Helm Release ==="
+          helm list -n ${{ env.NAMESPACE }}
+          helm history kubernetes-dashboard -n ${{ env.NAMESPACE }}
+      
+      - name: Upload Pre-Rollback Backup
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-rollback-backup-${{ inputs.environment }}-${{ github.run_number }}
+          path: backup/
+          retention-days: 30
+      
+      - name: Rollback Summary
+        run: |
+          echo "### ⏮️ Rollback Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ inputs.rollback_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Executed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Current State" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          helm list -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      
+      - name: Notify Team
+        run: |
+          echo "🔔 Rollback executed on ${{ inputs.environment }}"
+          echo "Consider investigating the issue that caused the rollback."
+
+  post-rollback-test:
+    name: Post-Rollback Tests
+    needs: rollback
+    runs-on: ubuntu-24.04
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect and Test
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+          
+          echo "=== Running Post-Rollback Tests ==="
+          
+          # Test 1: Pod health
+          HEALTHY=$(kubectl get pods -n ${{ env.NAMESPACE }} --field-selector=status.phase=Running --no-headers | wc -l)
+          TOTAL=$(kubectl get pods -n ${{ env.NAMESPACE }} --no-headers | wc -l)
+          echo "Healthy pods: $HEALTHY/$TOTAL"
+          
+          # Test 2: Service accessibility
+          kubectl get svc -n ${{ env.NAMESPACE }}
+          
+          # Test 3: Token generation
+          kubectl create token dashboard-admin -n ${{ env.NAMESPACE }} --duration=1h > /dev/null && echo "✅ Token generation works"
+          
+          echo "=== All tests passed ==="

@@ -1,0 +1,341 @@
+# Simple Bash-Based Deployment Workflow
+# File: .github/workflows/deploy-bash.yml
+# Practical approach: Uses existing bash scripts for straightforward deployment
+
+name: Deploy Dashboard (Bash Scripts)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'manifests/**'
+      - 'helm/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-bash.yml'
+  
+  pull_request:
+    branches:
+      - main
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'dev'
+      
+      method:
+        description: 'Deployment method'
+        required: true
+        type: choice
+        options:
+          - helm
+          - manifests
+        default: 'helm'
+      
+      create_token:
+        description: 'Generate admin token'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CLUSTER_NAME: prod-cus-aks-sre-lab-003
+  RESOURCE_GROUP: prod-cus-platform-base-rg-001
+  SUBSCRIPTION: tango-CICD-platform-github-gitflow
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-24.04
+    
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Step 2: Azure Login with OIDC
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      # Step 3: Setup kubectl and kubelogin
+      - name: Setup kubectl
+        run: |
+          echo "Installing kubectl and kubelogin..."
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Install kubelogin
+          az aks install-cli
+          
+          echo "Kubectl version:"
+          kubectl version --client
+      
+      # Step 4: Setup Helm
+      - name: Setup Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+      
+      # Step 5: Connect to AKS
+      - name: Connect to AKS
+        run: |
+          echo "Connecting to AKS cluster..."
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.CLUSTER_NAME }} \
+            --overwrite-existing
+          
+          # Convert to use kubelogin
+          kubelogin convert-kubeconfig -l azurecli
+          
+          # Test connection
+          kubectl get nodes
+          echo "✅ Successfully connected to AKS"
+      
+      # Step 6: Deploy with Helm
+      - name: Deploy with Helm
+        if: github.event.inputs.method == 'helm' || github.event_name != 'workflow_dispatch'
+        run: |
+          echo "Deploying Kubernetes Dashboard with Helm..."
+          
+          # Determine environment
+          ENV="${{ github.event.inputs.environment || 'dev' }}"
+          VALUES_FILE="helm/values-${ENV}.yaml"
+          
+          echo "Using values file: $VALUES_FILE"
+          
+          # Add Helm repo
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm repo update
+          
+          # Deploy
+          helm upgrade --install kubernetes-dashboard \
+            kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --version 7.14.0 \
+            --values "$VALUES_FILE" \
+            --wait \
+            --timeout 10m \
+            --atomic
+          
+          echo "✅ Helm deployment completed"
+      
+      # Step 7: Deploy with Manifests (Alternative)
+      - name: Deploy with Manifests
+        if: github.event.inputs.method == 'manifests'
+        run: |
+          echo "Deploying Kubernetes Dashboard with manifests..."
+          bash scripts/ubuntu/03-deploy-manifests.sh
+          echo "✅ Manifest deployment completed"
+      
+      # Step 8: Verify Deployment
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployment..."
+          
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s || true
+          
+          # Show status
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          
+          echo "=== Services ==="
+          kubectl get svc -n ${{ env.NAMESPACE }}
+          
+          echo "=== Deployments ==="
+          kubectl get deployments -n ${{ env.NAMESPACE }}
+          
+          # Check rollout status
+          kubectl rollout status deployment \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s
+          
+          echo "✅ Deployment verified"
+      
+      # Step 9: Create Admin Service Account
+      - name: Create Admin Service Account
+        if: github.event.inputs.create_token != 'false'
+        run: |
+          echo "Creating admin service account..."
+          
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: dashboard-admin
+            namespace: ${{ env.NAMESPACE }}
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: dashboard-admin-binding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+          - kind: ServiceAccount
+            name: dashboard-admin
+            namespace: ${{ env.NAMESPACE }}
+          EOF
+          
+          echo "✅ Admin service account created"
+      
+      # Step 10: Generate Access Token
+      - name: Generate Access Token
+        if: github.event.inputs.create_token != 'false'
+        id: token
+        run: |
+          echo "Generating admin token..."
+          
+          TOKEN=$(kubectl create token dashboard-admin \
+            -n ${{ env.NAMESPACE }} \
+            --duration=24h)
+          
+          # Mask token in logs
+          echo "::add-mask::$TOKEN"
+          
+          # Save to output (masked)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          
+          echo "✅ Token generated (expires in 24 hours)"
+      
+      # Step 11: Save Token to Azure Key Vault
+      - name: Save Token to Key Vault
+        if: github.event.inputs.create_token != 'false' && github.event.inputs.environment == 'prod'
+        run: |
+          echo "Saving token to Azure Key Vault..."
+          
+          az keyvault secret set \
+            --vault-name "prod-platform-kv" \
+            --name "dashboard-admin-token" \
+            --value "${{ steps.token.outputs.token }}" \
+            --expires $(date -u -d "+24 hours" +%Y-%m-%dT%H:%M:%SZ) \
+            2>/dev/null || echo "Key Vault not available, skipping..."
+      
+      # Step 12: Display Access Instructions
+      - name: Display Access Instructions
+        run: |
+          echo "=== 🎉 Deployment Complete ==="
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment || 'dev' }}"
+          echo "Namespace: ${{ env.NAMESPACE }}"
+          echo "Cluster: ${{ env.CLUSTER_NAME }}"
+          echo ""
+          echo "=== Access Instructions ==="
+          echo "1. Start port-forward:"
+          echo "   kubectl port-forward -n ${{ env.NAMESPACE }} svc/kubernetes-dashboard-kong-proxy 8443:443"
+          echo ""
+          echo "2. Access dashboard:"
+          echo "   https://localhost:8443"
+          echo ""
+          echo "3. Get admin token:"
+          echo "   kubectl create token dashboard-admin -n ${{ env.NAMESPACE }} --duration=24h"
+          echo ""
+          echo "=== Quick Commands ==="
+          echo "Check status:"
+          echo "  kubectl get all -n ${{ env.NAMESPACE }}"
+          echo ""
+          echo "View logs:"
+          echo "  kubectl logs -n ${{ env.NAMESPACE }} -l app.kubernetes.io/instance=kubernetes-dashboard"
+
+  # Post-deployment validation
+  validate:
+    name: Validate Deployment
+    needs: deploy
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.environment == 'prod' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.CLUSTER_NAME }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Run Health Checks
+        run: |
+          echo "=== Running Health Checks ==="
+          
+          # Check pod health
+          READY_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} \
+            --field-selector=status.phase=Running \
+            --no-headers | wc -l)
+          TOTAL_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} \
+            --no-headers | wc -l)
+          
+          echo "Ready pods: $READY_PODS/$TOTAL_PODS"
+          
+          if [ "$READY_PODS" -eq "$TOTAL_PODS" ] && [ "$READY_PODS" -gt 0 ]; then
+            echo "✅ All pods are healthy"
+          else
+            echo "❌ Some pods are not ready"
+            kubectl get pods -n ${{ env.NAMESPACE }}
+            exit 1
+          fi
+          
+          # Check service endpoints
+          ENDPOINTS=$(kubectl get endpoints -n ${{ env.NAMESPACE }} \
+            kubernetes-dashboard-kong-proxy \
+            -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || echo "")
+          
+          if [ -n "$ENDPOINTS" ]; then
+            echo "✅ Service endpoints available"
+          else
+            echo "❌ No service endpoints"
+            exit 1
+          fi
+          
+          echo "=== Health checks passed ==="
+      
+      - name: Test API Connectivity
+        run: |
+          echo "Testing API connectivity..."
+          
+          POD=$(kubectl get pods -n ${{ env.NAMESPACE }} \
+            -l app.kubernetes.io/name=kong \
+            -o jsonpath='{.items[0].metadata.name}')
+          
+          if [ -n "$POD" ]; then
+            kubectl exec -n ${{ env.NAMESPACE }} "$POD" -- \
+              curl -k -f https://localhost:8443/api/v1/health \
+              && echo "✅ API is responding" \
+              || echo "⚠️  API health check failed"
+          fi

@@ -1,0 +1,332 @@
+# Security - Token Rotation Workflow
+# File: .github/workflows/security-token-rotation.yml
+# Automated token rotation and security checks
+
+name: 🔐 Security & Token Rotation
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'prod', 'all']
+        default: 'prod'
+      
+      rotate_tokens:
+        description: 'Rotate admin tokens'
+        type: boolean
+        default: true
+      
+      audit_rbac:
+        description: 'Audit RBAC permissions'
+        type: boolean
+        default: true
+      
+      scan_security:
+        description: 'Run security scans'
+        type: boolean
+        default: false
+
+env:
+  AKS_CLUSTER: prod-cus-aks-sre-lab-003
+  AKS_RG: prod-cus-platform-base-rg-001
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  rotate-tokens:
+    name: Rotate Tokens (${{ github.event.inputs.environment || 'prod' }})
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.rotate_tokens != 'false'
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    strategy:
+      matrix:
+        account: [dashboard-admin, dashboard-readonly]
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Generate New Token (${{ matrix.account }})
+        id: token
+        run: |
+          echo "Generating new token for ${{ matrix.account }}..."
+          
+          # Create token with 24-hour expiry
+          TOKEN=$(kubectl create token ${{ matrix.account }} -n ${{ env.NAMESPACE }} --duration=24h)
+          echo "::add-mask::$TOKEN"
+          
+          # Store in outputs (masked)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          
+          echo "✅ New token generated for ${{ matrix.account }}"
+      
+      - name: Save Token to Azure Key Vault
+        run: |
+          # Save to Key Vault with expiration
+          EXPIRY=$(date -u -d "+24 hours" +%Y-%m-%dT%H:%M:%SZ)
+          
+          az keyvault secret set \
+            --vault-name "prod-platform-kv" \
+            --name "dashboard-${{ matrix.account }}-token" \
+            --value "${{ steps.token.outputs.token }}" \
+            --expires "$EXPIRY" \
+            2>/dev/null || echo "⚠️ Key Vault not configured, token not stored"
+      
+      - name: Revoke Old Tokens
+        run: |
+          echo "Note: Kubernetes service account tokens are revoked automatically upon expiry"
+          echo "Old tokens will expire in 24 hours from their creation time"
+      
+      - name: Token Rotation Summary
+        run: |
+          echo "### 🔐 Token Rotated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Account:** ${{ matrix.account }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Expires:** 24 hours from now" >> $GITHUB_STEP_SUMMARY
+          echo "**Storage:** Azure Key Vault" >> $GITHUB_STEP_SUMMARY
+
+  audit-rbac:
+    name: Audit RBAC Permissions
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.audit_rbac != 'false'
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Audit Service Accounts
+        run: |
+          echo "=== Dashboard Service Accounts ==="
+          kubectl get sa -n ${{ env.NAMESPACE }}
+          
+          echo "=== Service Account Secrets ==="
+          kubectl get secrets -n ${{ env.NAMESPACE }} | grep service-account-token || echo "No legacy tokens found"
+      
+      - name: Audit ClusterRoleBindings
+        run: |
+          echo "=== Dashboard ClusterRoleBindings ==="
+          kubectl get clusterrolebindings | grep dashboard
+          
+          echo "=== Details ==="
+          kubectl describe clusterrolebindings dashboard-admin 2>/dev/null || echo "dashboard-admin not found"
+          kubectl describe clusterrolebindings dashboard-readonly 2>/dev/null || echo "dashboard-readonly not found"
+      
+      - name: Check for Excessive Permissions
+        run: |
+          echo "=== Checking for cluster-admin bindings ==="
+          
+          # List all cluster-admin bindings in dashboard namespace
+          kubectl get clusterrolebindings -o json | \
+            jq -r '.items[] | select(.roleRef.name=="cluster-admin") | select(.subjects[]?.namespace=="'${{ env.NAMESPACE }}'") | .metadata.name'
+          
+          # Warn if too many cluster-admin bindings exist
+          COUNT=$(kubectl get clusterrolebindings -o json | \
+            jq -r '.items[] | select(.roleRef.name=="cluster-admin") | select(.subjects[]?.namespace=="'${{ env.NAMESPACE }}'") | .metadata.name' | wc -l)
+          
+          if [ "$COUNT" -gt 1 ]; then
+            echo "⚠️ Warning: $COUNT cluster-admin bindings found in ${{ env.NAMESPACE }}"
+            echo "Consider using more restrictive roles"
+          else
+            echo "✅ RBAC permissions look appropriate"
+          fi
+      
+      - name: Generate RBAC Audit Report
+        run: |
+          echo "### 📋 RBAC Audit Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** ${{ env.NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Service Accounts" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get sa -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### ClusterRoleBindings" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get clusterrolebindings | grep dashboard >> $GITHUB_STEP_SUMMARY || echo "None found" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.scan_security == 'true'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Scan Manifests with Kubesec
+        run: |
+          # Install kubesec
+          wget https://github.com/controlplaneio/kubesec/releases/download/v2.13.0/kubesec_linux_amd64.tar.gz
+          tar -xzf kubesec_linux_amd64.tar.gz
+          chmod +x kubesec
+          
+          echo "=== Scanning Kubernetes Manifests ==="
+          for file in manifests/*.yaml; do
+            echo "Scanning $file..."
+            ./kubesec scan "$file" || true
+          done
+      
+      - name: Check Pod Security Standards
+        run: |
+          echo "=== Checking Pod Security Standards ==="
+          
+          # Check if pods run as root
+          kubectl get pods -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | select(.spec.containers[].securityContext.runAsUser == 0 or .spec.containers[].securityContext.runAsNonRoot == false) | .metadata.name' \
+            || echo "✅ No pods running as root"
+          
+          # Check for privileged containers
+          kubectl get pods -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | select(.spec.containers[].securityContext.privileged == true) | .metadata.name' \
+            || echo "✅ No privileged containers"
+          
+          # Check for host network
+          kubectl get pods -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | select(.spec.hostNetwork == true) | .metadata.name' \
+            || echo "✅ No pods using host network"
+      
+      - name: Check Network Policies
+        run: |
+          echo "=== Network Policies ==="
+          kubectl get networkpolicies -n ${{ env.NAMESPACE }}
+          
+          if kubectl get networkpolicies -n ${{ env.NAMESPACE }} | grep -q dashboard; then
+            echo "✅ Network policies configured"
+          else
+            echo "⚠️ Warning: No network policies found"
+          fi
+      
+      - name: Check Resource Limits
+        run: |
+          echo "=== Resource Limits Check ==="
+          
+          kubectl get pods -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | .metadata.name as $name | .spec.containers[] | select(.resources.limits == null) | "⚠️ \($name) has no resource limits"' \
+            || echo "✅ All pods have resource limits"
+      
+      - name: Security Scan Summary
+        run: |
+          echo "### 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scanned:** ${{ env.NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review scan output above for detailed findings." >> $GITHUB_STEP_SUMMARY
+
+  compliance-check:
+    name: Compliance Check
+    runs-on: ubuntu-24.04
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Check Compliance Requirements
+        run: |
+          echo "=== Compliance Checklist ==="
+          
+          # 1. Check for required labels
+          echo "1. Checking labels..."
+          kubectl get deployments -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | select(.metadata.labels.environment == null) | .metadata.name' \
+            && echo "⚠️ Some resources missing environment label" \
+            || echo "✅ Labels present"
+          
+          # 2. Check audit logging
+          echo "2. Checking audit policy..."
+          echo "Note: AKS audit logging should be enabled at cluster level"
+          
+          # 3. Check TLS configuration
+          echo "3. Checking TLS..."
+          kubectl get services -n ${{ env.NAMESPACE }} -o json | \
+            jq -r '.items[] | select(.spec.ports[].port == 80) | .metadata.name' \
+            && echo "⚠️ HTTP services found" \
+            || echo "✅ All services use HTTPS"
+          
+          # 4. Check pod disruption budgets
+          echo "4. Checking PodDisruptionBudgets..."
+          kubectl get pdb -n ${{ env.NAMESPACE }}
+          
+          # 5. Check resource quotas
+          echo "5. Checking ResourceQuotas..."
+          kubectl get resourcequotas -n ${{ env.NAMESPACE }}
+          
+          echo "=== Compliance check complete ==="

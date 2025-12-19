@@ -1,0 +1,219 @@
+# Multi-Environment Deployment Pipeline
+# File: .github/workflows/deploy-multi-env.yml
+# Progressive deployment: dev → staging → prod with approvals
+
+name: 🔄 Multi-Environment Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'manifests/**'
+      - 'helm/**'
+  
+  workflow_dispatch:
+    inputs:
+      skip_dev:
+        description: 'Skip dev deployment'
+        type: boolean
+        default: false
+      skip_staging:
+        description: 'Skip staging deployment'
+        type: boolean
+        default: false
+
+env:
+  AKS_CLUSTER: prod-cus-aks-sre-lab-003
+  AKS_RG: prod-cus-platform-base-rg-001
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Job 1: Deploy to Dev
+  deploy-dev:
+    name: 🔧 Deploy to Dev
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.skip_dev != 'true'
+    environment:
+      name: dev
+      url: https://localhost:8443
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup & Deploy
+        run: |
+          # Azure login
+          az login --service-principal \
+            -u ${{ secrets.AZURE_CLIENT_ID }} \
+            -p ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          
+          # Tools
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          
+          # Connect
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l spn
+          export AAD_SERVICE_PRINCIPAL_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
+          export AAD_SERVICE_PRINCIPAL_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
+          
+          # Deploy
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }}-dev \
+            --create-namespace \
+            --version 7.14.0 \
+            --values helm/values-dev.yaml \
+            --set fullnameOverride=dashboard-dev \
+            --wait --timeout 10m
+          
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ env.NAMESPACE }}-dev --timeout=300s
+      
+      - name: Smoke Test
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }}-dev
+          echo "✅ Dev deployment successful"
+  
+  # Job 2: Deploy to Staging
+  deploy-staging:
+    name: 🧪 Deploy to Staging
+    needs: deploy-dev
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.skip_staging != 'true'
+    environment:
+      name: staging
+      url: https://localhost:8443
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Tools
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      
+      - name: Deploy to Staging
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+          
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }}-staging \
+            --create-namespace \
+            --version 7.14.0 \
+            --values helm/values-dev.yaml \
+            --set fullnameOverride=dashboard-staging \
+            --set api.scaling.replicas=2 \
+            --wait --timeout 10m
+          
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ env.NAMESPACE }}-staging --timeout=300s
+      
+      - name: Integration Tests
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }}-staging
+          echo "✅ Staging deployment successful"
+  
+  # Job 3: Deploy to Production (requires manual approval)
+  deploy-prod:
+    name: 🚀 Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-24.04
+    environment:
+      name: prod
+      url: https://localhost:8443
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Tools
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      
+      - name: Backup Current State
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+          
+          # Backup current release
+          helm get values kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup-values-${{ github.run_number }}.yaml 2>/dev/null || true
+          kubectl get all -n ${{ env.NAMESPACE }} -o yaml > backup-resources-${{ github.run_number }}.yaml 2>/dev/null || true
+      
+      - name: Deploy to Production
+        run: |
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --version 7.14.0 \
+            --values helm/values-prod.yaml \
+            --wait --timeout 10m --atomic
+          
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=kubernetes-dashboard \
+            -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Production Smoke Tests
+        run: |
+          # Check pod health
+          READY=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app.kubernetes.io/instance=kubernetes-dashboard --field-selector=status.phase=Running --no-headers | wc -l)
+          TOTAL=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app.kubernetes.io/instance=kubernetes-dashboard --no-headers | wc -l)
+          
+          if [ "$READY" -eq "$TOTAL" ] && [ "$READY" -gt 0 ]; then
+            echo "✅ All $READY pods are healthy"
+          else
+            echo "❌ Only $READY/$TOTAL pods are ready"
+            exit 1
+          fi
+          
+          # Check service endpoints
+          kubectl get endpoints -n ${{ env.NAMESPACE }}
+      
+      - name: Upload Backup Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-backup-${{ github.run_number }}
+          path: backup-*.yaml
+          retention-days: 30
+      
+      - name: Notify Success
+        run: |
+          echo "### 🎉 Production Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,142 @@
+# Practical One-Click Deployment
+# File: .github/workflows/deploy-simple.yml
+# Most practical approach: Single workflow for quick deployments
+
+name: 🚀 Quick Deploy Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'prod']
+        default: 'dev'
+      
+      method:
+        description: 'Deployment Method'
+        required: true
+        type: choice
+        options: ['helm', 'manifests']
+        default: 'helm'
+
+env:
+  AKS_CLUSTER: prod-cus-aks-sre-lab-003
+  AKS_RG: prod-cus-platform-base-rg-001
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-24.04
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Tools
+        run: |
+          # Install kubectl 1.30
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          
+          # Install kubelogin
+          az aks install-cli
+          
+          # Install Helm
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+          kubectl cluster-info
+      
+      - name: Deploy with Helm
+        if: inputs.method == 'helm'
+        run: |
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm repo update
+          
+          helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --version 7.14.0 \
+            --values helm/values-${{ inputs.environment }}.yaml \
+            --wait --timeout 10m --atomic
+      
+      - name: Deploy with Manifests
+        if: inputs.method == 'manifests'
+        run: |
+          kubectl apply -f manifests/namespace.yaml
+          kubectl apply -f manifests/serviceaccount.yaml
+          kubectl apply -f manifests/rbac.yaml
+          kubectl apply -f manifests/deployment.yaml
+          kubectl apply -f manifests/service.yaml
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Create Admin User & Generate Token
+        id: token
+        run: |
+          # Create service account if not exists
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: dashboard-admin
+            namespace: ${{ env.NAMESPACE }}
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: dashboard-admin
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+          - kind: ServiceAccount
+            name: dashboard-admin
+            namespace: ${{ env.NAMESPACE }}
+          EOF
+          
+          # Generate token
+          TOKEN=$(kubectl create token dashboard-admin -n ${{ env.NAMESPACE }} --duration=24h)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+      
+      - name: Verify Deployment
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }}
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=kubernetes-dashboard -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Display Access Info
+        run: |
+          echo "### 🎉 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Method:** ${{ inputs.method }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** ${{ env.NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔐 Access Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Port-forward" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl port-forward -n ${{ env.NAMESPACE }} svc/kubernetes-dashboard-kong-proxy 8443:443" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Access at: https://localhost:8443" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Get new token:" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl create token dashboard-admin -n ${{ env.NAMESPACE }} --duration=24h" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,200 @@
+# Helm values for Production Environment
+# File: helm/values-prod.yaml
+
+app:
+  mode: 'dashboard'
+  
+  scheduling:
+    nodeSelector:
+      kubernetes.io/os: linux
+      node.kubernetes.io/instance-type: "Standard_D4s_v3"  # Adjust based on your node SKU
+  
+  security:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 2001
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+    
+    podSecurityContext:
+      fsGroup: 2001
+      seccompProfile:
+        type: RuntimeDefault
+  
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Kong API Gateway Configuration
+kong:
+  enabled: true
+  proxy:
+    type: ClusterIP
+  
+  # Production resources
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # High availability
+  replicaCount: 2
+  
+  # Pod annotations
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+
+# API Container Configuration
+api:
+  scaling:
+    replicas: 2
+  
+  containers:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    
+    # Production-grade probes
+    livenessProbe:
+      httpGet:
+        scheme: HTTP
+        path: /api/v1/health
+        port: 9000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    
+    readinessProbe:
+      httpGet:
+        scheme: HTTP
+        path: /api/v1/health
+        port: 9000
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 2
+    
+    image:
+      repository: docker.io/kubernetesui/dashboard-api
+      tag: "1.14.0"
+      pullPolicy: IfNotPresent
+
+# Web Container Configuration
+web:
+  scaling:
+    replicas: 2
+  
+  containers:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    
+    image:
+      repository: docker.io/kubernetesui/dashboard-web
+      tag: "1.7.0"
+      pullPolicy: IfNotPresent
+
+# Auth Container Configuration
+auth:
+  containers:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    
+    image:
+      repository: docker.io/kubernetesui/dashboard-auth
+      tag: "1.4.0"
+      pullPolicy: IfNotPresent
+
+# Metrics Scraper Configuration
+metricsScraper:
+  enabled: true
+  scaling:
+    replicas: 1
+  
+  containers:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    
+    image:
+      repository: docker.io/kubernetesui/dashboard-metrics-scraper
+      tag: "1.2.2"
+      pullPolicy: IfNotPresent
+
+# Disable metrics-server (assume already installed in cluster)
+metrics-server:
+  enabled: false
+
+# Nginx Ingress Configuration (optional - prefer Istio in production)
+nginx:
+  enabled: false
+
+# Certificate generation
+cert-manager:
+  enabled: false
+
+# Additional production settings
+extras:
+  # Pod annotations
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    prometheus.io/scrape: "true"
+  
+  # Service annotations for internal load balancer
+  serviceAnnotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "aks-subnet"
+  
+  # Labels
+  labels:
+    environment: production
+    managed-by: platform-engineering
+    cluster: prod-cus-aks-sre-lab-003
+  
+  # Affinity rules for high availability
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - kubernetes-dashboard
+          topologyKey: kubernetes.io/hostname
+
+# Network Policy
+networkPolicy:
+  enabled: true

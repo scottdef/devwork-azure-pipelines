@@ -1,0 +1,420 @@
+# Operations and Maintenance Workflow
+# File: .github/workflows/operations.yml
+# Common operational tasks and maintenance
+
+name: 🔧 Operations & Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Operation to perform'
+        required: true
+        type: choice
+        options:
+          - health-check
+          - backup
+          - restore
+          - scale
+          - restart
+          - cleanup
+          - upgrade
+        default: 'health-check'
+      
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'prod']
+        default: 'dev'
+      
+      # For scaling
+      replicas:
+        description: 'Number of replicas (for scale operation)'
+        required: false
+        type: string
+        default: '2'
+      
+      # For restore
+      backup_run_number:
+        description: 'Backup run number (for restore operation)'
+        required: false
+        type: string
+
+env:
+  AKS_CLUSTER: prod-cus-aks-sre-lab-003
+  AKS_RG: prod-cus-platform-base-rg-001
+  NAMESPACE: kubernetes-dashboard
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'health-check'
+    
+    steps:
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Check Cluster Health
+        run: |
+          echo "=== Cluster Info ==="
+          kubectl cluster-info
+          kubectl get nodes
+          
+          echo "=== Dashboard Namespace ==="
+          kubectl get namespace ${{ env.NAMESPACE }}
+      
+      - name: Check Pod Health
+        run: |
+          echo "=== Pods Status ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          
+          # Count healthy pods
+          RUNNING=$(kubectl get pods -n ${{ env.NAMESPACE }} --field-selector=status.phase=Running --no-headers | wc -l)
+          TOTAL=$(kubectl get pods -n ${{ env.NAMESPACE }} --no-headers | wc -l)
+          
+          echo "Healthy: $RUNNING/$TOTAL"
+          
+          if [ "$RUNNING" -eq "$TOTAL" ] && [ "$RUNNING" -gt 0 ]; then
+            echo "✅ All pods healthy"
+          else
+            echo "❌ Some pods unhealthy"
+            kubectl describe pods -n ${{ env.NAMESPACE }}
+            exit 1
+          fi
+      
+      - name: Check Service Health
+        run: |
+          echo "=== Services ==="
+          kubectl get svc -n ${{ env.NAMESPACE }}
+          
+          echo "=== Endpoints ==="
+          kubectl get endpoints -n ${{ env.NAMESPACE }}
+      
+      - name: Check Resource Usage
+        run: |
+          echo "=== Resource Usage ==="
+          kubectl top pods -n ${{ env.NAMESPACE }} 2>/dev/null || echo "Metrics server not available"
+          
+          echo "=== Resource Quotas ==="
+          kubectl describe resourcequota -n ${{ env.NAMESPACE }} 2>/dev/null || echo "No quotas defined"
+      
+      - name: Check Events
+        run: |
+          echo "=== Recent Events ==="
+          kubectl get events -n ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+      
+      - name: Health Check Summary
+        run: |
+          echo "### 💚 Health Check Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** ${{ env.NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Pod Status" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  backup:
+    name: Backup Configuration
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'backup'
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl and Helm
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Create Backup
+        run: |
+          mkdir -p backup/${{ inputs.environment }}
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          echo "Creating backup: $TIMESTAMP"
+          
+          # Backup Helm release
+          helm get values kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup/${{ inputs.environment }}/helm-values-$TIMESTAMP.yaml
+          helm get manifest kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup/${{ inputs.environment }}/helm-manifest-$TIMESTAMP.yaml
+          helm history kubernetes-dashboard -n ${{ env.NAMESPACE }} > backup/${{ inputs.environment }}/helm-history-$TIMESTAMP.txt
+          
+          # Backup Kubernetes resources
+          kubectl get all -n ${{ env.NAMESPACE }} -o yaml > backup/${{ inputs.environment }}/resources-$TIMESTAMP.yaml
+          kubectl get secrets -n ${{ env.NAMESPACE }} -o yaml > backup/${{ inputs.environment }}/secrets-$TIMESTAMP.yaml
+          kubectl get configmaps -n ${{ env.NAMESPACE }} -o yaml > backup/${{ inputs.environment }}/configmaps-$TIMESTAMP.yaml
+          kubectl get sa -n ${{ env.NAMESPACE }} -o yaml > backup/${{ inputs.environment }}/serviceaccounts-$TIMESTAMP.yaml
+          
+          # Backup RBAC
+          kubectl get clusterrolebindings | grep dashboard > backup/${{ inputs.environment }}/clusterrolebindings-$TIMESTAMP.txt || true
+          
+          # Create backup metadata
+          cat > backup/${{ inputs.environment }}/metadata-$TIMESTAMP.txt <<EOF
+          Backup Date: $(date -u)
+          Environment: ${{ inputs.environment }}
+          Namespace: ${{ env.NAMESPACE }}
+          Cluster: ${{ env.AKS_CLUSTER }}
+          Git SHA: ${{ github.sha }}
+          Workflow Run: ${{ github.run_number }}
+          EOF
+          
+          echo "✅ Backup created: $TIMESTAMP"
+      
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-backup-${{ inputs.environment }}-${{ github.run_number }}
+          path: backup/${{ inputs.environment }}/
+          retention-days: 90
+      
+      - name: Backup Summary
+        run: |
+          echo "### 💾 Backup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Retention:** 90 days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To restore this backup, run the operations workflow with:" >> $GITHUB_STEP_SUMMARY
+          echo "- Operation: restore" >> $GITHUB_STEP_SUMMARY
+          echo "- Backup run number: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+
+  restore:
+    name: Restore from Backup
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'restore'
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Validate Input
+        run: |
+          if [ -z "${{ inputs.backup_run_number }}" ]; then
+            echo "❌ backup_run_number is required for restore operation"
+            exit 1
+          fi
+      
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Download Backup
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-backup-${{ inputs.environment }}-${{ inputs.backup_run_number }}
+          path: restore/
+      
+      - name: Restore Resources
+        run: |
+          echo "Restoring from backup run: ${{ inputs.backup_run_number }}"
+          
+          # Find the most recent backup files
+          VALUES_FILE=$(ls -t restore/helm-values-*.yaml | head -1)
+          RESOURCES_FILE=$(ls -t restore/resources-*.yaml | head -1)
+          
+          echo "Restoring resources from: $RESOURCES_FILE"
+          kubectl apply -f "$RESOURCES_FILE"
+          
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+      
+      - name: Verify Restore
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }}
+          echo "✅ Restore complete"
+
+  scale:
+    name: Scale Deployment
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'scale'
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Scale Deployments
+        run: |
+          echo "Scaling to ${{ inputs.replicas }} replicas..."
+          
+          # Scale each deployment
+          for deployment in $(kubectl get deployments -n ${{ env.NAMESPACE }} -o name); do
+            echo "Scaling $deployment..."
+            kubectl scale $deployment -n ${{ env.NAMESPACE }} --replicas=${{ inputs.replicas }}
+          done
+          
+          # Wait for rollout
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+          
+          echo "✅ Scaling complete"
+          kubectl get deployments -n ${{ env.NAMESPACE }}
+
+  restart:
+    name: Restart Pods
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'restart'
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Restart Deployments
+        run: |
+          echo "Restarting all deployments..."
+          kubectl rollout restart deployment -n ${{ env.NAMESPACE }}
+          
+          # Wait for rollout
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+          
+          echo "✅ Restart complete"
+          kubectl get pods -n ${{ env.NAMESPACE }}
+
+  cleanup:
+    name: Cleanup Resources
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'cleanup'
+    environment: ${{ inputs.environment }}-cleanup
+    
+    steps:
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Cleanup Failed Pods
+        run: |
+          echo "Cleaning up failed/completed pods..."
+          kubectl delete pods -n ${{ env.NAMESPACE }} --field-selector=status.phase=Failed 2>/dev/null || echo "No failed pods"
+          kubectl delete pods -n ${{ env.NAMESPACE }} --field-selector=status.phase=Succeeded 2>/dev/null || echo "No completed pods"
+      
+      - name: Cleanup Evicted Pods
+        run: |
+          kubectl get pods -n ${{ env.NAMESPACE }} | grep Evicted | awk '{print $1}' | xargs kubectl delete pod -n ${{ env.NAMESPACE }} 2>/dev/null || echo "No evicted pods"
+      
+      - name: List Remaining Resources
+        run: |
+          kubectl get all -n ${{ env.NAMESPACE }}
+          echo "✅ Cleanup complete"
+
+  upgrade:
+    name: Upgrade Dashboard
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.operation == 'upgrade'
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login & Setup
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Setup Tools
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          az aks install-cli
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          az aks get-credentials --resource-group ${{ env.AKS_RG }} --name ${{ env.AKS_CLUSTER }}
+          kubelogin convert-kubeconfig -l azurecli
+      
+      - name: Check Current Version
+        run: |
+          echo "Current Helm release:"
+          helm list -n ${{ env.NAMESPACE }}
+      
+      - name: Upgrade Helm Release
+        run: |
+          helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+          helm repo update
+          
+          # Upgrade to latest chart version
+          helm upgrade kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+            --namespace ${{ env.NAMESPACE }} \
+            --values helm/values-${{ inputs.environment }}.yaml \
+            --wait --timeout 10m --atomic
+      
+      - name: Verify Upgrade
+        run: |
+          kubectl rollout status deployment -n ${{ env.NAMESPACE }} --timeout=300s
+          helm list -n ${{ env.NAMESPACE }}
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          echo "✅ Upgrade complete"
