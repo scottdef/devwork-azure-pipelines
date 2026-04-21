@@ -1,0 +1,246 @@
+# =============================================================================
+# hotfix.yml  (lives in synapse-repo-dev)
+#
+# Emergency hotfix path — deploys a hotfix branch directly to prod,
+# bypassing the normal dev → test → prod promotion chain.
+#
+# This workflow:
+#   1. Validates the hotfix branch against synapse-workspace-prod parameters
+#   2. Requires HOTFIX typed as confirmation
+#   3. Requires `prod` environment approval (db-ops)
+#   4. Deploys to prod workspace
+#   5. Creates a hotfix release tag
+#   6. Dispatches synapse-repo-prod to sync its prod branch
+#   7. Opens a follow-up issue to backport the fix through the normal pipeline
+#
+# To use:
+#   1. Branch from `prod`:   git checkout -b hotfix/<ticket> prod
+#   2. Make minimal fix in Synapse Studio (dev workspace), export JSON
+#   3. Commit and push hotfix branch
+#   4. Trigger this workflow with branch name + incident ref
+# =============================================================================
+name: Hotfix — Direct to Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      hotfix_branch:
+        description: 'Hotfix branch name (must start with hotfix/)'
+        required: true
+        type: string
+      incident_reference:
+        description: 'Incident / ticket reference (e.g. INC-4231)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type  HOTFIX  to confirm emergency production deployment'
+        required: true
+        type: string
+
+env:
+  WORKSPACE_PROD:      synapse-workspace-prod
+  RESOURCE_GROUP_PROD: rg-synapse-prod
+  ORG:                 ${{ github.repository_owner }}
+
+concurrency:
+  group: synapse-prod-hotfix
+  cancel-in-progress: false
+
+jobs:
+  # ── Guard ──────────────────────────────────────────────────────────────────
+  confirm:
+    name: Validate hotfix inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation word
+        run: |
+          if [[ "${{ inputs.confirm }}" != "HOTFIX" ]]; then
+            echo "::error::Must type HOTFIX to confirm. Got: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+      - name: Validate branch name prefix
+        run: |
+          if [[ ! "${{ inputs.hotfix_branch }}" =~ ^hotfix/ ]]; then
+            echo "::error::Branch must start with hotfix/. Got: '${{ inputs.hotfix_branch }}'"
+            exit 1
+          fi
+
+      - name: Verify branch exists in synapse-repo-dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            "repos/${{ env.ORG }}/synapse-repo-dev/git/ref/heads/${{ inputs.hotfix_branch }}" \
+            --silent || {
+              echo "::error::Branch ${{ inputs.hotfix_branch }} not found in synapse-repo-dev"
+              exit 1
+            }
+
+  # ── Validate (runs against prod parameters — not dev) ─────────────────────
+  validate:
+    name: Validate hotfix artifacts against prod parameters
+    runs-on: ubuntu-latest
+    needs: confirm
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.hotfix_branch }}
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:       ${{ vars.GH_APP_ID }}
+          private-key:  ${{ secrets.GH_APP_PRIVATE_KEY }}
+          repositories: synapse-repo-dev,synapse-repo-prod
+
+      - name: Validate against prod workspace
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE_PROD }}
+          ArtifactsFolder:     '${{ github.workspace }}'
+          environment:         'Azure Public'
+          resourceGroup:       ${{ env.RESOURCE_GROUP_PROD }}
+          clientId:            ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          clientSecret:        ${{ secrets.AZURE_CLIENT_SECRET_PROD }}
+          subscriptionId:      ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:            ${{ secrets.AZURE_TENANT_ID }}
+          operation:           'validate'
+
+  # ── Deploy to prod (requires environment approval) ─────────────────────────
+  deploy-prod:
+    name: Deploy hotfix to prod
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: prod     # ← blocks for db-ops approval
+
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.hotfix_branch }}
+          fetch-depth: 0
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:       ${{ vars.GH_APP_ID }}
+          private-key:  ${{ secrets.GH_APP_PRIVATE_KEY }}
+          repositories: synapse-repo-dev,synapse-repo-prod
+
+      - name: Azure Login (prod SPN)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Stop active Synapse triggers
+        run: |
+          chmod +x ./scripts/stop-triggers.sh
+          ./scripts/stop-triggers.sh "${{ env.WORKSPACE_PROD }}"
+
+      - name: Deploy hotfix to synapse-workspace-prod
+        id: deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:    ${{ env.WORKSPACE_PROD }}
+          ArtifactsFolder:        '${{ github.workspace }}'
+          OverrideArmParameters:  '${{ github.workspace }}/parameters/prod.parameters.yaml'
+          environment:            'Azure Public'
+          resourceGroup:          ${{ env.RESOURCE_GROUP_PROD }}
+          clientId:               ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          clientSecret:           ${{ secrets.AZURE_CLIENT_SECRET_PROD }}
+          subscriptionId:         ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:               ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:              'validateDeploy'
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          chmod +x ./scripts/start-triggers.sh
+          ./scripts/start-triggers.sh "${{ env.WORKSPACE_PROD }}"
+
+      # ── Merge hotfix branch → prod branch in synapse-repo-dev ─────────────
+      - name: Merge hotfix → prod branch
+        if: steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name  "github-actions[bot]"
+
+          git fetch origin prod
+          git checkout prod
+          git merge --no-ff "${{ inputs.hotfix_branch }}" \
+            -m "hotfix: merge ${{ inputs.hotfix_branch }} → prod [${{ inputs.incident_reference }}]"
+          git push origin prod
+
+      # ── Create hotfix release tag ─────────────────────────────────────────
+      - name: Create hotfix release
+        if: steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          chmod +x ./scripts/create-release.sh
+          ./scripts/create-release.sh prod synapse-repo-dev "${{ env.ORG }}"
+
+      # ── Dispatch prod repo to sync its prod branch ─────────────────────────
+      - name: Dispatch synapse-repo-prod to sync prod branch
+        if: steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PROD_SHA=$(git -C . rev-parse prod)
+          gh api "repos/${{ env.ORG }}/synapse-repo-prod/dispatches" \
+            -X POST \
+            --input - <<EOF
+          {
+            "event_type": "run-synapse-prod-cicd",
+            "client_payload": {
+              "source_repo":   "synapse-repo-dev",
+              "source_branch": "prod",
+              "source_sha":    "${PROD_SHA}",
+              "triggered_by":  "${{ github.actor }}",
+              "run_url":       "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+          }
+          EOF
+
+      # ── Open backport follow-up issue ─────────────────────────────────────
+      - name: Open backport issue
+        if: steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh issue create \
+            --repo "${{ env.ORG }}/synapse-repo-dev" \
+            --title "Backport hotfix ${{ inputs.hotfix_branch }} through dev → test" \
+            --label "hotfix,backport" \
+            --body "## Hotfix Backport Required
+
+Branch \`${{ inputs.hotfix_branch }}\` was deployed directly to production as an emergency hotfix.
+
+**Incident:** \`${{ inputs.incident_reference }}\`
+**Deployed:** $(date -u '+%Y-%m-%d %H:%M UTC')
+**By:** \`${{ github.actor }}\`
+
+### Action items
+- [ ] Cherry-pick or merge \`${{ inputs.hotfix_branch }}\` into \`dev\`
+- [ ] Let dev CI/CD run and validate
+- [ ] Promote to test via normal PR flow
+- [ ] Promote to prod via normal PR flow (this re-aligns the prod branch)
+- [ ] Close this issue
+"
+
+      - name: Summary
+        if: always()
+        run: |
+          STATUS="${{ steps.deploy.outcome }}"
+          echo "## Hotfix Deploy — ${STATUS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch    | \`${{ inputs.hotfix_branch }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Incident  | \`${{ inputs.incident_reference }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| By        | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status    | ${STATUS} |" >> "$GITHUB_STEP_SUMMARY"

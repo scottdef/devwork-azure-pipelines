@@ -1,0 +1,193 @@
+# =============================================================================
+# rollback.yml  (lives in synapse-repo-prod)
+#
+# Production rollback is the most guarded operation in the entire pipeline.
+# Two confirmation walls:
+#   1. The user must type  ROLLBACK  in the workflow_dispatch input
+#   2. The `prod` GitHub environment gate requires db-ops approval
+# =============================================================================
+name: Rollback Prod Workspace
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: 'Release tag to roll back to (e.g. prod-v1.0.3)'
+        required: true
+        type: string
+      incident_reference:
+        description: 'Incident / ticket reference (e.g. INC-4231)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type  ROLLBACK  to confirm — this will affect production'
+        required: true
+        type: string
+
+env:
+  WORKSPACE:      synapse-workspace-prod
+  RESOURCE_GROUP: rg-synapse-prod
+  ORG:            ${{ github.repository_owner }}
+
+concurrency:
+  group: synapse-prod-rollback
+  cancel-in-progress: false
+
+jobs:
+  # ── Guard: fail fast before touching anything ──────────────────────────────
+  confirm:
+    name: Confirm rollback intent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation word
+        run: |
+          if [[ "${{ inputs.confirm }}" != "ROLLBACK" ]]; then
+            echo "::error::You must type exactly ROLLBACK. Got: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+      - name: Validate tag format
+        run: |
+          if [[ ! "${{ inputs.target_version }}" =~ ^prod-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag must match prod-vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Validate incident reference is not empty
+        run: |
+          if [[ -z "${{ inputs.incident_reference }}" ]]; then
+            echo "::error::An incident reference is required for production rollback"
+            exit 1
+          fi
+
+      - name: Verify tag exists in repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            "repos/${{ env.ORG }}/synapse-repo-prod/git/ref/tags/${{ inputs.target_version }}" \
+            --silent || {
+              echo "::error::Tag ${{ inputs.target_version }} not found in synapse-repo-prod"
+              exit 1
+            }
+
+      - name: Emit audit log entry
+        run: |
+          echo "::notice::PROD ROLLBACK INITIATED"
+          echo "::notice::Tag=${{ inputs.target_version }}"
+          echo "::notice::Incident=${{ inputs.incident_reference }}"
+          echo "::notice::Actor=${{ github.actor }}"
+
+  # ── Rollback (requires `prod` environment approval from db-ops) ─────────────
+  rollback:
+    name: Roll back prod to ${{ inputs.target_version }}
+    runs-on: ubuntu-latest
+    needs: confirm
+    environment: prod     # ← blocks here until db-ops approves
+
+    steps:
+      - name: Checkout synapse-repo-prod at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_version }}
+          fetch-depth: 0
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:       ${{ vars.GH_APP_ID }}
+          private-key:  ${{ secrets.GH_APP_PRIVATE_KEY }}
+          repositories: synapse-repo-prod
+
+      - name: Azure Login (prod SPN)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Snapshot live workspace before rollback
+        run: |
+          {
+            echo "=== Pre-rollback workspace snapshot ==="
+            echo "Pipelines:"
+            az synapse pipeline list \
+              --workspace-name "${{ env.WORKSPACE }}" \
+              --query "[].name" -o tsv | sort
+            echo ""
+            echo "Triggers:"
+            az synapse trigger list \
+              --workspace-name "${{ env.WORKSPACE }}" \
+              --query "[].{name:name,state:properties.runtimeState}" \
+              -o table
+          } | tee /tmp/pre-rollback-snapshot.txt
+
+          echo "### Pre-rollback snapshot" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/pre-rollback-snapshot.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop active triggers
+        run: |
+          chmod +x ./scripts/stop-triggers.sh
+          ./scripts/stop-triggers.sh "${{ env.WORKSPACE }}"
+
+      - name: Deploy tagged version to prod workspace
+        id: deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:    ${{ env.WORKSPACE }}
+          ArtifactsFolder:        '${{ github.workspace }}'
+          OverrideArmParameters:  '${{ github.workspace }}/parameters/prod.parameters.yaml'
+          environment:            'Azure Public'
+          resourceGroup:          ${{ env.RESOURCE_GROUP }}
+          clientId:               ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          clientSecret:           ${{ secrets.AZURE_CLIENT_SECRET_PROD }}
+          subscriptionId:         ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:               ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:              'validateDeploy'
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          chmod +x ./scripts/start-triggers.sh
+          ./scripts/start-triggers.sh "${{ env.WORKSPACE }}"
+
+      - name: Create rollback record as GitHub Issue
+        if: steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh issue create \
+            --repo "${{ env.ORG }}/synapse-repo-prod" \
+            --title "ROLLBACK: prod rolled back to ${{ inputs.target_version }}" \
+            --label "rollback,incident" \
+            --body "## Production Rollback Record
+
+**Tag deployed:** \`${{ inputs.target_version }}\`
+**Incident ref:** \`${{ inputs.incident_reference }}\`
+**Initiated by:** \`${{ github.actor }}\`
+**Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+### Action items
+- [ ] Root cause analysis completed
+- [ ] Fix developed on dev branch
+- [ ] Fix promoted through full dev → test → prod pipeline
+- [ ] This issue closed after fix deployed
+" || echo "Warning: could not create issue (check GH_APP permissions)"
+
+      - name: Summary
+        if: always()
+        run: |
+          STATUS="${{ steps.deploy.outcome }}"
+          ICON=$([[ "$STATUS" == "success" ]] && echo "✅" || echo "❌")
+          echo "## ${ICON} Production Rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field            | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------------------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target version   | \`${{ inputs.target_version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Incident ref     | \`${{ inputs.incident_reference }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace        | \`${{ env.WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Initiated by     | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Deploy outcome   | ${STATUS} |" >> "$GITHUB_STEP_SUMMARY"

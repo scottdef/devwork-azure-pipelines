@@ -1,0 +1,152 @@
+# =============================================================================
+# drift-detection.yml  (lives in synapse-repo-dev)
+#
+# Daily scheduled check: compares live synapse-workspace-dev artifact inventory
+# against the dev branch.  Opens a GitHub Issue if drift is found.
+# Can also be triggered manually via workflow_dispatch.
+# =============================================================================
+name: Drift Detection — Dev
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 07:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to compare against (default: dev)'
+        required: false
+        default: 'dev'
+        type: string
+
+env:
+  WORKSPACE:      synapse-workspace-dev
+  RESOURCE_GROUP: rg-synapse-dev
+  ORG:            ${{ github.repository_owner }}
+  CHECK_BRANCH:   ${{ inputs.branch || 'dev' }}
+
+jobs:
+  drift-check:
+    name: Detect workspace drift
+    runs-on: ubuntu-latest
+    # No environment gate — this is read-only; no approval needed
+
+    steps:
+      - name: Checkout ${{ env.CHECK_BRANCH }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECK_BRANCH }}
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+
+      - name: Run drift detection
+        id: drift
+        run: |
+          chmod +x ./scripts/detect-drift.sh
+          # detect-drift.sh exits 1 on drift; capture that without failing the step
+          if ./scripts/detect-drift.sh "${{ env.WORKSPACE }}" "${{ github.workspace }}"; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            # Capture the report text for the issue body
+            REPORT=$(cat /tmp/drift-report-${{ env.WORKSPACE }}.txt)
+            # GitHub output doesn't handle multiline directly — use env file
+            {
+              echo 'DRIFT_REPORT<<DRIFT_EOF'
+              cat /tmp/drift-report-${{ env.WORKSPACE }}.txt
+              echo 'DRIFT_EOF'
+            } >> "$GITHUB_ENV"
+          fi
+
+      # ── If drift: check for an existing open drift issue before creating ────
+      - name: Check for existing open drift issue
+        id: existing-issue
+        if: steps.drift.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ISSUE_NUM=$(gh issue list \
+            --repo "${{ env.ORG }}/synapse-repo-dev" \
+            --label "drift" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || echo "")
+          echo "issue_number=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+
+      - name: Open drift issue (none exists)
+        if: >
+          steps.drift.outputs.drift == 'true' &&
+          steps.existing-issue.outputs.issue_number == ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh issue create \
+            --repo "${{ env.ORG }}/synapse-repo-dev" \
+            --title "⚠️ Drift detected in synapse-workspace-dev [$(date -u +%Y-%m-%d)]" \
+            --label "drift,needs-triage" \
+            --assignee "${{ github.actor }}" \
+            --body "## Workspace Drift Detected
+
+**Workspace:** \`${{ env.WORKSPACE }}\`
+**Compared branch:** \`${{ env.CHECK_BRANCH }}\`
+**Detected:** $(date -u '+%Y-%m-%d %H:%M UTC')
+**Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+### Diff (< repo  >  live workspace)
+
+\`\`\`
+${DRIFT_REPORT}
+\`\`\`
+
+### Remediation options
+1. If the live workspace has the correct state: re-publish from Synapse Studio or re-run the dev CI/CD workflow to overwrite with repo state.
+2. If the repo is stale: export the live workspace artifacts and commit them to \`${{ env.CHECK_BRANCH }}\`.
+
+> This issue is auto-closed when a subsequent drift check finds no drift.
+"
+
+      - name: Update existing drift issue
+        if: >
+          steps.drift.outputs.drift == 'true' &&
+          steps.existing-issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh issue comment "${{ steps.existing-issue.outputs.issue_number }}" \
+            --repo "${{ env.ORG }}/synapse-repo-dev" \
+            --body "**Drift still present** — $(date -u '+%Y-%m-%d %H:%M UTC')
+
+\`\`\`
+${DRIFT_REPORT}
+\`\`\`
+"
+
+      - name: Close drift issue if drift resolved
+        if: steps.drift.outputs.drift == 'false' && steps.existing-issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh issue close "${{ steps.existing-issue.outputs.issue_number }}" \
+            --repo "${{ env.ORG }}/synapse-repo-dev" \
+            --comment "✅ Drift resolved — workspace matches \`${{ env.CHECK_BRANCH }}\` branch as of $(date -u '+%Y-%m-%d %H:%M UTC')."
+
+      - name: Summary
+        if: always()
+        run: |
+          if [[ "${{ steps.drift.outputs.drift }}" == "true" ]]; then
+            echo "## ⚠️ Drift detected in \`${{ env.WORKSPACE }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "${DRIFT_REPORT}" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ✅ No drift detected in \`${{ env.WORKSPACE }}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi

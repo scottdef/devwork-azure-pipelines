@@ -1,0 +1,130 @@
+# =============================================================================
+# rollback.yml  (lives in synapse-repo-dev)
+#
+# Manual workflow_dispatch — rolls back synapse-workspace-dev to any prior
+# release tag (dev-vX.Y.Z).  Requires ROLLBACK typed as confirmation.
+# =============================================================================
+name: Rollback Dev Workspace
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: 'Release tag to roll back to (e.g. dev-v1.0.3)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type  ROLLBACK  to confirm'
+        required: true
+        type: string
+
+env:
+  WORKSPACE:      synapse-workspace-dev
+  RESOURCE_GROUP: rg-synapse-dev
+  ORG:            ${{ github.repository_owner }}
+
+concurrency:
+  group: synapse-dev-rollback
+  cancel-in-progress: false
+
+jobs:
+  # ── Guard ──────────────────────────────────────────────────────────────────
+  confirm:
+    name: Confirm rollback intent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation word
+        run: |
+          if [[ "${{ inputs.confirm }}" != "ROLLBACK" ]]; then
+            echo "::error::You must type exactly ROLLBACK to confirm. Got: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+
+      - name: Validate tag format
+        run: |
+          if [[ ! "${{ inputs.target_version }}" =~ ^dev-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '${{ inputs.target_version }}' does not match dev-vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Verify tag exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ env.ORG }}/synapse-repo-dev/git/ref/tags/${{ inputs.target_version }}" \
+            --silent || {
+              echo "::error::Tag ${{ inputs.target_version }} not found in repo"
+              exit 1
+            }
+
+  # ── Rollback ───────────────────────────────────────────────────────────────
+  rollback:
+    name: Roll back to ${{ inputs.target_version }}
+    runs-on: ubuntu-latest
+    needs: confirm
+    environment: dev
+
+    steps:
+      - name: Checkout at target tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_version }}
+          fetch-depth: 0
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+
+      - name: Record current live state (pre-rollback snapshot)
+        run: |
+          az synapse pipeline list \
+            --workspace-name "${{ env.WORKSPACE }}" \
+            --query "[].name" -o tsv | sort > /tmp/pre-rollback-pipelines.txt
+          echo "### Pre-rollback pipelines" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/pre-rollback-pipelines.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop active triggers
+        run: |
+          chmod +x ./scripts/stop-triggers.sh
+          ./scripts/stop-triggers.sh "${{ env.WORKSPACE }}"
+
+      - name: Deploy tagged version to dev workspace
+        id: deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:    ${{ env.WORKSPACE }}
+          ArtifactsFolder:        '${{ github.workspace }}'
+          OverrideArmParameters:  '${{ github.workspace }}/parameters/dev.parameters.yaml'
+          environment:            'Azure Public'
+          resourceGroup:          ${{ env.RESOURCE_GROUP }}
+          clientId:               ${{ secrets.AZURE_CLIENT_ID_DEV }}
+          clientSecret:           ${{ secrets.AZURE_CLIENT_SECRET_DEV }}
+          subscriptionId:         ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:               ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:              'validateDeploy'
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          chmod +x ./scripts/start-triggers.sh
+          ./scripts/start-triggers.sh "${{ env.WORKSPACE }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Rollback Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field           | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target version  | \`${{ inputs.target_version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace       | \`${{ env.WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Initiated by    | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Deploy outcome  | ${{ steps.deploy.outcome }} |" >> "$GITHUB_STEP_SUMMARY"

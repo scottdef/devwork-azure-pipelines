@@ -1,0 +1,119 @@
+{
+  "_comment": "Place this file in the root of the collaboration branch (dev).",
+  "_comment2": "Synapse Studio reads this on Publish to decide which properties become ARM parameters.",
+  "_comment3": "Syntax: '=' keeps current value as default, '-' omits default, '|' marks Key Vault, '*' wildcards.",
+
+  "Microsoft.Synapse/workspaces/linkedServices": {
+    "*": {
+      "properties": {
+        "typeProperties": {
+          "connectionString":  "|-connectionString:secureString",
+          "accountKey":        "|-accountKey:secureString",
+          "accountName":       "=",
+          "baseUrl":           "|-baseUrl:secureString",
+          "url":               "|-url:secureString",
+          "endpoint":          "=",
+          "tenant":            "=",
+          "subscriptionId":    "=",
+          "resourceGroupName": "="
+        }
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/notebooks": {
+    "properties": {
+      "bigDataPool": {
+        "referenceName": "="
+      },
+      "sessionProperties": {
+        "driverMemory":   "=",
+        "driverCores":    "=",
+        "executorMemory": "=",
+        "executorCores":  "=",
+        "numExecutors":   "="
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/pipelines": {
+    "properties": {
+      "parameters": {
+        "*": {
+          "*": "="
+        }
+      },
+      "variables": {
+        "*": {
+          "*": "="
+        }
+      },
+      "activities": {
+        "*": {
+          "typeProperties": {
+            "waitTimeInSeconds": "=",
+            "url":               "="
+          }
+        }
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/triggers": {
+    "properties": {
+      "typeProperties": {
+        "recurrence": {
+          "frequency": "=",
+          "interval":  "=",
+          "startTime": "=",
+          "endTime":   "="
+        },
+        "maxConcurrency": "="
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/datasets": {
+    "properties": {
+      "typeProperties": {
+        "folderPath":    "=",
+        "fileName":      "=",
+        "location":      "=",
+        "tableName":     "=",
+        "schema":        "="
+      },
+      "parameters": {
+        "*": {
+          "*": "="
+        }
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/dataflows": {
+    "properties": {
+      "typeProperties": {
+        "sources":        "-",
+        "sinks":          "-",
+        "transformations": "-"
+      }
+    }
+  },
+
+  "Microsoft.Synapse/workspaces/sqlscripts": {},
+
+  "Microsoft.Synapse/workspaces/integrationRuntimes": {
+    "properties": {
+      "typeProperties": {
+        "ssisProperties": {
+          "catalogInfo": {
+            "catalogServerEndpoint": "=",
+            "catalogAdminPassword": {
+              "value": "|-catalogAdminPassword:secureString"
+            }
+          }
+        }
+      }
+    }
+  }
+}

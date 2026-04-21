@@ -1,0 +1,114 @@
+# =============================================================================
+# drift-detection.yml  (lives in synapse-repo-prod)
+# Prod drift is treated as P1 — creates issue with urgent label and pings team
+# =============================================================================
+name: Drift Detection — Prod
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 08:00 UTC daily
+  workflow_dispatch:
+
+env:
+  WORKSPACE:      synapse-workspace-prod
+  RESOURCE_GROUP: rg-synapse-prod
+  ORG:            ${{ github.repository_owner }}
+
+jobs:
+  drift-check:
+    name: Detect workspace drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout prod branch
+        uses: actions/checkout@v4
+        with:
+          ref: prod
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Run drift detection
+        id: drift
+        run: |
+          chmod +x ./scripts/detect-drift.sh
+          if ./scripts/detect-drift.sh "${{ env.WORKSPACE }}" "${{ github.workspace }}"; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'DRIFT_REPORT<<DRIFT_EOF'
+              cat /tmp/drift-report-${{ env.WORKSPACE }}.txt
+              echo 'DRIFT_EOF'
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Manage drift issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          EXISTING=$(gh issue list \
+            --repo "${{ env.ORG }}/synapse-repo-prod" \
+            --label "drift" --state open \
+            --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          if [[ "${{ steps.drift.outputs.drift }}" == "true" ]]; then
+            if [[ -z "$EXISTING" ]]; then
+              gh issue create \
+                --repo "${{ env.ORG }}/synapse-repo-prod" \
+                --title "🚨 P1 DRIFT in synapse-workspace-prod [$(date -u +%Y-%m-%d)]" \
+                --label "drift,P1,incident" \
+                --body "## 🚨 Production Workspace Drift Detected
+
+**This is a P1 incident.** The live production workspace does not match the \`prod\` branch.
+
+**Workspace:** \`${{ env.WORKSPACE }}\`
+**Detected:** $(date -u '+%Y-%m-%d %H:%M UTC')
+**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+### Diff (< in repo  >  in live workspace)
+\`\`\`
+${DRIFT_REPORT}
+\`\`\`
+
+### Immediate actions
+1. **Do not run any Synapse pipelines** until drift is investigated.
+2. Determine if the change was intentional (manual Studio edit) or unintentional.
+3. If unintentional: use the [Rollback workflow](${{ github.server_url }}/${{ env.ORG }}/synapse-repo-prod/actions/workflows/rollback.yml) to restore the last known-good release.
+4. If intentional: commit the change to the \`prod\` branch and close this issue.
+"
+            else
+              gh issue comment "$EXISTING" \
+                --repo "${{ env.ORG }}/synapse-repo-prod" \
+                --body "**⚠️ Drift STILL present** — $(date -u '+%Y-%m-%d %H:%M UTC')
+\`\`\`
+${DRIFT_REPORT}
+\`\`\`"
+            fi
+          elif [[ -n "$EXISTING" ]]; then
+            gh issue close "$EXISTING" \
+              --repo "${{ env.ORG }}/synapse-repo-prod" \
+              --comment "✅ Drift resolved $(date -u '+%Y-%m-%d %H:%M UTC')."
+          fi
+
+      - name: Fail the workflow on drift (makes the scheduled run visibly red)
+        if: steps.drift.outputs.drift == 'true'
+        run: |
+          echo "::error::Production workspace drift detected — see issue in synapse-repo-prod"
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          [[ "${{ steps.drift.outputs.drift }}" == "true" ]] \
+            && echo "## 🚨 PROD DRIFT DETECTED" >> "$GITHUB_STEP_SUMMARY" \
+            || echo "## ✅ No drift in \`${{ env.WORKSPACE }}\`" >> "$GITHUB_STEP_SUMMARY"
