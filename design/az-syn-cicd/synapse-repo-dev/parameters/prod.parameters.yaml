@@ -1,0 +1,19 @@
+###############################################################################
+# parameters/prod.parameters.yaml
+# Override values for synapse-workspace-prod
+###############################################################################
+
+workspaceName: synapse-workspace-prod
+
+WorkspaceDefaultStorage_properties_typeProperties_url: >-
+  https://proddatalake.dfs.core.windows.net
+
+LS_AzureKeyVault_properties_typeProperties_baseUrl: >-
+  https://myorg-prod-kv.vault.azure.net/
+
+# BigDataPool_properties_typeProperties_sparkPool_referenceName: prodsparkpool01
+# LS_SomethingOnPrem_properties_connectVia_referenceName: prod-selfhosted-ir
+
+# LS_AzureSqlDb_properties_typeProperties_connectionString: >-
+#   Integrated Security=False;Encrypt=True;Connection Timeout=30;
+#   Data Source=prod-sqlserver.database.windows.net;Initial Catalog=prod_db

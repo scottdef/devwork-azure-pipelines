@@ -1,0 +1,269 @@
+###############################################################################
+# synapse-prod-cicd-workflow.yml
+# Repository: synapse-repo-prod
+#
+# Triggers:
+#   workflow_dispatch     Full deploy to synapse-workspace-prod + create release
+#                         (dispatched by dispatch-prod-cicd.yml in synapse-repo-dev)
+#   pull_request → main   Validate only (required status check for main ruleset)
+#
+# Required secrets (repo-level):
+#   AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   GH_APP_PRIVATE_KEY
+#
+# Required vars (repo-level):
+#   GH_APP_ID
+#   SYNAPSE_WORKSPACE_PROD
+#   RESOURCE_GROUP_PROD
+#   DEV_REPO_NAME              synapse-repo-dev
+###############################################################################
+name: synapse-prod-cicd-workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Commit SHA from synapse-repo-dev prod branch'
+        required: true
+        type: string
+      source_branch:
+        description: 'Source branch to clone from synapse-repo-dev'
+        required: true
+        default: prod
+        type: string
+      dev_release:
+        description: 'Dev release version that triggered this run'
+        required: false
+        type: string
+      triggered_by:
+        description: 'GitHub actor who triggered the original merge'
+        required: false
+        type: string
+
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: synapse-prod-${{ github.event_name == 'workflow_dispatch' && 'deploy' || github.head_ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SYNAPSE_WORKSPACE: ${{ vars.SYNAPSE_WORKSPACE_PROD }}
+  RESOURCE_GROUP:    ${{ vars.RESOURCE_GROUP_PROD }}
+  AZURE_ENV:         'Azure Public'
+  TRIGGER_STATE_FILE: /tmp/synapse-prod-triggers.json
+  DEV_REPO:          ${{ github.repository_owner }}/${{ vars.DEV_REPO_NAME || 'synapse-repo-dev' }}
+
+jobs:
+  ###########################################################################
+  # JOB: validate
+  # Runs on BOTH workflow_dispatch AND pull_request→main.
+  # Job name "validate" matches the main branch ruleset status check:
+  #   "synapse-prod-cicd-workflow / validate"
+  ###########################################################################
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      # On workflow_dispatch: clone synapse-repo-dev at source_sha
+      - name: Checkout synapse-repo-dev (dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEV_REPO }}
+          ref:        ${{ inputs.source_sha }}
+          token:      ${{ steps.app-token.outputs.token }}
+          path:       synapse-source
+          fetch-depth: 1
+
+      # On pull_request→main: clone synapse-repo-dev prod branch (latest)
+      - name: Checkout synapse-repo-dev (PR check)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEV_REPO }}
+          ref:        prod
+          token:      ${{ steps.app-token.outputs.token }}
+          path:       synapse-source
+          fetch-depth: 1
+
+      - name: Checkout synapse-repo-prod (self)
+        uses: actions/checkout@v4
+        with:
+          path:       synapse-prod-repo
+          fetch-depth: 0
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Validate Synapse artifacts against prod workspace
+        id: synapse-validate
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:          ${{ env.SYNAPSE_WORKSPACE }}
+          ArtifactsFolder:              '${{ github.workspace }}/synapse-source'
+          environment:                  ${{ env.AZURE_ENV }}
+          resourceGroup:                ${{ env.RESOURCE_GROUP }}
+          clientId:                     ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret:                 ${{ secrets.AZURE_CLIENT_SECRET }}
+          subscriptionId:               ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:                     ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:                    validate
+
+      - name: Upload exported templates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-prod-exported-templates-${{ github.run_number }}
+          path: '${{ github.workspace }}/ExportedArtifacts/'
+          retention-days: 90
+
+      - name: Post validation summary
+        if: always()
+        run: |
+          echo "## Synapse Prod — Validation Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ env.SYNAPSE_WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source SHA | \`${{ inputs.source_sha || 'PR check — latest prod branch' }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | \`${{ github.event_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  ###########################################################################
+  # JOB: deploy
+  # Runs ONLY on workflow_dispatch (after validate succeeds)
+  # PRODUCTION DEPLOYMENT — requires environment approval gate
+  ###########################################################################
+  deploy:
+    name: deploy-to-prod
+    needs: validate
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: synapse-prod    # ← GitHub environment with required reviewers
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Checkout synapse-repo-dev at source SHA
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEV_REPO }}
+          ref:        ${{ inputs.source_sha }}
+          token:      ${{ steps.app-token.outputs.token }}
+          path:       synapse-source
+          fetch-depth: 1
+
+      - name: Checkout synapse-repo-prod (for scripts + release tagging)
+        uses: actions/checkout@v4
+        with:
+          path:       synapse-prod-repo
+          fetch-depth: 0
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop active triggers
+        run: |
+          chmod +x synapse-prod-repo/scripts/toggle-triggers.sh
+          synapse-prod-repo/scripts/toggle-triggers.sh stop \
+            "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Deploy to prod workspace (validateDeploy)
+        id: synapse-deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:          ${{ env.SYNAPSE_WORKSPACE }}
+          ArtifactsFolder:              '${{ github.workspace }}/synapse-source'
+          OverrideArmParameters:        '${{ github.workspace }}/synapse-source/parameters/prod.parameters.yaml'
+          environment:                  ${{ env.AZURE_ENV }}
+          resourceGroup:                ${{ env.RESOURCE_GROUP }}
+          clientId:                     ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret:                 ${{ secrets.AZURE_CLIENT_SECRET }}
+          subscriptionId:               ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:                     ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:                    validateDeploy
+
+      - name: Start triggers
+        if: always()
+        run: |
+          synapse-prod-repo/scripts/toggle-triggers.sh start \
+            "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Create prod release
+        id: release
+        working-directory: synapse-prod-repo
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_SHA:        ${{ inputs.source_sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_ID:     ${{ github.run_id }}
+          GITHUB_ACTOR:      ${{ inputs.triggered_by || github.actor }}
+          GITHUB_REF_NAME:   prod
+          GITHUB_WORKFLOW:   synapse-prod-cicd-workflow
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          chmod +x scripts/create-release.sh
+          ./scripts/create-release.sh "prod" "${{ github.repository }}" \
+            "Promoted from dev release: \`${{ inputs.dev_release }}\`"
+
+      - name: Production deployment summary
+        run: |
+          echo "## ✅ Synapse Prod — Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ env.SYNAPSE_WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source SHA | \`${{ inputs.source_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Dev release | \`${{ inputs.dev_release }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Prod release | \`${{ steps.release.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Approved by | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  ###########################################################################
+  # JOB: notify-failure
+  ###########################################################################
+  notify-failure:
+    name: notify-on-failure
+    needs: [validate, deploy]
+    if: failure() && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Failure summary
+        run: |
+          echo "## ❌ Synapse Prod — Pipeline Failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "**PRODUCTION DEPLOYMENT DID NOT COMPLETE**" >> "$GITHUB_STEP_SUMMARY"
+          echo "Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) immediately." >> "$GITHUB_STEP_SUMMARY"
+          echo "Source SHA: \`${{ inputs.source_sha }}\`" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,78 @@
+###############################################################################
+# dispatch-test-cicd.yml
+# Repository: synapse-repo-dev
+#
+# Triggers when dev branch is merged into test branch (push→test).
+# Uses the GitHub App to dispatch synapse-test-cicd-workflow in synapse-repo-test,
+# passing the source commit SHA and branch so it can clone the right code.
+#
+# Required vars (repo-level):
+#   GH_APP_ID
+#   GITHUB_ORG   (your GitHub organization name)
+###############################################################################
+name: dispatch-test-cicd
+
+on:
+  push:
+    branches:
+      - test
+    paths:
+      - 'pipeline/**'
+      - 'dataset/**'
+      - 'linkedService/**'
+      - 'notebook/**'
+      - 'trigger/**'
+      - 'dataflow/**'
+      - 'sqlscript/**'
+      - 'credential/**'
+      - 'sparkJobDefinition/**'
+      - 'template-parameters-definition.json'
+
+concurrency:
+  group: dispatch-test
+  cancel-in-progress: false   # never cancel — queue dispatches
+
+jobs:
+  dispatch:
+    name: dispatch-to-test-repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Dispatch synapse-test-cicd-workflow
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          DATESTAMP="$(date -u '+%Y.%m.%d')"
+          DEV_RELEASE="test-${DATESTAMP}.${{ github.run_number }}"
+
+          echo "==> Dispatching to synapse-repo-test"
+          echo "    source_sha:         ${{ github.sha }}"
+          echo "    source_branch:      test"
+          echo "    dev_release:        ${DEV_RELEASE}"
+
+          gh workflow run synapse-test-cicd-workflow.yml \
+            --repo "${{ github.repository_owner }}/synapse-repo-test" \
+            --field "source_sha=${{ github.sha }}" \
+            --field "source_branch=test" \
+            --field "dev_release=${DEV_RELEASE}" \
+            --field "triggered_by=${{ github.actor }}"
+
+          echo "==> Dispatch sent to synapse-repo-test"
+
+      - name: Dispatch summary
+        run: |
+          echo "## 🚀 Dispatched: synapse-test-cicd-workflow" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target repo | \`synapse-repo-test\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source SHA | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source branch | \`test\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"

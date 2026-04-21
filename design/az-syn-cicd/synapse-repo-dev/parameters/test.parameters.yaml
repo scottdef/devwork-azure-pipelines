@@ -1,0 +1,19 @@
+###############################################################################
+# parameters/test.parameters.yaml
+# Override values for synapse-workspace-test
+###############################################################################
+
+workspaceName: synapse-workspace-test
+
+WorkspaceDefaultStorage_properties_typeProperties_url: >-
+  https://testdatalake.dfs.core.windows.net
+
+LS_AzureKeyVault_properties_typeProperties_baseUrl: >-
+  https://myorg-test-kv.vault.azure.net/
+
+# BigDataPool_properties_typeProperties_sparkPool_referenceName: testsparkpool01
+# LS_SomethingOnPrem_properties_connectVia_referenceName: test-selfhosted-ir
+
+# LS_AzureSqlDb_properties_typeProperties_connectionString: >-
+#   Integrated Security=False;Encrypt=True;Connection Timeout=30;
+#   Data Source=test-sqlserver.database.windows.net;Initial Catalog=test_db

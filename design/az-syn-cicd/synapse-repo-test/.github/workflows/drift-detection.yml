@@ -1,0 +1,165 @@
+###############################################################################
+# drift-detection.yml
+# Place in synapse-repo-test AND synapse-repo-prod
+#
+# Runs daily to detect manual changes made directly in test/prod workspaces
+# that are not reflected in synapse-repo-dev. Alerts via GitHub Step Summary
+# and workflow annotations.
+###############################################################################
+name: Drift Detection
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:        # allow manual trigger
+
+concurrency:
+  group: drift-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  detect-drift:
+    name: detect-drift
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Resolve environment
+        id: env
+        run: |
+          REPO="${{ github.repository }}"
+          if [[ "$REPO" == *"prod"* ]]; then
+            echo "label=prod"     >> "$GITHUB_OUTPUT"
+            echo "branch=prod"    >> "$GITHUB_OUTPUT"
+            echo "workspace=${{ vars.SYNAPSE_WORKSPACE_PROD }}" >> "$GITHUB_OUTPUT"
+            echo "rg=${{ vars.RESOURCE_GROUP_PROD }}"           >> "$GITHUB_OUTPUT"
+          else
+            echo "label=test"     >> "$GITHUB_OUTPUT"
+            echo "branch=test"    >> "$GITHUB_OUTPUT"
+            echo "workspace=${{ vars.SYNAPSE_WORKSPACE_TEST }}" >> "$GITHUB_OUTPUT"
+            echo "rg=${{ vars.RESOURCE_GROUP_TEST }}"           >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout expected state from synapse-repo-dev
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/synapse-repo-dev
+          ref:        ${{ steps.env.outputs.branch }}
+          token:      ${{ steps.app-token.outputs.token }}
+          path:       expected-state
+          fetch-depth: 1
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Detect drift
+        id: drift
+        env:
+          WORKSPACE: ${{ steps.env.outputs.workspace }}
+        run: |
+          set +e  # don't exit on diff differences
+
+          DRIFT_FOUND=false
+          DRIFT_REPORT=""
+
+          log_drift() {
+            local artifact_type="$1"
+            local diff_output="$2"
+            if [[ -n "$diff_output" ]]; then
+              DRIFT_FOUND=true
+              DRIFT_REPORT+="### ${artifact_type} drift\n\`\`\`diff\n${diff_output}\n\`\`\`\n\n"
+              echo "::warning::Drift detected in ${artifact_type}"
+            fi
+          }
+
+          # Pipelines
+          LIVE_PIPELINES=$(az synapse pipeline list \
+            --workspace-name "$WORKSPACE" \
+            --query "sort_by([].name, &@)" -o tsv 2>/dev/null || echo "")
+          EXPECTED_PIPELINES=$(find expected-state/pipeline -name '*.json' 2>/dev/null \
+            | xargs -I{} basename {} .json | sort || echo "")
+          PIPELINE_DIFF=$(diff <(echo "$EXPECTED_PIPELINES") <(echo "$LIVE_PIPELINES") || true)
+          log_drift "Pipelines" "$PIPELINE_DIFF"
+
+          # Triggers
+          LIVE_TRIGGERS=$(az synapse trigger list \
+            --workspace-name "$WORKSPACE" \
+            --query "sort_by([].name, &@)" -o tsv 2>/dev/null || echo "")
+          EXPECTED_TRIGGERS=$(find expected-state/trigger -name '*.json' 2>/dev/null \
+            | xargs -I{} basename {} .json | sort || echo "")
+          TRIGGER_DIFF=$(diff <(echo "$EXPECTED_TRIGGERS") <(echo "$LIVE_TRIGGERS") || true)
+          log_drift "Triggers" "$TRIGGER_DIFF"
+
+          # Datasets
+          LIVE_DATASETS=$(az synapse dataset list \
+            --workspace-name "$WORKSPACE" \
+            --query "sort_by([].name, &@)" -o tsv 2>/dev/null || echo "")
+          EXPECTED_DATASETS=$(find expected-state/dataset -name '*.json' 2>/dev/null \
+            | xargs -I{} basename {} .json | sort || echo "")
+          DATASET_DIFF=$(diff <(echo "$EXPECTED_DATASETS") <(echo "$LIVE_DATASETS") || true)
+          log_drift "Datasets" "$DATASET_DIFF"
+
+          # Linked Services
+          LIVE_LS=$(az synapse linked-service list \
+            --workspace-name "$WORKSPACE" \
+            --query "sort_by([].name, &@)" -o tsv 2>/dev/null | grep -v 'WorkspaceDefaultStorage\|WorkspaceDefaultSqlServer' || echo "")
+          EXPECTED_LS=$(find expected-state/linkedService -name '*.json' 2>/dev/null \
+            | xargs -I{} basename {} .json | sort || echo "")
+          LS_DIFF=$(diff <(echo "$EXPECTED_LS") <(echo "$LIVE_LS") || true)
+          log_drift "LinkedServices" "$LS_DIFF"
+
+          # Write outputs
+          echo "drift_found=${DRIFT_FOUND}" >> "$GITHUB_OUTPUT"
+
+          # Write full report to a file for summary
+          printf "%b" "$DRIFT_REPORT" > /tmp/drift-report.md
+
+          set -e
+
+      - name: Write drift summary
+        run: |
+          ENV_LABEL="${{ steps.env.outputs.label }}"
+          WORKSPACE="${{ steps.env.outputs.workspace }}"
+          DRIFT="${{ steps.drift.outputs.drift_found }}"
+
+          if [[ "$DRIFT" == "true" ]]; then
+            echo "## ⚠️ Drift Detected in ${ENV_LABEL^} Workspace" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Workspace:** \`${WORKSPACE}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "The following artifacts exist in the live workspace but differ from **synapse-repo-dev/${ENV_LABEL}**:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/drift-report.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Action required:** Redeploy from synapse-repo-dev or run the Rollback workflow." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ✅ No Drift Detected" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Workspace:** \`${WORKSPACE}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Live workspace matches expected state from synapse-repo-dev/${ENV_LABEL}." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fail if drift found
+        if: steps.drift.outputs.drift_found == 'true'
+        run: |
+          echo "::error::Workspace drift detected. See job summary for details."
+          exit 1

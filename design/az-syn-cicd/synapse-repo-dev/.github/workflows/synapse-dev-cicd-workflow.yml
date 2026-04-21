@@ -1,0 +1,226 @@
+###############################################################################
+# synapse-dev-cicd-workflow.yml
+# Repository: synapse-repo-dev
+#
+# Triggers:
+#   push → dev        Deploy to synapse-workspace-dev + create dev release
+#   pull_request → test  Validate only (required status check for test branch ruleset)
+#
+# Required secrets (repo-level):
+#   AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   GH_APP_PRIVATE_KEY
+#
+# Required vars (repo-level):
+#   GH_APP_ID            GitHub App ID (org-owner permissions)
+#   SYNAPSE_WORKSPACE_DEV   synapse-workspace-dev
+#   RESOURCE_GROUP_DEV      resource group of dev workspace
+###############################################################################
+name: synapse-dev-cicd-workflow
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'pipeline/**'
+      - 'dataset/**'
+      - 'linkedService/**'
+      - 'notebook/**'
+      - 'trigger/**'
+      - 'dataflow/**'
+      - 'sqlscript/**'
+      - 'credential/**'
+      - 'sparkJobDefinition/**'
+      - 'template-parameters-definition.json'
+
+  pull_request:
+    branches:
+      - test
+    paths:
+      - 'pipeline/**'
+      - 'dataset/**'
+      - 'linkedService/**'
+      - 'notebook/**'
+      - 'trigger/**'
+      - 'dataflow/**'
+      - 'sqlscript/**'
+      - 'credential/**'
+      - 'sparkJobDefinition/**'
+      - 'template-parameters-definition.json'
+
+# One deploy at a time per branch; cancel in-progress PR checks on new push
+concurrency:
+  group: synapse-dev-${{ github.event_name == 'push' && 'deploy' || github.head_ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SYNAPSE_WORKSPACE: ${{ vars.SYNAPSE_WORKSPACE_DEV }}
+  RESOURCE_GROUP:    ${{ vars.RESOURCE_GROUP_DEV }}
+  AZURE_ENV:         'Azure Public'
+  TRIGGER_STATE_FILE: /tmp/synapse-dev-triggers.json
+
+jobs:
+  ###########################################################################
+  # JOB: validate
+  # Runs on BOTH push→dev and pull_request→test
+  # This job name ("validate") is what the test branch ruleset references:
+  #   "synapse-dev-cicd-workflow / validate"
+  ###########################################################################
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || 'dev' }}
+          fetch-depth: 1
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Validate Synapse artifacts
+        id: synapse-validate
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:      ${{ env.SYNAPSE_WORKSPACE }}
+          ArtifactsFolder:          '${{ github.workspace }}'
+          environment:              ${{ env.AZURE_ENV }}
+          resourceGroup:            ${{ env.RESOURCE_GROUP }}
+          clientId:                 ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret:             ${{ secrets.AZURE_CLIENT_SECRET }}
+          subscriptionId:           ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:                 ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:                validate
+
+      - name: Upload exported templates (PR artifact for review)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-dev-exported-templates-pr${{ github.event.pull_request.number }}
+          path: '${{ github.workspace }}/ExportedArtifacts/'
+          retention-days: 14
+
+      - name: Post validation summary
+        if: always()
+        run: |
+          echo "## Synapse Dev — Validation Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ env.SYNAPSE_WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | \`${{ github.event_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Ref | \`${{ github.ref_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  ###########################################################################
+  # JOB: deploy
+  # Runs ONLY on push→dev (after validate succeeds)
+  ###########################################################################
+  deploy:
+    name: deploy-to-dev
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: synapse-dev
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0   # full history needed for tagging
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop active triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Deploy to dev workspace (validateDeploy)
+        id: synapse-deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:          ${{ env.SYNAPSE_WORKSPACE }}
+          ArtifactsFolder:              '${{ github.workspace }}'
+          OverrideArmParameters:        './parameters/dev.parameters.yaml'
+          environment:                  ${{ env.AZURE_ENV }}
+          resourceGroup:                ${{ env.RESOURCE_GROUP }}
+          clientId:                     ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret:                 ${{ secrets.AZURE_CLIENT_SECRET }}
+          subscriptionId:               ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:                     ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:                    validateDeploy
+
+      - name: Start triggers
+        if: always()
+        run: |
+          ./scripts/toggle-triggers.sh start "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Create dev release
+        id: release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          chmod +x scripts/create-release.sh
+          ./scripts/create-release.sh "dev" "${{ github.repository }}"
+
+      - name: Deployment summary
+        run: |
+          echo "## ✅ Synapse Dev — Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ env.SYNAPSE_WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Release | \`${{ steps.release.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Actor | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  ###########################################################################
+  # JOB: notify-failure
+  ###########################################################################
+  notify-failure:
+    name: notify-on-failure
+    needs: [validate, deploy]
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post failure summary
+        run: |
+          echo "## ❌ Synapse Dev — Pipeline Failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." >> "$GITHUB_STEP_SUMMARY"

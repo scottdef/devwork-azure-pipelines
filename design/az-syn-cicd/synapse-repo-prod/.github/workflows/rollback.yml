@@ -1,0 +1,190 @@
+###############################################################################
+# rollback.yml  — place this file in BOTH synapse-repo-test AND synapse-repo-prod
+#
+# Allows any authorized user to redeploy any prior release by providing
+# the source SHA from synapse-repo-dev.
+#
+# Usage: Actions → "Synapse Rollback" → Run workflow → fill inputs
+###############################################################################
+name: Synapse Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'SHA from synapse-repo-dev to redeploy (get from release notes)'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback (recorded in release notes)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type ROLLBACK to confirm'
+        required: true
+        type: string
+
+# Never cancel a rollback in progress
+concurrency:
+  group: synapse-rollback-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: preflight-checks
+    runs-on: ubuntu-latest
+    outputs:
+      env_label: ${{ steps.env.outputs.label }}
+      workspace:  ${{ steps.env.outputs.workspace }}
+      rg:         ${{ steps.env.outputs.rg }}
+    steps:
+      - name: Validate confirmation string
+        if: inputs.confirm != 'ROLLBACK'
+        run: |
+          echo "::error::Confirmation string must be exactly 'ROLLBACK'. Got: '${{ inputs.confirm }}'"
+          exit 1
+
+      - name: Resolve environment from repo name
+        id: env
+        run: |
+          REPO="${{ github.repository }}"
+          if [[ "$REPO" == *"prod"* ]]; then
+            echo "label=prod"     >> "$GITHUB_OUTPUT"
+            echo "workspace=${{ vars.SYNAPSE_WORKSPACE_PROD }}" >> "$GITHUB_OUTPUT"
+            echo "rg=${{ vars.RESOURCE_GROUP_PROD }}"           >> "$GITHUB_OUTPUT"
+          else
+            echo "label=test"     >> "$GITHUB_OUTPUT"
+            echo "workspace=${{ vars.SYNAPSE_WORKSPACE_TEST }}" >> "$GITHUB_OUTPUT"
+            echo "rg=${{ vars.RESOURCE_GROUP_TEST }}"           >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate SHA format
+        run: |
+          SHA="${{ inputs.source_sha }}"
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::source_sha must be a full 40-character Git SHA. Got: '$SHA'"
+            exit 1
+          fi
+
+      - name: Preflight summary
+        run: |
+          echo "## 🔄 Rollback Preflight Checks Passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source SHA | \`${{ inputs.source_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Reason | ${{ inputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Initiated by | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  rollback:
+    name: rollback-deploy
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: synapse-${{ needs.preflight.outputs.env_label }}  # triggers approval gate
+
+    env:
+      SYNAPSE_WORKSPACE:  ${{ needs.preflight.outputs.workspace }}
+      RESOURCE_GROUP:     ${{ needs.preflight.outputs.rg }}
+      ENV_LABEL:          ${{ needs.preflight.outputs.env_label }}
+      AZURE_ENV:          'Azure Public'
+      TRIGGER_STATE_FILE: /tmp/synapse-rollback-triggers.json
+      DEV_REPO:           ${{ github.repository_owner }}/${{ vars.DEV_REPO_NAME || 'synapse-repo-dev' }}
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Checkout synapse-repo-dev at rollback SHA
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEV_REPO }}
+          ref:        ${{ inputs.source_sha }}
+          token:      ${{ steps.app-token.outputs.token }}
+          path:       synapse-source
+          fetch-depth: 1
+
+      - name: Verify rollback SHA exists in dev repo
+        run: |
+          cd synapse-source
+          echo "==> Rollback target commit:"
+          git log -1 --format="%H %s %ai %an"
+
+      - name: Checkout this repo (for scripts)
+        uses: actions/checkout@v4
+        with:
+          path:       self-repo
+          fetch-depth: 0
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId":       "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":   "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId":       "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop active triggers
+        run: |
+          chmod +x self-repo/scripts/toggle-triggers.sh
+          self-repo/scripts/toggle-triggers.sh stop \
+            "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Redeploy rollback SHA (validateDeploy)
+        id: synapse-deploy
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName:          ${{ env.SYNAPSE_WORKSPACE }}
+          ArtifactsFolder:              '${{ github.workspace }}/synapse-source'
+          OverrideArmParameters:        '${{ github.workspace }}/synapse-source/parameters/${{ env.ENV_LABEL }}.parameters.yaml'
+          environment:                  ${{ env.AZURE_ENV }}
+          resourceGroup:                ${{ env.RESOURCE_GROUP }}
+          clientId:                     ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret:                 ${{ secrets.AZURE_CLIENT_SECRET }}
+          subscriptionId:               ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId:                     ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation:                    validateDeploy
+
+      - name: Start triggers
+        if: always()
+        run: |
+          self-repo/scripts/toggle-triggers.sh start \
+            "${{ env.SYNAPSE_WORKSPACE }}" "${{ env.TRIGGER_STATE_FILE }}"
+
+      - name: Create rollback release record
+        id: release
+        working-directory: self-repo
+        env:
+          GH_TOKEN:          ${{ steps.app-token.outputs.token }}
+          GITHUB_SHA:        ${{ inputs.source_sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_ID:     ${{ github.run_id }}
+          GITHUB_ACTOR:      ${{ github.actor }}
+          GITHUB_REF_NAME:   ${{ env.ENV_LABEL }}
+          GITHUB_WORKFLOW:   Synapse Rollback
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          chmod +x scripts/create-release.sh
+          ./scripts/create-release.sh \
+            "rollback-${{ env.ENV_LABEL }}" \
+            "${{ github.repository }}" \
+            "⏪ **ROLLBACK** — reason: ${{ inputs.reason }}"
+
+      - name: Rollback complete summary
+        run: |
+          echo "## ⏪ Rollback Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Environment | \`${{ env.ENV_LABEL }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ env.SYNAPSE_WORKSPACE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Rolled back to SHA | \`${{ inputs.source_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Rollback release | \`${{ steps.release.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Reason | ${{ inputs.reason }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Executed by | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,27 @@
+###############################################################################
+# parameters/dev.parameters.yaml
+# Override values for synapse-workspace-dev
+# These map to parameterized fields in TemplateParametersForWorkspace.json
+###############################################################################
+
+# Workspace identity
+workspaceName: synapse-workspace-dev
+
+# Default ADLS Gen2 storage (workspace root storage)
+WorkspaceDefaultStorage_properties_typeProperties_url: >-
+  https://devdatalake.dfs.core.windows.net
+
+# Azure Key Vault linked service base URL
+LS_AzureKeyVault_properties_typeProperties_baseUrl: >-
+  https://myorg-dev-kv.vault.azure.net/
+
+# Spark pool name (if referenced in notebooks)
+# BigDataPool_properties_typeProperties_sparkPool_referenceName: devsparkpool01
+
+# Integration Runtime name (if using self-hosted IR)
+# LS_SomethingOnPrem_properties_connectVia_referenceName: dev-selfhosted-ir
+
+# Example: SQL database linked service connection string override
+# LS_AzureSqlDb_properties_typeProperties_connectionString: >-
+#   Integrated Security=False;Encrypt=True;Connection Timeout=30;
+#   Data Source=dev-sqlserver.database.windows.net;Initial Catalog=dev_db
