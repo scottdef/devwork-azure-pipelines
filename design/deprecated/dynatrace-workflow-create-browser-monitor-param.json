@@ -1,0 +1,147 @@
+{
+  "title": "Create Synthetic Browser Monitor",
+  "description": "Workflow that provisions a Dynatrace synthetic browser monitor via the Synthetic Monitors API (v1). Reads monitor configuration from workflow parameters and posts to the tenant REST endpoint. On success the entityId is logged; on failure a descriptive error is surfaced.",
+  "owner": "admin",
+  "ownerType": "USER",
+  "isPrivate": false,
+  "trigger": {
+    "triggerType": "Manual",
+    "filterParameters": {
+      "timerFilterParameters": {}
+    },
+    "isActive": true
+  },
+  "schemaVersion": 3,
+  "variables": {
+    "monitorName": {
+      "value": "Browser Monitor Example",
+      "description": "Display name of the synthetic browser monitor. Override this variable before running the workflow to change the monitor name without touching execution parameters."
+    }
+  },
+  "tasks": {
+    "validate_inputs": {
+      "name": "validate_inputs",
+      "description": "Validate that required workflow parameters are present before attempting monitor creation.",
+      "action": "dynatrace.automations:run-javascript",
+      "active": true,
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\n\nexport default async function ({ execution_id }) {\n  const exec = await execution(execution_id);\n  const params    = exec.params    ?? {};\n  const variables = exec.variables ?? {};\n\n  // monitorName is a workflow variable \u2014 validate it separately\n  const monitorName = variables.monitorName;\n  if (!monitorName || monitorName.trim() === '') {\n    throw new Error(\n      `Workflow variable 'monitorName' is not set or is empty. ` +\n      `Set it in the workflow Variables panel before running.`\n    );\n  }\n\n  // Remaining required values come from execution parameters\n  const required = [\n    'targetUrl',\n    'frequencyMin',\n    'locationIds',\n    'applicationId'\n  ];\n\n  const missing = required.filter((k) => !params[k]);\n  if (missing.length > 0) {\n    throw new Error(\n      `Missing required workflow parameters: ${missing.join(', ')}. ` +\n      `Provide them when triggering the workflow manually or via the API.`\n    );\n  }\n\n  if (typeof params.frequencyMin !== 'number' || params.frequencyMin < 5) {\n    throw new Error(\n      `'frequencyMin' must be a number >= 5 (Dynatrace minimum). Got: ${params.frequencyMin}`\n    );\n  }\n\n  if (!Array.isArray(params.locationIds) || params.locationIds.length === 0) {\n    throw new Error(`'locationIds' must be a non-empty array of Dynatrace location entity IDs.`);\n  }\n\n  console.log(`[validate_inputs] Validated. monitorName='${monitorName}'.`);\n  return { valid: true, monitorName, params };\n}"
+      },
+      "position": {
+        "x": 0,
+        "y": 1
+      },
+      "predecessors": [],
+      "conditions": {
+        "states": {},
+        "custom": "",
+        "else": "STOP"
+      }
+    },
+    "build_monitor_payload": {
+      "name": "build_monitor_payload",
+      "description": "Construct the JSON request body for the Dynatrace Synthetic Monitors API.",
+      "action": "dynatrace.automations:run-javascript",
+      "active": true,
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\n\nexport default async function ({ execution_id }) {\n  const exec = await execution(execution_id);\n  const params    = exec.params    ?? {};\n  const variables = exec.variables ?? {};\n\n  // \u2500\u2500 monitorName comes from the workflow variable \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const monitorName    = variables.monitorName;               // set in Variables panel\n\n  // \u2500\u2500 Remaining config from execution parameters \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const targetUrl      = params.targetUrl;                    // e.g. 'https://app.example.com'\n  const frequencyMin   = params.frequencyMin ?? 5;            // Minimum: 5\n  const locationIds    = params.locationIds;                  // Array of GEOLOCATION- / SYNTHETIC_LOCATION- IDs\n  const applicationId  = params.applicationId;               // APPLICATION-XXXXXXXXXXXXXXXX\n  const tags           = params.tags ?? [];                   // Optional string array\n  const enabled        = params.enabled ?? true;\n  const deviceName     = params.deviceName ?? 'Desktop';\n  const orientation    = params.orientation ?? 'landscape';\n  const waitFor        = params.waitFor ?? 'page_complete';\n\n  // \u2500\u2500 Anomaly detection thresholds \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const loadingTimeMs  = params.loadingTimeThresholdMs ?? 10000;\n  const affectedLocs   = params.localOutageAffectedLocations ?? 1;\n  const consRuns       = params.localOutageConsecutiveRuns ?? 3;\n\n  // \u2500\u2500 KPM \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const loadActionKpm  = params.loadActionKpm ?? 'VISUALLY_COMPLETE';\n  const xhrActionKpm   = params.xhrActionKpm  ?? 'VISUALLY_COMPLETE';\n\n  const payload = {\n    type: 'BROWSER',\n    name: monitorName,\n    enabled,\n    frequencyMin,\n    locations: locationIds,\n    manuallyAssignedApps: [applicationId],\n    tags,\n    keyPerformanceMetrics: {\n      loadActionKpm,\n      xhrActionKpm\n    },\n    anomalyDetection: {\n      outageHandling: {\n        globalOutage: true,\n        localOutage: true,\n        localOutagePolicy: {\n          affectedLocations: affectedLocs,\n          consecutiveRuns: consRuns\n        }\n      },\n      loadingTimeThresholds: {\n        enabled: true,\n        thresholds: [\n          {\n            type: 'TOTAL',\n            requestIndex: 1,\n            valueMs: loadingTimeMs\n          }\n        ]\n      }\n    },\n    script: {\n      type: 'availability',\n      version: '1.0',\n      configuration: {\n        device: {\n          deviceName,\n          orientation\n        }\n      },\n      events: [\n        {\n          type: 'navigate',\n          description: `Loading of \"${targetUrl}\"`,\n          url: targetUrl,\n          wait: {\n            waitFor\n          }\n        }\n      ]\n    },\n    events: []\n  };\n\n  console.log(`[build_monitor_payload] Payload for monitor '${monitorName}' constructed.`);\n  return { payload };\n}"
+      },
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "predecessors": [
+        "validate_inputs"
+      ],
+      "conditions": {
+        "states": {
+          "validate_inputs": "SUCCESS"
+        },
+        "custom": "",
+        "else": "STOP"
+      }
+    },
+    "create_synthetic_monitor": {
+      "name": "create_synthetic_monitor",
+      "description": "POST the monitor payload to POST /api/v1/synthetic/monitors. Returns entityId on success.",
+      "action": "dynatrace.automations:http-function",
+      "active": true,
+      "input": {
+        "method": "POST",
+        "url": "{{`{{ .env.DT_TENANT_URL }}`}}/api/v1/synthetic/monitors",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Api-Token {{`{{ .env.DT_API_TOKEN }}`}}"
+        },
+        "payload": "{{`{{ result('build_monitor_payload').payload | toJSON }}`}}"
+      },
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "predecessors": [
+        "build_monitor_payload"
+      ],
+      "conditions": {
+        "states": {
+          "build_monitor_payload": "SUCCESS"
+        },
+        "custom": "",
+        "else": "STOP"
+      }
+    },
+    "verify_and_log_result": {
+      "name": "verify_and_log_result",
+      "description": "Check the HTTP response status code and extract the new monitor entityId.",
+      "action": "dynatrace.automations:run-javascript",
+      "active": true,
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\n\nexport default async function ({ execution_id }) {\n  const exec = await execution(execution_id);\n  const httpResult = await exec.result('create_synthetic_monitor');\n\n  // The http-function task surfaces statusCode + body\n  const statusCode = httpResult?.statusCode ?? 0;\n  const body       = httpResult?.body ?? {};\n\n  if (statusCode === 200 || statusCode === 201) {\n    const entityId = body.entityId ?? body.monitorId ?? 'UNKNOWN';\n    console.log(`[verify_and_log_result] Monitor created successfully. entityId: ${entityId}`);\n    return {\n      success: true,\n      entityId,\n      statusCode,\n      monitorUrl: `${process.env['DT_TENANT_URL']}/#synthetics/monitors/${entityId}`\n    };\n  }\n\n  // Treat any non-2xx as a failure\n  const errMessage = body.error?.message ?? body.message ?? JSON.stringify(body);\n  throw new Error(\n    `Synthetic monitor creation failed. HTTP ${statusCode}: ${errMessage}`\n  );\n}"
+      },
+      "position": {
+        "x": 0,
+        "y": 4
+      },
+      "predecessors": [
+        "create_synthetic_monitor"
+      ],
+      "conditions": {
+        "states": {
+          "create_synthetic_monitor": "SUCCESS"
+        },
+        "custom": "",
+        "else": "ERROR"
+      }
+    },
+    "handle_error": {
+      "name": "handle_error",
+      "description": "Runs if any upstream task fails. Surfaces the error message for operator review.",
+      "action": "dynatrace.automations:run-javascript",
+      "active": true,
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\n\nexport default async function ({ execution_id }) {\n  const exec = await execution(execution_id);\n  const taskNames = [\n    'validate_inputs',\n    'build_monitor_payload',\n    'create_synthetic_monitor',\n    'verify_and_log_result'\n  ];\n\n  for (const taskName of taskNames) {\n    try {\n      const state = await exec.taskState(taskName);\n      if (state === 'FAILED' || state === 'CANCELLED') {\n        const err = await exec.result(taskName).catch((e) => ({ _error: e.message }));\n        console.error(\n          `[handle_error] Task '${taskName}' is in state '${state}'. ` +\n          `Details: ${JSON.stringify(err)}`\n        );\n      }\n    } catch (_) {\n      // task may not have run; ignore\n    }\n  }\n\n  return { handled: true };\n}"
+      },
+      "position": {
+        "x": 1,
+        "y": 4
+      },
+      "predecessors": [
+        "validate_inputs",
+        "build_monitor_payload",
+        "create_synthetic_monitor",
+        "verify_and_log_result"
+      ],
+      "conditions": {
+        "states": {
+          "validate_inputs": "ERROR",
+          "build_monitor_payload": "ERROR",
+          "create_synthetic_monitor": "ERROR",
+          "verify_and_log_result": "ERROR"
+        },
+        "conditionLinkType": "OR",
+        "custom": "",
+        "else": "SKIP"
+      }
+    }
+  }
+}
