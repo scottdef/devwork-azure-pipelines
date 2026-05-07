@@ -1,0 +1,137 @@
+name: "08 · Rollback"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Environment to roll back"
+        required: true
+        type: choice
+        options: [dev, test, prod]
+      target_version:
+        description: "Git tag to roll back to"
+        required: true
+        type: string
+      confirm_rollback:
+        description: "Type ROLLBACK to confirm"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Confirm
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ inputs.confirm_rollback }}" = "ROLLBACK" ] || \
+            { echo "::error::Type 'ROLLBACK' to confirm." && exit 1; }
+
+  rollback:
+    name: "Rollback → ${{ inputs.target_environment }}"
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - name: Resolve config
+        id: cfg
+        run: |
+          case "${{ inputs.target_environment }}" in
+            dev)
+              echo "repo=${{ vars.GITHUB_ORG }}/synapse-repo-dev"       >> "$GITHUB_OUTPUT"
+              echo "workspace=${{ vars.SYNAPSE_WORKSPACE_DEV }}"        >> "$GITHUB_OUTPUT"
+              echo "rg=${{ vars.RESOURCE_GROUP_DEV }}"                  >> "$GITHUB_OUTPUT"
+              ;;
+            test)
+              echo "repo=${{ vars.GITHUB_ORG }}/synapse-repo-test"      >> "$GITHUB_OUTPUT"
+              echo "workspace=${{ vars.SYNAPSE_WORKSPACE_TEST }}"       >> "$GITHUB_OUTPUT"
+              echo "rg=${{ vars.RESOURCE_GROUP_TEST }}"                 >> "$GITHUB_OUTPUT"
+              ;;
+            prod)
+              echo "repo=${{ vars.GITHUB_ORG }}/synapse-repo-prod"      >> "$GITHUB_OUTPUT"
+              echo "workspace=${{ vars.SYNAPSE_WORKSPACE_PROD }}"       >> "$GITHUB_OUTPUT"
+              echo "rg=${{ vars.RESOURCE_GROUP_PROD }}"                 >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      # Resolve SPN secrets per environment — avoids dynamic format() case issues
+      - name: Resolve credentials
+        id: creds
+        run: |
+          case "${{ inputs.target_environment }}" in
+            dev)  echo "spn_id=${{ secrets.SYNAPSE_DEV_SPN_ID }}"    >> "$GITHUB_OUTPUT"
+                  echo "spn_sec=${{ secrets.SYNAPSE_DEV_SPN_SECRET }}" >> "$GITHUB_OUTPUT" ;;
+            test) echo "spn_id=${{ secrets.SYNAPSE_TEST_SPN_ID }}"   >> "$GITHUB_OUTPUT"
+                  echo "spn_sec=${{ secrets.SYNAPSE_TEST_SPN_SECRET }}" >> "$GITHUB_OUTPUT" ;;
+            prod) echo "spn_id=${{ secrets.SYNAPSE_PROD_SPN_ID }}"   >> "$GITHUB_OUTPUT"
+                  echo "spn_sec=${{ secrets.SYNAPSE_PROD_SPN_SECRET }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.cfg.outputs.repo }}
+          ref: ${{ inputs.target_version }}
+          token: ${{ secrets.GH_APP_TOKEN }}
+
+      - uses: azure/login@v2
+        with:
+          creds: >-
+            {"clientId":"${{ steps.creds.outputs.spn_id }}",
+             "clientSecret":"${{ steps.creds.outputs.spn_sec }}",
+             "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+             "tenantId":"${{ secrets.AZURE_TENANT_ID }}"}
+
+      - name: Stop triggers
+        run: |
+          set -euo pipefail
+          WS="${{ steps.cfg.outputs.workspace }}"
+          triggers=$(az synapse trigger list --workspace-name "$WS" \
+            --query "[?properties.runtimeState=='Started'].name" -o tsv)
+          [ -z "$triggers" ] && echo "[]" > active-triggers.json && exit 0
+          echo "$triggers" | jq -R -s 'split("\n")|map(select(.!=""))' > active-triggers.json
+          while IFS= read -r t; do
+            [ -z "$t" ] && continue
+            az synapse trigger stop --workspace-name "$WS" --name "$t" || true
+          done <<< "$triggers"
+
+      - name: Deploy rollback
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ steps.cfg.outputs.workspace }}
+          ArtifactsFolder: "${{ github.workspace }}"
+          OverrideArmParameters: "./parameters/${{ inputs.target_environment }}.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ steps.cfg.outputs.rg }}
+          clientId: ${{ steps.creds.outputs.spn_id }}
+          clientSecret: ${{ steps.creds.outputs.spn_sec }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "validateDeploy"
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          sleep 15
+          WS="${{ steps.cfg.outputs.workspace }}"
+          [ ! -f active-triggers.json ] && exit 0
+          mapfile -t names < <(jq -r '.[]' active-triggers.json)
+          for name in "${names[@]}"; do
+            [ -z "$name" ] && continue
+            for i in 1 2 3; do
+              az synapse trigger start --workspace-name "$WS" --name "$name" 2>/dev/null && break
+              sleep 5
+            done
+          done
+
+      - name: Summary
+        run: |
+          echo "## ⏪ Rollback Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Env | \`${{ inputs.target_environment }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workspace | \`${{ steps.cfg.outputs.workspace }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | \`${{ inputs.target_version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Actor | \`${{ github.actor }}\` |" >> "$GITHUB_STEP_SUMMARY"

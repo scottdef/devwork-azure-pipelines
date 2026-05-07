@@ -1,0 +1,120 @@
+name: "03 · Synapse Promote → TEST"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Source commit SHA from dev"
+        required: true
+        type: string
+      release_version:
+        description: "Release version tag"
+        required: false
+        default: "latest"
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  promote-to-test:
+    name: "Deploy → TEST"
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      WORKSPACE: ${{ vars.SYNAPSE_WORKSPACE_TEST }}
+    steps:
+      - name: Checkout dev repo at source SHA
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GITHUB_ORG }}/synapse-repo-dev
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.GH_APP_TOKEN }}
+          path: source
+
+      - name: Checkout test repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GITHUB_ORG }}/synapse-repo-test
+          token: ${{ secrets.GH_APP_TOKEN }}
+          path: target
+
+      - name: Sync artifacts dev → test
+        run: |
+          set -euo pipefail
+          for dir in pipeline dataset linkedService notebook trigger dataflow sqlscript parameters; do
+            if [ -d "source/$dir" ]; then
+              rm -rf "target/$dir"
+              cp -r "source/$dir" "target/$dir"
+              echo "Synced: $dir"
+            fi
+          done
+
+      - name: Commit to test repo
+        working-directory: target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet && echo "No changes." && exit 0
+          git commit -m "Promote from dev @ ${{ inputs.source_sha }} (${{ inputs.release_version }})"
+          git push
+
+      - uses: azure/login@v2
+        with:
+          creds: >-
+            {"clientId":"${{ secrets.SYNAPSE_TEST_SPN_ID }}",
+             "clientSecret":"${{ secrets.SYNAPSE_TEST_SPN_SECRET }}",
+             "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+             "tenantId":"${{ secrets.AZURE_TENANT_ID }}"}
+
+      - name: Stop triggers
+        run: |
+          set -euo pipefail
+          triggers=$(az synapse trigger list \
+            --workspace-name "$WORKSPACE" \
+            --query "[?properties.runtimeState=='Started'].name" -o tsv)
+          [ -z "$triggers" ] && echo "[]" > active-triggers.json && exit 0
+          echo "$triggers" | jq -R -s 'split("\n")|map(select(.!=""))' > active-triggers.json
+          while IFS= read -r t; do
+            [ -z "$t" ] && continue
+            az synapse trigger stop --workspace-name "$WORKSPACE" --name "$t" || true
+          done <<< "$triggers"
+
+      - name: Deploy to TEST
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ vars.SYNAPSE_WORKSPACE_TEST }}
+          ArtifactsFolder: "${{ github.workspace }}/target"
+          OverrideArmParameters: "./target/parameters/test.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ vars.RESOURCE_GROUP_TEST }}
+          clientId: ${{ secrets.SYNAPSE_TEST_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_TEST_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "validateDeploy"
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          sleep 15
+          [ ! -f active-triggers.json ] && exit 0
+          mapfile -t names < <(jq -r '.[]' active-triggers.json)
+          for name in "${names[@]}"; do
+            [ -z "$name" ] && continue
+            for i in 1 2 3; do
+              az synapse trigger start --workspace-name "$WORKSPACE" --name "$name" 2>/dev/null && break
+              sleep 5
+            done
+          done
+
+      - name: Tag release
+        working-directory: target
+        run: |
+          V="test-$(date +'%Y%m%d.%H%M%S')-${{ inputs.source_sha }}"
+          git tag -a "$V" -m "Test release: $V"
+          git push origin "$V"
+          echo "::notice::Tagged $V"

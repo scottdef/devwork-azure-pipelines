@@ -1,0 +1,125 @@
+name: "06 · Terraform Apply"
+
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/**"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, test, prod]
+      confirm:
+        description: 'Type "apply" to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    name: "Apply · ${{ matrix.environment }}"
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - environment: dev
+            spn_id: SYNAPSE_DEV_SPN_ID
+            spn_secret: SYNAPSE_DEV_SPN_SECRET
+          - environment: test
+            spn_id: SYNAPSE_TEST_SPN_ID
+            spn_secret: SYNAPSE_TEST_SPN_SECRET
+          - environment: prod
+            spn_id: SYNAPSE_PROD_SPN_ID
+            spn_secret: SYNAPSE_PROD_SPN_SECRET
+    env:
+      TF_IN_AUTOMATION: "true"
+      ARM_CLIENT_ID: ${{ secrets[matrix.spn_id] }}
+      ARM_CLIENT_SECRET: ${{ secrets[matrix.spn_secret] }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - name: Confirm (manual only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.confirm }}" != "apply" ]; then
+            echo "::error::Type 'apply' to confirm." && exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+          terraform_wrapper: false
+
+      - name: Download state
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-state-${{ matrix.environment }}
+          path: terraform/
+        continue-on-error: true
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Apply
+        id: apply
+        run: |
+          terraform apply \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -input=false -no-color -auto-approve 2>&1 | tee apply.txt
+
+      - name: Upload state (critical)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state-${{ matrix.environment }}
+          path: terraform/terraform.tfstate
+          retention-days: 90
+          overwrite: true
+
+      - name: Upload state backup
+        if: steps.apply.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state-backup-${{ matrix.environment }}-${{ github.run_number }}
+          path: terraform/terraform.tfstate
+          retention-days: 365
+
+      - name: Record state ref
+        if: steps.apply.outcome == 'success'
+        run: |
+          cd "${{ github.workspace }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .terraform-state-refs
+          cat > ".terraform-state-refs/${{ matrix.environment }}.json" << REFEOF
+          {
+            "environment": "${{ matrix.environment }}",
+            "artifact": "terraform-state-${{ matrix.environment }}",
+            "run_id": "${{ github.run_id }}",
+            "sha": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          REFEOF
+          git add .terraform-state-refs/
+          git commit -m "tf state ref: ${{ matrix.environment }} #${{ github.run_number }}" || true
+          git push || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_APP_TOKEN }}
+
+      - name: Fail on error
+        if: steps.apply.outcome == 'failure'
+        run: exit 1

@@ -1,0 +1,4 @@
+workspaceName: synapse-workspace-test
+LS_AzureKeyVault_properties_typeProperties_baseUrl: https://kv-synapse-test.vault.azure.net/
+WorkspaceDefaultStorage_properties_typeProperties_url: https://synapsetestdatalake.dfs.core.windows.net
+BigDataPool_properties_typeProperties_sparkPool_referenceName: sparkpooltest

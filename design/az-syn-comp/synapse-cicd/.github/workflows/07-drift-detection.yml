@@ -1,0 +1,150 @@
+name: "07 · Drift Detection"
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  detect-drift:
+    name: "Drift · ${{ matrix.environment }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: dev
+            spn_id: SYNAPSE_DEV_SPN_ID
+            spn_secret: SYNAPSE_DEV_SPN_SECRET
+            workspace_var: SYNAPSE_WORKSPACE_DEV
+          - environment: test
+            spn_id: SYNAPSE_TEST_SPN_ID
+            spn_secret: SYNAPSE_TEST_SPN_SECRET
+            workspace_var: SYNAPSE_WORKSPACE_TEST
+          - environment: prod
+            spn_id: SYNAPSE_PROD_SPN_ID
+            spn_secret: SYNAPSE_PROD_SPN_SECRET
+            workspace_var: SYNAPSE_WORKSPACE_PROD
+    env:
+      WORKSPACE: ${{ vars[matrix.workspace_var] }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: >-
+            {"clientId":"${{ secrets[matrix.spn_id] }}",
+             "clientSecret":"${{ secrets[matrix.spn_secret] }}",
+             "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+             "tenantId":"${{ secrets.AZURE_TENANT_ID }}"}
+
+      - name: Synapse artifact drift
+        id: drift
+        run: |
+          set -euo pipefail
+          DRIFT=false
+          REPORT=""
+          check() {
+            local type="$1" expected="$2" live="$3"
+            if [ "$expected" != "$live" ]; then
+              DRIFT=true
+              REPORT="${REPORT}| ${type} | ${expected} | ${live} | ⚠️ |\n"
+            else
+              REPORT="${REPORT}| ${type} | ${expected} | ${live} | ✅ |\n"
+            fi
+          }
+          LP=$(az synapse pipeline list --workspace-name "$WORKSPACE" --query "length(@)" -o tsv 2>/dev/null||echo 0)
+          LT=$(az synapse trigger list --workspace-name "$WORKSPACE" --query "length(@)" -o tsv 2>/dev/null||echo 0)
+          LD=$(az synapse dataset list --workspace-name "$WORKSPACE" --query "length(@)" -o tsv 2>/dev/null||echo 0)
+          LL=$(az synapse linked-service list --workspace-name "$WORKSPACE" --query "length(@)" -o tsv 2>/dev/null||echo 0)
+          LN=$(az synapse notebook list --workspace-name "$WORKSPACE" --query "length(@)" -o tsv 2>/dev/null||echo 0)
+          EP=$(find pipeline/ -name '*.json' 2>/dev/null|wc -l||echo 0)
+          ET=$(find trigger/ -name '*.json' 2>/dev/null|wc -l||echo 0)
+          ED=$(find dataset/ -name '*.json' 2>/dev/null|wc -l||echo 0)
+          EL=$(find linkedService/ -name '*.json' 2>/dev/null|wc -l||echo 0)
+          EN=$(find notebook/ -name '*.json' 2>/dev/null|wc -l||echo 0)
+          check "Pipelines" "$EP" "$LP"
+          check "Triggers" "$ET" "$LT"
+          check "Datasets" "$ED" "$LD"
+          check "LinkedSvcs" "$EL" "$LL"
+          check "Notebooks" "$EN" "$LN"
+          echo "drift_found=$DRIFT" >> "$GITHUB_OUTPUT"
+          echo -e "$REPORT" > drift-report.txt
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Download state
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-state-${{ matrix.environment }}
+          path: terraform/
+        continue-on-error: true
+
+      - name: TF drift check
+        id: tf_drift
+        working-directory: terraform
+        env:
+          ARM_CLIENT_ID: ${{ secrets[matrix.spn_id] }}
+          ARM_CLIENT_SECRET: ${{ secrets[matrix.spn_secret] }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          [ ! -f terraform.tfstate ] && echo "tf_drift=skipped" >> "$GITHUB_OUTPUT" && exit 0
+          terraform init -input=false
+          set +e
+          terraform plan \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -input=false -no-color -detailed-exitcode 2>&1 | tee tf-plan.txt
+          EC=$?
+          set -e
+          if [ "$EC" -eq 2 ]; then
+            echo "tf_drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tf_drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create issue
+        if: steps.drift.outputs.drift_found == 'true' || steps.tf_drift.outputs.tf_drift == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const dr = fs.readFileSync('drift-report.txt','utf8');
+            let tfp = 'N/A';
+            try { tfp = fs.readFileSync('terraform/tf-plan.txt','utf8'); } catch {}
+            if (tfp.length > 50000) tfp = tfp.substring(0,50000) + '\n...(truncated)';
+            const title = `Drift: ${{ matrix.environment }} — ${new Date().toISOString().split('T')[0]}`;
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: 'drift,${{ matrix.environment }}', state: 'open'
+            });
+            const body = [
+              `## Drift — \`${{ matrix.environment }}\` (\`${process.env.WORKSPACE}\`)`,
+              `| Type | Expected | Live | Status |`,
+              `|------|----------|------|--------|`,
+              dr,
+              `<details><summary>TF plan</summary>`,
+              '',
+              '```',
+              tfp,
+              '```',
+              `</details>`
+            ].join('\n');
+            if (existing.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['drift','${{ matrix.environment }}']
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing[0].number, body
+              });
+            }

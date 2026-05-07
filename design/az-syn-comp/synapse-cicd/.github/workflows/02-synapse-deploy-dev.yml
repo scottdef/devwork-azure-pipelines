@@ -1,0 +1,103 @@
+name: "02 · Synapse Deploy → DEV"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/**"
+      - "dataset/**"
+      - "linkedService/**"
+      - "notebook/**"
+      - "trigger/**"
+      - "dataflow/**"
+      - "sqlscript/**"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  deploy-dev:
+    name: "Deploy → DEV"
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      WORKSPACE: ${{ vars.SYNAPSE_WORKSPACE_DEV }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: >-
+            {"clientId":"${{ secrets.SYNAPSE_DEV_SPN_ID }}",
+             "clientSecret":"${{ secrets.SYNAPSE_DEV_SPN_SECRET }}",
+             "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+             "tenantId":"${{ secrets.AZURE_TENANT_ID }}"}
+
+      - name: Stop triggers
+        run: |
+          set -euo pipefail
+          triggers=$(az synapse trigger list \
+            --workspace-name "$WORKSPACE" \
+            --query "[?properties.runtimeState=='Started'].name" -o tsv)
+          if [ -z "$triggers" ]; then
+            echo "[]" > active-triggers.json
+          else
+            echo "$triggers" | jq -R -s 'split("\n")|map(select(.!=""))' > active-triggers.json
+            while IFS= read -r t; do
+              [ -z "$t" ] && continue
+              az synapse trigger stop --workspace-name "$WORKSPACE" --name "$t" || true
+              echo "Stopped: $t"
+            done <<< "$triggers"
+          fi
+
+      - name: Deploy (validateDeploy)
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ vars.SYNAPSE_WORKSPACE_DEV }}
+          ArtifactsFolder: "${{ github.workspace }}"
+          environment: "Azure Public"
+          resourceGroup: ${{ vars.RESOURCE_GROUP_DEV }}
+          clientId: ${{ secrets.SYNAPSE_DEV_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_DEV_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "validateDeploy"
+
+      - name: Restart triggers
+        if: always()
+        run: |
+          sleep 15
+          [ ! -f active-triggers.json ] && exit 0
+          mapfile -t names < <(jq -r '.[]' active-triggers.json)
+          for name in "${names[@]}"; do
+            [ -z "$name" ] && continue
+            for i in 1 2 3; do
+              az synapse trigger start --workspace-name "$WORKSPACE" --name "$name" 2>/dev/null && break
+              sleep 5
+            done
+          done
+
+      - name: Set release version
+        id: version
+        run: |
+          V="dev-$(date +'%Y%m%d.%H%M%S')-${GITHUB_SHA::8}"
+          echo "tag=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger test promotion
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '03-synapse-promote-test.yml',
+              ref: 'main',
+              inputs: {
+                source_sha: '${{ github.sha }}',
+                release_version: '${{ steps.version.outputs.tag }}'
+              }
+            });

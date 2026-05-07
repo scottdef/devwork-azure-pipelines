@@ -1,0 +1,4 @@
+workspaceName: synapse-workspace-dev
+LS_AzureKeyVault_properties_typeProperties_baseUrl: https://kv-synapse-dev.vault.azure.net/
+WorkspaceDefaultStorage_properties_typeProperties_url: https://synapsedevdatalake.dfs.core.windows.net
+BigDataPool_properties_typeProperties_sparkPool_referenceName: sparkpooldev

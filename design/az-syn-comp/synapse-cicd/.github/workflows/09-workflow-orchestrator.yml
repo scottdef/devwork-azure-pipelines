@@ -1,0 +1,136 @@
+name: "09 · Workflow Orchestrator"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to orchestrate"
+        required: true
+        type: choice
+        options:
+          - full-deploy-pipeline
+          - deploy-to-env
+          - terraform-all
+          - sync-repos
+          - notify-webhook
+      target_environment:
+        description: "Target env (for deploy-to-env)"
+        required: false
+        type: choice
+        options: ["", dev, test, prod]
+      webhook_url:
+        description: "Webhook URL (optional)"
+        required: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  orchestrate:
+    name: "${{ inputs.action }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "full-deploy-pipeline"
+        if: inputs.action == 'full-deploy-pipeline'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: '02-synapse-deploy-dev.yml', ref: 'main'
+            });
+            core.notice('Pipeline started: dev deploy → auto-promotes to test. Prod requires manual 04 trigger.');
+
+      - name: "deploy-to-env"
+        if: inputs.action == 'deploy-to-env'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            const env = '${{ inputs.target_environment }}';
+            if (!env) { core.setFailed('target_environment required'); return; }
+            const map = {
+              dev:  { wf: '02-synapse-deploy-dev.yml',    inputs: {} },
+              test: { wf: '03-synapse-promote-test.yml',  inputs: { source_sha: '${{ github.sha }}', release_version: 'orchestrated' } },
+              prod: { wf: '04-synapse-promote-prod.yml',  inputs: { source_tag: 'latest', confirm_production: 'DEPLOY' } }
+            };
+            const { wf, inputs: inp } = map[env];
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: wf, ref: 'main', inputs: inp
+            });
+
+      - name: "terraform-all"
+        if: inputs.action == 'terraform-all'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            for (const env of ['dev','test','prod']) {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner, repo: context.repo.repo,
+                workflow_id: '05-terraform-plan.yml', ref: 'main',
+                inputs: { environment: env }
+              });
+              await new Promise(r => setTimeout(r, 5000));
+            }
+
+      - name: "sync-repos"
+        if: inputs.action == 'sync-repos'
+        run: |
+          set -euo pipefail
+          DIRS="pipeline dataset linkedService notebook trigger dataflow sqlscript parameters"
+          WORK=$(mktemp -d)
+          gh repo clone "${{ vars.GITHUB_ORG }}/synapse-repo-dev" "${WORK}/source" -- --depth 1
+          for repo in synapse-repo-test synapse-repo-prod; do
+            gh repo clone "${{ vars.GITHUB_ORG }}/${repo}" "${WORK}/${repo}" -- --depth 1
+            for d in $DIRS; do
+              [ -d "${WORK}/source/$d" ] && rm -rf "${WORK}/${repo}/$d" && cp -r "${WORK}/source/$d" "${WORK}/${repo}/$d"
+            done
+            cd "${WORK}/${repo}"
+            git add -A
+            if ! git diff --staged --quiet; then
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git commit -m "Sync from dev (orchestrator #${{ github.run_number }})"
+              git push
+              echo "Pushed: $repo"
+            fi
+            cd -
+          done
+          rm -rf "$WORK"
+        env:
+          GH_TOKEN: ${{ secrets.GH_APP_TOKEN }}
+
+      - name: "notify-webhook"
+        if: inputs.action == 'notify-webhook' && inputs.webhook_url != ''
+        run: |
+          curl -sS -X POST "${{ inputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -d '{"event":"orchestrator","action":"${{ inputs.action }}","actor":"${{ github.actor }}","run":"${{ github.run_id }}"}'
+
+      - name: Post-action webhook
+        if: always() && inputs.webhook_url != ''
+        run: |
+          curl -sS -X POST "${{ inputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -d '{"event":"orchestrator_done","action":"${{ inputs.action }}","status":"${{ job.status }}"}'
+
+      - name: Audit trail
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .workflow-runs
+          cat > ".workflow-runs/orch-${{ github.run_id }}.json" << AUDITEOF
+          {"run_id":"${{ github.run_id }}","action":"${{ inputs.action }}","env":"${{ inputs.target_environment }}","actor":"${{ github.actor }}","status":"${{ job.status }}","at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          AUDITEOF
+          git add .workflow-runs/
+          git commit -m "orch: ${{ inputs.action }} #${{ github.run_id }}" || true
+          git push || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_APP_TOKEN }}
