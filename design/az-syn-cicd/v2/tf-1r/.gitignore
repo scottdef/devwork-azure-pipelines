@@ -1,0 +1,27 @@
+# ── Terraform ──
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# ── Local env ──
+.env
+*.pem
+*.key
+
+# ── Workflow run artifacts ──
+.workflow-runs/
+active-triggers.json
+active-triggers.txt
+
+# ── OS ──
+.DS_Store
+Thumbs.db

@@ -1,0 +1,83 @@
+###############################################################################
+# synapse-validate.yml — Validate Synapse artifacts on pull request
+#
+# Uses the Azure/synapse-workspace-deployment action in 'validate' mode.
+# This generates ARM templates from the collaboration branch artifacts
+# without deploying, catching errors before merge.
+#
+# The exported templates are uploaded as an artifact for the deploy workflow.
+###############################################################################
+name: "Synapse Validate"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "pipeline/**"
+      - "dataset/**"
+      - "linkedService/**"
+      - "notebook/**"
+      - "trigger/**"
+      - "dataflow/**"
+      - "sqlscript/**"
+      - "parameters/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: synapse-validate-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: "Validate Synapse Artifacts"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate against dev workspace
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: "synapse-workspace-dev"
+          ArtifactsFolder: "${{ github.workspace }}"
+          operation: "validate"
+
+      - name: Upload exported templates
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-templates
+          path: "${{ github.workspace }}/ExportedArtifacts/"
+          retention-days: 5
+
+      - name: Validation summary
+        run: |
+          echo "## Synapse Validation :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d "${{ github.workspace }}/ExportedArtifacts" ]; then
+            echo "Templates generated successfully:" >> $GITHUB_STEP_SUMMARY
+            ls -la "${{ github.workspace }}/ExportedArtifacts/" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Warning**: No ExportedArtifacts directory found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `### Synapse Artifact Validation :microscope:
+            **Status**: Passed
+            ARM templates generated from collaboration branch artifacts.
+            Templates archived as \`synapse-templates\` artifact for deployment.
+
+            *Triggered by: @${{ github.actor }}*`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output,
+            });

@@ -1,0 +1,5 @@
+# parameters/dev.parameters.yaml
+# Synapse ARM template parameter overrides for DEV
+workspaceName: synapse-workspace-dev
+LS_AzureKeyVault_properties_typeProperties_baseUrl: https://kv-synapse-dev.vault.azure.net/
+WorkspaceDefaultStorage_properties_typeProperties_url: https://devdatalake.dfs.core.windows.net

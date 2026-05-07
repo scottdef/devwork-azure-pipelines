@@ -1,0 +1,5 @@
+# parameters/prod.parameters.yaml
+# Synapse ARM template parameter overrides for PROD
+workspaceName: synapse-workspace-prod
+LS_AzureKeyVault_properties_typeProperties_baseUrl: https://kv-synapse-prod.vault.azure.net/
+WorkspaceDefaultStorage_properties_typeProperties_url: https://proddatalake.dfs.core.windows.net

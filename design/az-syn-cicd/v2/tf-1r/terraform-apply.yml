@@ -1,0 +1,215 @@
+###############################################################################
+# terraform-apply.yml — Apply Terraform changes on merge to main
+#
+# Runs sequentially: dev → test → prod.  Each environment:
+#   1. Downloads state from the GitHub artifact
+#   2. Runs terraform apply with the environment-specific tfvars
+#   3. Uploads the updated state as a GitHub artifact
+#
+# Test and prod use GitHub Environments with required reviewers as gates.
+###############################################################################
+name: "Terraform Apply"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (leave blank for full pipeline)"
+        type: choice
+        options:
+          - ""
+          - dev
+          - test
+          - prod
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEV
+  # ═══════════════════════════════════════════════════════════════════════════
+  apply-dev:
+    name: "Apply → Dev"
+    runs-on: ubuntu-latest
+    if: ${{ inputs.environment == '' || inputs.environment == 'dev' }}
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Download previous state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd terraform
+          gh run download --name "tfstate-dev" --dir . 2>/dev/null || \
+            echo "No previous state — fresh init"
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -input=false
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          TF_VAR_client_id: ${{ secrets.SYNAPSE_DEV_SPN_ID }}
+          TF_VAR_client_secret: ${{ secrets.SYNAPSE_DEV_SPN_SECRET }}
+        run: |
+          terraform -chdir=terraform apply \
+            -var-file="environments/dev.tfvars" \
+            -auto-approve \
+            -no-color \
+            2>&1 | tee apply-output.txt
+
+      - name: Upload updated state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "tfstate-dev"
+          path: terraform/terraform.tfstate
+          retention-days: 90
+          overwrite: true
+
+      - name: Apply summary
+        run: |
+          echo "## Terraform Apply — Dev :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -20 apply-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TEST
+  # ═══════════════════════════════════════════════════════════════════════════
+  apply-test:
+    name: "Apply → Test"
+    needs: apply-dev
+    runs-on: ubuntu-latest
+    if: ${{ inputs.environment == '' || inputs.environment == 'test' }}
+    environment: test  # ← requires reviewer approval
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Download previous state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd terraform
+          gh run download --name "tfstate-test" --dir . 2>/dev/null || \
+            echo "No previous state — fresh init"
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -input=false
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          TF_VAR_client_id: ${{ secrets.SYNAPSE_TEST_SPN_ID }}
+          TF_VAR_client_secret: ${{ secrets.SYNAPSE_TEST_SPN_SECRET }}
+        run: |
+          terraform -chdir=terraform apply \
+            -var-file="environments/test.tfvars" \
+            -auto-approve \
+            -no-color \
+            2>&1 | tee apply-output.txt
+
+      - name: Upload updated state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "tfstate-test"
+          path: terraform/terraform.tfstate
+          retention-days: 90
+          overwrite: true
+
+      - name: Apply summary
+        run: |
+          echo "## Terraform Apply — Test :test_tube:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          tail -20 apply-output.txt >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PROD
+  # ═══════════════════════════════════════════════════════════════════════════
+  apply-prod:
+    name: "Apply → Prod"
+    needs: apply-test
+    runs-on: ubuntu-latest
+    if: ${{ inputs.environment == '' || inputs.environment == 'prod' }}
+    environment: production  # ← requires reviewer approval
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Download previous state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd terraform
+          gh run download --name "tfstate-prod" --dir . 2>/dev/null || \
+            echo "No previous state — fresh init"
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -input=false
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          TF_VAR_client_id: ${{ secrets.SYNAPSE_PROD_SPN_ID }}
+          TF_VAR_client_secret: ${{ secrets.SYNAPSE_PROD_SPN_SECRET }}
+        run: |
+          terraform -chdir=terraform apply \
+            -var-file="environments/prod.tfvars" \
+            -auto-approve \
+            -no-color \
+            2>&1 | tee apply-output.txt
+
+      - name: Upload updated state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "tfstate-prod"
+          path: terraform/terraform.tfstate
+          retention-days: 90
+          overwrite: true
+
+      - name: Apply summary
+        run: |
+          echo "## Terraform Apply — Prod :shield:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          tail -20 apply-output.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: Tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="infra-v$(date +'%Y%m%d.%H%M%S')"
+          git tag -a "$VERSION" -m "Infrastructure release ${VERSION}"
+          git push origin "$VERSION"
+          echo "::notice::Tagged as ${VERSION}"

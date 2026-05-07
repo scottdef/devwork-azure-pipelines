@@ -1,0 +1,146 @@
+###############################################################################
+# synapse-deploy.yml — Deploy to prod workspace (synapse-repo-prod)
+#
+# Triggered by:
+#   - Cross-repo workflow_dispatch from synapse-repo-test
+#   - Manual dispatch with a source tag
+#
+# End of the promotion chain.  Tags the prod repo after success.
+###############################################################################
+name: "Synapse Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Release tag from synapse-repo-dev"
+        required: true
+        type: string
+      source_repo:
+        description: "Triggering repo (org/synapse-repo-test)"
+        required: false
+        default: ""
+      deploy_mode:
+        description: "deploy (workspace_publish) or validateDeploy (collaboration)"
+        required: false
+        type: choice
+        options:
+          - deploy
+          - validateDeploy
+        default: deploy
+
+env:
+  WORKSPACE: "synapse-workspace-prod"
+  RESOURCE_GROUP: "rg-synapse-prod"
+  DEV_REPO: "synapse-repo-dev"
+  ORG: ${{ github.repository_owner }}
+  TEMPLATE_FILE: "dev-artifacts/synapse-workspace-dev/TemplateForWorkspace.json"
+  PARAMS_FILE: "dev-artifacts/synapse-workspace-dev/TemplateParametersForWorkspace.json"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOY TO PROD
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-prod:
+    name: "Deploy → Prod"
+    runs-on: ubuntu-latest
+    environment: production  # ← approval gate (strictest)
+    steps:
+      - name: Checkout prod repo
+        uses: actions/checkout@v4
+        with:
+          path: prod-repo
+          fetch-depth: 0
+
+      - name: Checkout dev repo at ${{ inputs.source_tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: "${{ env.ORG }}/${{ env.DEV_REPO }}"
+          ref: ${{ inputs.source_tag }}
+          token: ${{ secrets.GH_APP_TOKEN }}
+          path: dev-artifacts
+
+      - name: Verify templates
+        run: |
+          if [ "${{ inputs.deploy_mode }}" = "deploy" ]; then
+            test -f "${{ env.TEMPLATE_FILE }}" || \
+              { echo "::error::Missing TemplateForWorkspace.json at tag ${{ inputs.source_tag }}"; exit 1; }
+          fi
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x prod-repo/scripts/toggle-triggers.sh
+          ./prod-repo/scripts/toggle-triggers.sh stop "${{ env.WORKSPACE }}"
+
+      - name: Deploy (ARM templates)
+        if: inputs.deploy_mode == 'deploy'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ${{ env.TEMPLATE_FILE }}
+          ParametersFile: ${{ env.PARAMS_FILE }}
+          OverrideArmParameters: "./prod-repo/parameters/prod.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "deploy"
+
+      - name: Deploy (validateDeploy)
+        if: inputs.deploy_mode == 'validateDeploy'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: "dev-artifacts"
+          OverrideArmParameters: "./prod-repo/parameters/prod.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "validateDeploy"
+
+      - name: Start triggers
+        if: always()
+        run: ./prod-repo/scripts/toggle-triggers.sh start "${{ env.WORKSPACE }}"
+
+      # ── Tag the prod repo with the release ──
+      - name: Tag production release
+        working-directory: prod-repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PROD_TAG="prod-${{ inputs.source_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$PROD_TAG" -m "Production release from dev tag ${{ inputs.source_tag }}"
+          git push origin "$PROD_TAG"
+          echo "::notice::Production tagged as ${PROD_TAG}"
+
+      - name: Summary
+        run: |
+          echo "## Synapse Deploy → Prod :shield:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dev source tag**: \`${{ inputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prod tag**: \`prod-${{ inputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ inputs.deploy_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: ${{ env.WORKSPACE }}" >> $GITHUB_STEP_SUMMARY

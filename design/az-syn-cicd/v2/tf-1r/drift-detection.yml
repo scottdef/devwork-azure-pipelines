@@ -1,0 +1,87 @@
+###############################################################################
+# drift-detection.yml — Detect manual changes in test/prod Synapse workspaces
+#
+# Runs daily at 06:00 UTC.  Compares the live workspace state against the
+# ARM templates on workspace_publish.  Creates a GitHub issue if drift is
+# detected.
+###############################################################################
+name: "Drift Detection"
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    name: "Drift Check — ${{ matrix.environment }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: test
+            workspace: synapse-workspace-test
+            spn_id_key: SYNAPSE_TEST_SPN_ID
+            spn_secret_key: SYNAPSE_TEST_SPN_SECRET
+          - environment: prod
+            workspace: synapse-workspace-prod
+            spn_id_key: SYNAPSE_PROD_SPN_ID
+            spn_secret_key: SYNAPSE_PROD_SPN_SECRET
+
+    steps:
+      - name: Checkout workspace_publish
+        uses: actions/checkout@v4
+        with:
+          ref: workspace_publish
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets[matrix.spn_id_key] }}",
+              "clientSecret": "${{ secrets[matrix.spn_secret_key] }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Run drift detection
+        id: drift
+        run: |
+          chmod +x scripts/detect-drift.sh
+          if ./scripts/detect-drift.sh \
+            "${{ matrix.workspace }}" \
+            "./synapse-workspace-dev/TemplateForWorkspace.json" \
+            2>&1 | tee drift-output.txt; then
+            echo "drifted=false" >> $GITHUB_OUTPUT
+          else
+            echo "drifted=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue on drift
+        if: steps.drift.outputs.drifted == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('drift-output.txt', 'utf8');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Drift detected in ${{ matrix.environment }} (${{ matrix.workspace }})`,
+              body: `## Drift Detection Alert :warning:\n\n` +
+                    `**Environment**: ${{ matrix.environment }}\n` +
+                    `**Workspace**: ${{ matrix.workspace }}\n` +
+                    `**Detected**: ${new Date().toISOString()}\n\n` +
+                    `\`\`\`\n${output}\n\`\`\`\n\n` +
+                    `Someone made manual changes outside the CI/CD pipeline.\n` +
+                    `Review and either revert or incorporate into the collaboration branch.`,
+              labels: ['drift', 'synapse', '${{ matrix.environment }}'],
+            });

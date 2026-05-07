@@ -1,0 +1,23 @@
+{
+    "Microsoft.Synapse/workspaces/linkedServices": {
+        "*": {
+            "properties": {
+                "typeProperties": {
+                    "connectionString": "|:-connectionString:secureString",
+                    "accountName": "=",
+                    "baseUrl": "|:baseUrl:secureString"
+                }
+            }
+        }
+    },
+    "Microsoft.Synapse/workspaces/notebooks": {
+        "properties": {
+            "bigDataPool": { "referenceName": "=" }
+        }
+    },
+    "Microsoft.Synapse/workspaces/pipelines": {
+        "properties": {
+            "parameters": { "*": { "*": "=" } }
+        }
+    }
+}

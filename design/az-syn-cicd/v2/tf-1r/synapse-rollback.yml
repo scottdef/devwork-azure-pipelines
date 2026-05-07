@@ -1,0 +1,134 @@
+###############################################################################
+# synapse-rollback.yml — Roll back a Synapse environment to a tagged version
+#
+# Manual dispatch only.  Select the target environment and a git tag.
+# The workflow checks out the tagged version, stops triggers, deploys the
+# old templates, and restarts triggers.
+###############################################################################
+name: "Synapse Rollback"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - production
+      target_version:
+        description: "Git tag to roll back to (e.g. synapse-v20260101.120000)"
+        required: true
+        type: string
+      confirm:
+        description: "Type ROLLBACK to confirm"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # ── Gate ──────────────────────────────────────────────────────────────────
+  validate-input:
+    name: "Validate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'ROLLBACK'
+        run: |
+          echo "::error::You must type ROLLBACK to confirm. Aborting."
+          exit 1
+
+      - name: Verify tag exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git ls-remote --tags origin "refs/tags/${{ inputs.target_version }}" | grep -q . || \
+            { echo "::error::Tag ${{ inputs.target_version }} not found"; exit 1; }
+
+  # ── Rollback ──────────────────────────────────────────────────────────────
+  rollback:
+    name: "Rollback → ${{ inputs.target_environment }}"
+    needs: validate-input
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    steps:
+      - name: Checkout tagged version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_version }}
+
+      - name: Resolve credentials
+        id: creds
+        run: |
+          case "${{ inputs.target_environment }}" in
+            dev)
+              echo "workspace=synapse-workspace-dev" >> $GITHUB_OUTPUT
+              echo "rg=rg-synapse-dev" >> $GITHUB_OUTPUT
+              echo "spn_id_key=SYNAPSE_DEV_SPN_ID" >> $GITHUB_OUTPUT
+              echo "spn_secret_key=SYNAPSE_DEV_SPN_SECRET" >> $GITHUB_OUTPUT
+              echo "params=./parameters/dev.parameters.yaml" >> $GITHUB_OUTPUT
+              ;;
+            test)
+              echo "workspace=synapse-workspace-test" >> $GITHUB_OUTPUT
+              echo "rg=rg-synapse-test" >> $GITHUB_OUTPUT
+              echo "spn_id_key=SYNAPSE_TEST_SPN_ID" >> $GITHUB_OUTPUT
+              echo "spn_secret_key=SYNAPSE_TEST_SPN_SECRET" >> $GITHUB_OUTPUT
+              echo "params=./parameters/test.parameters.yaml" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "workspace=synapse-workspace-prod" >> $GITHUB_OUTPUT
+              echo "rg=rg-synapse-prod" >> $GITHUB_OUTPUT
+              echo "spn_id_key=SYNAPSE_PROD_SPN_ID" >> $GITHUB_OUTPUT
+              echo "spn_secret_key=SYNAPSE_PROD_SPN_SECRET" >> $GITHUB_OUTPUT
+              echo "params=./parameters/prod.parameters.yaml" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets[steps.creds.outputs.spn_id_key] }}",
+              "clientSecret": "${{ secrets[steps.creds.outputs.spn_secret_key] }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop "${{ steps.creds.outputs.workspace }}"
+
+      - name: Deploy tagged version
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ steps.creds.outputs.workspace }}
+          TemplateFile: "./synapse-workspace-dev/TemplateForWorkspace.json"
+          ParametersFile: "./synapse-workspace-dev/TemplateParametersForWorkspace.json"
+          OverrideArmParameters: ${{ steps.creds.outputs.params }}
+          environment: "Azure Public"
+          resourceGroup: ${{ steps.creds.outputs.rg }}
+          clientId: ${{ secrets[steps.creds.outputs.spn_id_key] }}
+          clientSecret: ${{ secrets[steps.creds.outputs.spn_secret_key] }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "deploy"
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start "${{ steps.creds.outputs.workspace }}"
+
+      - name: Rollback summary
+        run: |
+          echo "## Rollback Complete :rewind:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ inputs.target_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.target_environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: ${{ steps.creds.outputs.workspace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

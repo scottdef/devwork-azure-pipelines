@@ -1,0 +1,5 @@
+# parameters/test.parameters.yaml
+# Synapse ARM template parameter overrides for TEST
+workspaceName: synapse-workspace-test
+LS_AzureKeyVault_properties_typeProperties_baseUrl: https://kv-synapse-test.vault.azure.net/
+WorkspaceDefaultStorage_properties_typeProperties_url: https://testdatalake.dfs.core.windows.net

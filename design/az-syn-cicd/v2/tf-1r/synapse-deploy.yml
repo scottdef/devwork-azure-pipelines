@@ -1,0 +1,295 @@
+###############################################################################
+# synapse-deploy.yml — Deploy Synapse artifacts: dev → test → prod
+#
+# Two trigger modes:
+#   1. Push to workspace_publish branch (traditional: someone clicked Publish
+#      in Synapse Studio)
+#   2. Push to main with synapse artifact paths (modern: validateDeploy
+#      bypasses manual publish)
+#
+# Architecture:
+#   - Dev deploys automatically (it's the Git-connected workspace)
+#   - Test requires environment approval gate
+#   - Prod requires environment approval gate + tags the release
+#
+# Critical safety measure: triggers are stopped before deployment and
+# restarted after.  Deploying with active triggers causes
+# TriggerEnabledCannotUpdate failures.
+###############################################################################
+name: "Synapse Deploy"
+
+on:
+  # Traditional: publish branch updated via Synapse Studio "Publish"
+  push:
+    branches: [workspace_publish]
+
+  # Modern: artifact changes merged to main, bypasses manual publish
+  workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: "Deploy from collaboration branch (validateDeploy) or publish branch (deploy)"
+        type: choice
+        options:
+          - validateDeploy
+          - deploy
+        default: validateDeploy
+      skip_dev:
+        description: "Skip dev deployment"
+        type: boolean
+        default: false
+
+env:
+  # These are only used when deploying from workspace_publish
+  TEMPLATE_FILE: "./synapse-workspace-dev/TemplateForWorkspace.json"
+  PARAMS_FILE: "./synapse-workspace-dev/TemplateParametersForWorkspace.json"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DETERMINE DEPLOYMENT MODE
+  # ═══════════════════════════════════════════════════════════════════════════
+  setup:
+    name: "Setup"
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_mode: ${{ steps.mode.outputs.mode }}
+      source_branch: ${{ steps.mode.outputs.branch }}
+    steps:
+      - name: Determine mode
+        id: mode
+        run: |
+          if [ "${{ github.ref_name }}" = "workspace_publish" ]; then
+            echo "mode=deploy" >> $GITHUB_OUTPUT
+            echo "branch=workspace_publish" >> $GITHUB_OUTPUT
+          else
+            echo "mode=${{ inputs.deploy_mode || 'validateDeploy' }}" >> $GITHUB_OUTPUT
+            echo "branch=main" >> $GITHUB_OUTPUT
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VALIDATE TEMPLATES
+  # ═══════════════════════════════════════════════════════════════════════════
+  validate:
+    name: "Validate"
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.source_branch }}
+
+      - name: Verify templates (publish branch)
+        if: needs.setup.outputs.deploy_mode == 'deploy'
+        run: |
+          test -f "${{ env.TEMPLATE_FILE }}" || \
+            { echo "::error::Missing TemplateForWorkspace.json"; exit 1; }
+          test -f "${{ env.PARAMS_FILE }}" || \
+            { echo "::error::Missing TemplateParametersForWorkspace.json"; exit 1; }
+          echo "Templates validated"
+
+      - name: Upload workspace artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: synapse-artifacts
+          path: |
+            ${{ env.TEMPLATE_FILE }}
+            ${{ env.PARAMS_FILE }}
+            parameters/
+            scripts/
+            pipeline/
+            dataset/
+            linkedService/
+            notebook/
+            trigger/
+            dataflow/
+            sqlscript/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOY TO DEV (validateDeploy mode only — dev is Git-connected)
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-dev:
+    name: "Deploy → Dev"
+    needs: [setup, validate]
+    if: >-
+      needs.setup.outputs.deploy_mode == 'validateDeploy' &&
+      inputs.skip_dev != true
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: synapse-artifacts
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_DEV_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_DEV_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop "synapse-workspace-dev"
+
+      - name: Deploy (validateDeploy)
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: "synapse-workspace-dev"
+          ArtifactsFolder: "${{ github.workspace }}"
+          OverrideArmParameters: "./parameters/dev.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: "rg-synapse-dev"
+          clientId: ${{ secrets.SYNAPSE_DEV_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_DEV_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "validateDeploy"
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start "synapse-workspace-dev"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOY TO TEST
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-test:
+    name: "Deploy → Test"
+    needs: [setup, validate, deploy-dev]
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      (needs.deploy-dev.result == 'success' || needs.deploy-dev.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: test  # ← approval gate
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: synapse-artifacts
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_TEST_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_TEST_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop "synapse-workspace-test"
+
+      - name: Deploy to test
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: "synapse-workspace-test"
+          TemplateFile: ${{ needs.setup.outputs.deploy_mode == 'deploy' && env.TEMPLATE_FILE || '' }}
+          ParametersFile: ${{ needs.setup.outputs.deploy_mode == 'deploy' && env.PARAMS_FILE || '' }}
+          ArtifactsFolder: ${{ needs.setup.outputs.deploy_mode == 'validateDeploy' && github.workspace || '' }}
+          OverrideArmParameters: "./parameters/test.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: "rg-synapse-test"
+          clientId: ${{ secrets.SYNAPSE_TEST_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_TEST_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: ${{ needs.setup.outputs.deploy_mode }}
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start "synapse-workspace-test"
+
+      - name: Deploy summary
+        run: |
+          echo "## Synapse Deploy → Test :test_tube:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ needs.setup.outputs.deploy_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: synapse-workspace-test" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DEPLOY TO PROD
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-prod:
+    name: "Deploy → Prod"
+    needs: [setup, validate, deploy-test]
+    if: >-
+      always() &&
+      needs.validate.result == 'success' &&
+      needs.deploy-test.result == 'success'
+    runs-on: ubuntu-latest
+    environment: production  # ← approval gate
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: synapse-artifacts
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_PROD_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_PROD_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop "synapse-workspace-prod"
+
+      - name: Deploy to prod
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: "synapse-workspace-prod"
+          TemplateFile: ${{ needs.setup.outputs.deploy_mode == 'deploy' && env.TEMPLATE_FILE || '' }}
+          ParametersFile: ${{ needs.setup.outputs.deploy_mode == 'deploy' && env.PARAMS_FILE || '' }}
+          ArtifactsFolder: ${{ needs.setup.outputs.deploy_mode == 'validateDeploy' && github.workspace || '' }}
+          OverrideArmParameters: "./parameters/prod.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: "rg-synapse-prod"
+          clientId: ${{ secrets.SYNAPSE_PROD_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_PROD_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: ${{ needs.setup.outputs.deploy_mode }}
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start "synapse-workspace-prod"
+
+      - name: Tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="synapse-v$(date +'%Y%m%d.%H%M%S')"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Synapse production release ${VERSION}"
+          git push origin "$VERSION"
+          echo "::notice::Production deployment tagged as ${VERSION}"
+
+      - name: Deploy summary
+        run: |
+          echo "## Synapse Deploy → Prod :shield:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ needs.setup.outputs.deploy_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace**: synapse-workspace-prod" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
