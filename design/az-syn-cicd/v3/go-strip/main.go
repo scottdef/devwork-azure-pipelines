@@ -33,7 +33,7 @@ func stripLinkedServices(template map[string]any) (map[string]any, []string) {
 		return template, nil
 	}
 
-	var kept []any
+	kept := make([]any, 0)
 	var removedNames []string
 
 	for _, res := range resources {
@@ -85,9 +85,9 @@ func extractLinkedServiceName(resource map[string]any) string {
 		}
 	}
 
-	// Try to extract from "workspace/name" format
-	if parts := strings.SplitN(name, "/", 2); len(parts) == 2 {
-		return parts[1]
+	// Try to extract from "workspace/name" or "workspace/sub/name" format
+	if idx := strings.LastIndex(name, "/"); idx >= 0 {
+		return name[idx+1:]
 	}
 
 	return name
