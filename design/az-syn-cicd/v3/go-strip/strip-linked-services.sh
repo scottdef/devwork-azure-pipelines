@@ -23,12 +23,22 @@ BEFORE=$(jq '.resources | length' "$TEMPLATE")
 LS_COUNT=$(jq '[.resources[] | select(.type | endswith("/linkedServices"))] | length' "$TEMPLATE")
 
 # ── Extract linked service names (for parameter cleanup) ──
+# The name field can appear in several formats:
+#   "[concat(parameters('workspaceName'), '/LS_Name')]"  ← standard
+#   "workspace/LS_Name"                                   ← simplified
+#   "LS_Name"                                             ← bare name
+# We try the concat regex first, then split on /, then use the raw name.
 LS_NAMES=$(jq -r '
   .resources[]
   | select(.type | endswith("/linkedServices"))
   | .name
-  | capture("'"'"'/(?<n>[^'"'"']+)'"'"'") // {n: .}
-  | .n
+  | if test("'"'"'/[^'"'"']+'"'"'") then
+      capture("'"'"'/(?<n>[^'"'"']+)'"'"'").n
+    elif contains("/") then
+      split("/") | last
+    else
+      .
+    end
 ' "$TEMPLATE")
 
 # ── Strip from template ──
