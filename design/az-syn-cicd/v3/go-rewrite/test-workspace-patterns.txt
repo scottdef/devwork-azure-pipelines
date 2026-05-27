@@ -1,0 +1,45 @@
+# test-workspace-patterns.txt
+# Maps dev workspace naming patterns to test workspace equivalents.
+#
+# Format: match=replace (first = is the delimiter)
+# Lines starting with # are comments.  Empty lines are ignored.
+#
+# Order matters: patterns are applied sequentially from top to bottom.
+# Place longer, more specific patterns before shorter, broader ones
+# to avoid partial matches corrupting longer names.
+# 
+# Example: "dev-sql-server01" should be listed before "dev" to prevent
+# the shorter pattern from rewriting it to "tst-sql-server01" before
+# the specific pattern can match.
+
+# ── Workspace name ──────────────────────────────────────────────────────
+synapse-workspace-dev=synapse-workspace-test
+
+# ── Resource group ──────────────────────────────────────────────────────
+rg-synapse-dev=rg-synapse-test
+
+# ── Linked services (specific names first, then generic patterns) ──────
+link-svc-dev-db-sql01=link-svc-tst-db-sql01
+link-svc-dev-db-sql02=link-svc-tst-db-sql02
+link-svc-dev-kv=link-svc-tst-kv
+link-svc-dev-blob=link-svc-tst-blob
+link-svc-dev-adls=link-svc-tst-adls
+link-svc-dev-cosmosdb=link-svc-tst-cosmosdb
+
+# ── Storage accounts ───────────────────────────────────────────────────
+devdatalake=testdatalake
+devrawstorage=testrawstorage
+
+# ── Key Vaults ─────────────────────────────────────────────────────────
+kv-synapse-dev=kv-synapse-test
+
+# ── Server names ───────────────────────────────────────────────────────
+dev-sql-server01.database.windows.net=test-sql-server01.database.windows.net
+dev-sql-server02.database.windows.net=test-sql-server02.database.windows.net
+
+# ── Databases ──────────────────────────────────────────────────────────
+dev-analytics-db=test-analytics-db
+dev-staging-db=test-staging-db
+
+# ── Integration runtime (if named per-environment) ─────────────────────
+# ir-dev-selfhosted=ir-test-selfhosted

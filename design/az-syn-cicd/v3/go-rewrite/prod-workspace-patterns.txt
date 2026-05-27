@@ -1,0 +1,37 @@
+# prod-workspace-patterns.txt
+# Maps dev workspace naming patterns to prod workspace equivalents.
+#
+# Same format as test-workspace-patterns.txt.
+# Place longer patterns before shorter ones.
+
+# ── Workspace name ──────────────────────────────────────────────────────
+synapse-workspace-dev=synapse-workspace-prod
+
+# ── Resource group ──────────────────────────────────────────────────────
+rg-synapse-dev=rg-synapse-prod
+
+# ── Linked services ────────────────────────────────────────────────────
+link-svc-dev-db-sql01=link-svc-prd-db-sql01
+link-svc-dev-db-sql02=link-svc-prd-db-sql02
+link-svc-dev-kv=link-svc-prd-kv
+link-svc-dev-blob=link-svc-prd-blob
+link-svc-dev-adls=link-svc-prd-adls
+link-svc-dev-cosmosdb=link-svc-prd-cosmosdb
+
+# ── Storage accounts ───────────────────────────────────────────────────
+devdatalake=proddatalake
+devrawstorage=prodrawstorage
+
+# ── Key Vaults ─────────────────────────────────────────────────────────
+kv-synapse-dev=kv-synapse-prod
+
+# ── Server names ───────────────────────────────────────────────────────
+dev-sql-server01.database.windows.net=prod-sql-server01.database.windows.net
+dev-sql-server02.database.windows.net=prod-sql-server02.database.windows.net
+
+# ── Databases ──────────────────────────────────────────────────────────
+dev-analytics-db=prod-analytics-db
+dev-staging-db=prod-staging-db
+
+# ── Integration runtime ───────────────────────────────────────────────
+# ir-dev-selfhosted=ir-prod-selfhosted

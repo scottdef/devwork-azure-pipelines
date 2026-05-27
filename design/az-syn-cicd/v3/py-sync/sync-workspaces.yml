@@ -1,0 +1,165 @@
+###############################################################################
+# sync-workspaces.yml — Synchronize linked services across Synapse workspaces
+#
+# Ensures all workspaces contain homogeneous artifact names before deployment.
+# Any linked service that exists in one workspace but not another is created
+# as an identical copy in the missing workspace.  This makes ARM templates
+# portable across environments without name remapping.
+#
+# Two modes:
+#   - compare:  dry run, exits non-zero if drift exists (for PR checks)
+#   - sync:     creates missing artifacts in target workspaces
+#
+# Can run standalone, or as a pre-deployment step called from synapse-deploy.yml.
+###############################################################################
+name: "Sync Workspace Artifacts"
+
+on:
+  # Called by other workflows (synapse-deploy.yml) before deployment
+  workflow_call:
+    inputs:
+      source_workspace:
+        description: "Source workspace name"
+        required: true
+        type: string
+      target_workspace:
+        description: "Target workspace name"
+        required: true
+        type: string
+      artifact_types:
+        description: "Space-separated list of artifact types to sync"
+        required: false
+        type: string
+        default: "linked-service"
+      mode:
+        description: "compare (dry run) or sync (create missing)"
+        required: false
+        type: string
+        default: "sync"
+    secrets:
+      SYNAPSE_SPN_ID:
+        required: true
+      SYNAPSE_SPN_SECRET:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+
+  # Manual trigger for ad-hoc synchronization
+  workflow_dispatch:
+    inputs:
+      source_workspace:
+        description: "Source workspace"
+        required: true
+        type: string
+        default: "synapse-workspace-dev"
+      target_workspaces:
+        description: "Target workspace(s), space-separated"
+        required: true
+        type: string
+        default: "synapse-workspace-test synapse-workspace-prod"
+      artifact_types:
+        description: "Artifact types to sync"
+        required: true
+        type: choice
+        options:
+          - linked-service
+          - "linked-service dataset"
+          - "linked-service dataset pipeline"
+          - "linked-service dataset pipeline notebook trigger"
+        default: "linked-service"
+      mode:
+        description: "compare (dry run) or sync (create missing)"
+        required: true
+        type: choice
+        options:
+          - compare
+          - sync
+        default: compare
+      direction:
+        description: "Sync direction"
+        required: false
+        type: choice
+        options:
+          - source-to-target
+          - both
+        default: source-to-target
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: "Sync artifacts"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # ── Resolve inputs (workflow_call vs workflow_dispatch) ──
+      - name: Resolve parameters
+        id: params
+        run: |
+          # Source
+          SOURCE="${{ inputs.source_workspace }}"
+          echo "source=${SOURCE}" >> $GITHUB_OUTPUT
+
+          # Targets: workflow_call passes a single target, dispatch can pass many
+          if [ -n "${{ inputs.target_workspace }}" ]; then
+            TARGETS="${{ inputs.target_workspace }}"
+          else
+            TARGETS="${{ inputs.target_workspaces }}"
+          fi
+          echo "targets=${TARGETS}" >> $GITHUB_OUTPUT
+
+          # Artifact types
+          TYPES="${{ inputs.artifact_types || 'linked-service' }}"
+          echo "types=${TYPES}" >> $GITHUB_OUTPUT
+
+          # Mode
+          MODE="${{ inputs.mode || 'sync' }}"
+          echo "mode=${MODE}" >> $GITHUB_OUTPUT
+
+          # Direction
+          DIRECTION="${{ inputs.direction || 'source-to-target' }}"
+          echo "direction=${DIRECTION}" >> $GITHUB_OUTPUT
+
+      - name: Run sync
+        id: sync
+        run: |
+          FLAGS=""
+          if [ "${{ steps.params.outputs.mode }}" = "compare" ]; then
+            FLAGS="--compare"
+          fi
+
+          python scripts/sync-workspace-artifacts.py \
+            --source "${{ steps.params.outputs.source }}" \
+            --targets ${{ steps.params.outputs.targets }} \
+            --artifact-types ${{ steps.params.outputs.types }} \
+            --direction "${{ steps.params.outputs.direction }}" \
+            $FLAGS
+        continue-on-error: true
+
+      - name: Check result
+        run: |
+          if [ "${{ steps.sync.outcome }}" = "failure" ]; then
+            echo "::warning::Sync completed with errors — check the report above"
+            exit 1
+          fi
