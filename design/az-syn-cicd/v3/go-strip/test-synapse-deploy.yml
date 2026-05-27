@@ -1,0 +1,158 @@
+###############################################################################
+# synapse-deploy.yml — Three-phase deployment for synapse-repo-test
+#
+# Receives dispatch from synapse-repo-dev with a source tag.
+# Checks out the dev repo at that tag, then runs the same three phases:
+#   Phase 1: validate — regenerate ARM templates from the tagged artifacts
+#   Phase 2: strip   — remove linked services
+#   Phase 3: deploy  — deploy stripped templates with test parameter overrides
+###############################################################################
+name: "Synapse Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Release tag from synapse-repo-dev"
+        required: true
+        type: string
+      promote_to_prod:
+        description: "Trigger prod deployment after test"
+        type: boolean
+        default: true
+
+env:
+  WORKSPACE: "synapse-workspace-test"
+  RESOURCE_GROUP: "rg-synapse-test"
+  DEV_REPO: "synapse-repo-dev"
+  ORG: ${{ github.repository_owner }}
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  deploy-test:
+    name: "Validate → Strip → Deploy (test)"
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      # ── Checkout both repos ──
+      - name: Checkout test repo
+        uses: actions/checkout@v4
+        with:
+          path: test-repo
+
+      - name: Checkout dev repo at ${{ inputs.source_tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: "${{ env.ORG }}/${{ env.DEV_REPO }}"
+          ref: ${{ inputs.source_tag }}
+          token: ${{ secrets.GH_APP_TOKEN }}
+          path: dev-repo
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: false
+
+      - name: Build strip tool
+        run: |
+          cd test-repo/tools/strip-linked-services
+          go build -o "$GITHUB_WORKSPACE/strip-linked-services" .
+
+      # ════════════════════════════════════════════════════════════════════
+      # PHASE 1: Validate — generate ARM templates from dev artifacts
+      # ════════════════════════════════════════════════════════════════════
+      - name: "Phase 1: Validate (generate ARM templates)"
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: "dev-repo"
+          operation: "validate"
+
+      - name: Verify generated templates
+        run: |
+          test -f "dev-repo/ExportedArtifacts/TemplateForWorkspace.json" || \
+            { echo "::error::Template not generated"; exit 1; }
+
+          RESOURCE_COUNT=$(jq '.resources | length' dev-repo/ExportedArtifacts/TemplateForWorkspace.json)
+          LS_COUNT=$(jq '[.resources[] | select(.type | endswith("/linkedServices"))] | length' \
+            dev-repo/ExportedArtifacts/TemplateForWorkspace.json)
+          echo "Generated template: ${RESOURCE_COUNT} resources, ${LS_COUNT} linked services"
+
+      # ════════════════════════════════════════════════════════════════════
+      # PHASE 2: Strip — remove linked services
+      # ════════════════════════════════════════════════════════════════════
+      - name: "Phase 2: Strip linked services"
+        run: |
+          ./strip-linked-services \
+            -template "dev-repo/ExportedArtifacts/TemplateForWorkspace.json" \
+            -params   "dev-repo/ExportedArtifacts/TemplateParametersForWorkspace.json"
+
+      # ════════════════════════════════════════════════════════════════════
+      # PHASE 3: Deploy — stripped templates with test parameters
+      # ════════════════════════════════════════════════════════════════════
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x test-repo/scripts/toggle-triggers.sh
+          ./test-repo/scripts/toggle-triggers.sh stop "${{ env.WORKSPACE }}"
+
+      - name: "Phase 3: Deploy (stripped templates)"
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: "dev-repo/ExportedArtifacts/TemplateForWorkspace.json"
+          ParametersFile: "dev-repo/ExportedArtifacts/TemplateParametersForWorkspace.json"
+          OverrideArmParameters: "./test-repo/parameters/test.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "deploy"
+
+      - name: Start triggers
+        if: always()
+        run: ./test-repo/scripts/toggle-triggers.sh start "${{ env.WORKSPACE }}"
+
+      - name: Summary
+        run: |
+          echo "## Deploy → Test :test_tube:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source tag**: \`${{ inputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategy**: validate → strip linked services → deploy" >> $GITHUB_STEP_SUMMARY
+
+  promote-to-prod:
+    name: "Promote → prod"
+    needs: deploy-test
+    if: inputs.promote_to_prod != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger prod deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: '${{ env.ORG }}',
+              repo: 'synapse-repo-prod',
+              workflow_id: 'synapse-deploy.yml',
+              ref: 'main',
+              inputs: {
+                source_tag: '${{ inputs.source_tag }}',
+              },
+            });

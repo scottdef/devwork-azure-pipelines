@@ -1,0 +1,125 @@
+###############################################################################
+# synapse-deploy.yml — Three-phase deployment for synapse-repo-prod
+#
+# End of the promotion chain.  Same three phases, prod parameters, prod tag.
+###############################################################################
+name: "Synapse Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Release tag from synapse-repo-dev"
+        required: true
+        type: string
+
+env:
+  WORKSPACE: "synapse-workspace-prod"
+  RESOURCE_GROUP: "rg-synapse-prod"
+  DEV_REPO: "synapse-repo-dev"
+  ORG: ${{ github.repository_owner }}
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  deploy-prod:
+    name: "Validate → Strip → Deploy (prod)"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout prod repo
+        uses: actions/checkout@v4
+        with:
+          path: prod-repo
+          fetch-depth: 0
+
+      - name: Checkout dev repo at ${{ inputs.source_tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: "${{ env.ORG }}/${{ env.DEV_REPO }}"
+          ref: ${{ inputs.source_tag }}
+          token: ${{ secrets.GH_APP_TOKEN }}
+          path: dev-repo
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: false
+
+      - name: Build strip tool
+        run: |
+          cd prod-repo/tools/strip-linked-services
+          go build -o "$GITHUB_WORKSPACE/strip-linked-services" .
+
+      # ── Phase 1: Validate ──
+      - name: "Phase 1: Validate (generate ARM templates)"
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: "dev-repo"
+          operation: "validate"
+
+      # ── Phase 2: Strip ──
+      - name: "Phase 2: Strip linked services"
+        run: |
+          ./strip-linked-services \
+            -template "dev-repo/ExportedArtifacts/TemplateForWorkspace.json" \
+            -params   "dev-repo/ExportedArtifacts/TemplateParametersForWorkspace.json"
+
+      # ── Phase 3: Deploy ──
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.SYNAPSE_SPN_ID }}",
+              "clientSecret": "${{ secrets.SYNAPSE_SPN_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Stop triggers
+        run: |
+          chmod +x prod-repo/scripts/toggle-triggers.sh
+          ./prod-repo/scripts/toggle-triggers.sh stop "${{ env.WORKSPACE }}"
+
+      - name: "Phase 3: Deploy (stripped templates)"
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: "dev-repo/ExportedArtifacts/TemplateForWorkspace.json"
+          ParametersFile: "dev-repo/ExportedArtifacts/TemplateParametersForWorkspace.json"
+          OverrideArmParameters: "./prod-repo/parameters/prod.parameters.yaml"
+          environment: "Azure Public"
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: "deploy"
+
+      - name: Start triggers
+        if: always()
+        run: ./prod-repo/scripts/toggle-triggers.sh start "${{ env.WORKSPACE }}"
+
+      - name: Tag production release
+        working-directory: prod-repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PROD_TAG="prod-${{ inputs.source_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$PROD_TAG" -m "Production release from ${{ inputs.source_tag }} — linked services excluded"
+          git push origin "$PROD_TAG"
+
+      - name: Summary
+        run: |
+          echo "## Deploy → Prod :shield:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source tag**: \`${{ inputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prod tag**: \`prod-${{ inputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategy**: validate → strip linked services → deploy" >> $GITHUB_STEP_SUMMARY
