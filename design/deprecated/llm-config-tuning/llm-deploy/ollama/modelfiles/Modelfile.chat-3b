@@ -1,0 +1,33 @@
+# ──────────────────────────────────────────────────────────────────────
+#  Modelfile.chat-3b — General-purpose chat assistant
+#  VRAM: ~2.4 GB (fits entirely on Quadro P1000 with room for KV cache)
+#  Build: ollama create p1000-chat -f Modelfile.chat-3b
+# ──────────────────────────────────────────────────────────────────────
+
+FROM qwen2.5:3b
+
+# ── GPU / memory ─────────────────────────────────────────────────────
+PARAMETER num_gpu       99          # all layers on GPU (-1 also works)
+PARAMETER num_ctx       4096        # context window (KV cache ~200 MB at q8_0)
+PARAMETER num_predict   2048        # max tokens to generate per response
+
+# ── CPU threads (used for any layer spill + tokenizer) ───────────────
+PARAMETER num_thread    10          # = physical cores of i9-10900
+
+# ── Sampling ─────────────────────────────────────────────────────────
+PARAMETER temperature   0.7
+PARAMETER top_p         0.9
+PARAMETER top_k         40
+PARAMETER repeat_penalty 1.1
+PARAMETER repeat_last_n 64
+
+# ── Stop tokens ──────────────────────────────────────────────────────
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+# ── System prompt ────────────────────────────────────────────────────
+SYSTEM """You are a helpful, concise assistant running locally on a
+workstation. You answer questions accurately, cite uncertainty when
+unsure, and prefer short, actionable responses. Format code blocks
+with language tags. Current date context: the user is working in 2026
+on Ubuntu 20.04 with limited GPU resources."""

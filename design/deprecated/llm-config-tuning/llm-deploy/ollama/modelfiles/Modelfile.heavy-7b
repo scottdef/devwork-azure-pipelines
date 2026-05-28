@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────────────────────────
+#  Modelfile.heavy-7b — 7B model with partial GPU offload
+#  VRAM: ~3.2 GB (16 of 33 layers on GPU, rest on CPU)
+#  RAM:  ~3.5 GB additional system memory for CPU layers
+#  Speed: ~6-8 tok/s (hybrid) vs ~4-6 tok/s (CPU-only)
+#  Build: ollama create p1000-heavy -f Modelfile.heavy-7b
+#
+#  Use this for tasks that need 7B quality: complex reasoning, long-form
+#  writing, nuanced code review.  Too slow for interactive agent loops.
+# ──────────────────────────────────────────────────────────────────────
+
+FROM qwen2.5:7b
+
+# ── GPU / memory — partial offload ───────────────────────────────────
+#
+#  qwen2.5:7b Q4_K_M has 33 transformer layers.
+#  At ~110 MB/layer on GPU, 16 layers ≈ 1.76 GB model weight
+#  plus ~800 MB KV cache at q8_0 with 4096 context
+#  Total VRAM ≈ 2.6-3.0 GB — fits in 3.5 GB usable.
+#
+#  Tuning guide:
+#    num_gpu  VRAM     tok/s   notes
+#    0        0        ~4-6    pure CPU (DDR4-2933 bandwidth-bound)
+#    10       ~1.5 GB  ~5-7    light GPU assist
+#    16       ~2.6 GB  ~6-8    sweet spot for 4 GB card ← DEFAULT
+#    20       ~3.2 GB  ~7-9    aggressive — may OOM at long contexts
+#    33       ~4.5 GB  OOM     does NOT fit on P1000
+#
+PARAMETER num_gpu       16
+PARAMETER num_ctx       4096        # keep tight — KV scales with context
+PARAMETER num_predict   2048
+
+# ── CPU threads (handles the remaining 17 layers) ────────────────────
+PARAMETER num_thread    10
+
+# ── Sampling ─────────────────────────────────────────────────────────
+PARAMETER temperature   0.5
+PARAMETER top_p         0.9
+PARAMETER top_k         40
+PARAMETER repeat_penalty 1.1
+
+# ── Stop tokens ──────────────────────────────────────────────────────
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+# ── System prompt ────────────────────────────────────────────────────
+SYSTEM """You are an expert assistant with strong reasoning capabilities.
+You are running on constrained hardware (partial GPU offload, ~7 tok/s),
+so the user values quality over speed. Be thorough, cite uncertainty,
+and structure long answers with clear headings."""

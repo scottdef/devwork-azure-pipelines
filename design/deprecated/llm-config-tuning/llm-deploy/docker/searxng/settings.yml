@@ -1,0 +1,103 @@
+# ──────────────────────────────────────────────────────────────────────
+#  SearXNG settings.yml — local instance for LLM agent web search
+#  Mount at: /etc/searxng/settings.yml
+#
+#  CRITICAL: search.formats MUST include "json" or all programmatic
+#  queries (Open WebUI, LangChain, agent scripts) get 403 Forbidden.
+# ──────────────────────────────────────────────────────────────────────
+
+use_default_settings: true
+
+general:
+  instance_name: "P340 Local Search"
+  debug: false
+  privacypolicy_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json            # ← REQUIRED for API / agent access
+
+server:
+  secret_key: "replace-with-SEARXNG_SECRET-env-var"
+  limiter: false      # false for local-only use; true if exposed publicly
+  public_instance: false
+  image_proxy: true
+  method: "GET"       # GET is simpler for curl / httpx / agent clients
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  results_on_new_tab: false
+  infinite_scroll: false
+
+# ── Engine configuration ──────────────────────────────────────────────
+# Enable the engines that are most reliable and least rate-limited.
+# Brave and DuckDuckGo rate-limit quickly under automated queries;
+# Google via searxng's scraper is the most robust for volume.
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: false
+
+  - name: github
+    engine: github
+    shortcut: gh
+    disabled: false
+    categories: [it]
+
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    disabled: false
+    categories: [science]
+
+  - name: stackoverflow
+    engine: stackoverflow
+    shortcut: so
+    disabled: false
+    categories: [it]
+
+  # Brave — good but rate-limits under heavy agent use
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: false
+
+  # Disable noisy or slow engines to keep agent latency <3s
+  - name: bing
+    engine: bing
+    disabled: true
+
+  - name: yahoo
+    engine: yahoo
+    disabled: true
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20

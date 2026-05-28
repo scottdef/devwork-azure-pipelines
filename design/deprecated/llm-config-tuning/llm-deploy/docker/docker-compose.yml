@@ -1,0 +1,136 @@
+# ──────────────────────────────────────────────────────────────────────
+#  docker-compose.yml — Ollama + Open WebUI + SearXNG
+#  Hardware: Quadro P1000 4 GB · i9-10900 · 32 GB RAM
+#
+#  Usage:
+#    docker compose up -d
+#    docker compose logs -f
+#    docker compose down
+#
+#  Prerequisites:
+#    - Docker CE + Docker Compose V2
+#    - NVIDIA Container Toolkit (nvidia-ctk)
+#    - nvidia-smi returns clean output
+# ──────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Ollama inference server ──────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # ── VRAM management (4 GB Quadro P1000) ──
+      - OLLAMA_FLASH_ATTENTION=1          # enable flash attention kernels
+      - OLLAMA_KV_CACHE_TYPE=q8_0         # halve KV-cache memory
+      - OLLAMA_GPU_OVERHEAD=536870912     # reserve 512 MB for display server
+      # ── Scheduling ──
+      - OLLAMA_NUM_PARALLEL=1             # 1 slot = 1x KV cache (safe on 4 GB)
+      - OLLAMA_MAX_LOADED_MODELS=2        # chat + embed model simultaneously
+      - OLLAMA_KEEP_ALIVE=15m             # unload after 15 min idle
+      # ── Context ──
+      - OLLAMA_CONTEXT_LENGTH=4096        # global default; Modelfiles override
+      # ── Network ──
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_ORIGINS=*
+      # ── Multi-GPU (uncomment + set UUID if you add a second card) ──
+      # - CUDA_VISIBLE_DEVICES=GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+        limits:
+          # Cap container RAM so a runaway model doesn't take the system down
+          memory: 24G
+    # Health check — model list should always respond
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Open WebUI ───────────────────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+    environment:
+      # ── Backend connection ──
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # ── Auth ──
+      - WEBUI_AUTH=true
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:-change-me-run-openssl-rand-hex-32}
+      - DEFAULT_USER_ROLE=pending
+      - ENABLE_SIGNUP=true
+      # ── RAG / embeddings ──
+      - RAG_EMBEDDING_ENGINE=ollama
+      - RAG_EMBEDDING_MODEL=nomic-embed-text
+      - RAG_OLLAMA_BASE_URL=http://ollama:11434
+      - ENABLE_RAG_HYBRID_SEARCH=true
+      - RAG_TOP_K=5
+      - RAG_RELEVANCE_THRESHOLD=0.3
+      - CONTENT_EXTRACTION_ENGINE=tika
+      # ── Web search via SearXNG ──
+      - ENABLE_WEB_SEARCH=true
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
+      # ── Disable in-process pip installs in production ──
+      - ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
+    volumes:
+      - webui_data:/app/backend/data
+
+  # ── SearXNG metasearch engine ────────────────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SEARXNG_PORT:-8888}:8080"
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-$(openssl rand -hex 32)}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_data:/etc/searxng
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Valkey (Redis-compatible) for SearXNG rate limiting ──────────────
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: valkey
+    restart: unless-stopped
+    command: valkey-server --save 30 1 --loglevel warning
+    volumes:
+      - valkey_data:/data
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+
+volumes:
+  ollama_data:
+  webui_data:
+  searxng_data:
+  valkey_data:

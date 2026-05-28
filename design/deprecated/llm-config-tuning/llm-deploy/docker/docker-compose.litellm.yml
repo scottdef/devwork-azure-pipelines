@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────────────────────────────
+#  docker-compose.litellm.yml — LiteLLM proxy overlay
+#
+#  Usage (merged with base):
+#    docker compose -f docker-compose.yml \
+#                   -f docker-compose.litellm.yml up -d litellm
+#
+#  LiteLLM provides a single OpenAI-compatible endpoint that fans out
+#  to Ollama (local), LM Studio (local), vLLM (remote slave), etc.
+# ──────────────────────────────────────────────────────────────────────
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-local}
+      - LITELLM_SALT_KEY=${LITELLM_SALT_KEY:-salt-change-me}
+    volumes:
+      - ../agents/litellm/litellm_config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

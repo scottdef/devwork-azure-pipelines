@@ -1,0 +1,19 @@
+# ──────────────────────────────────────────────────────────────────────
+#  Modelfile.embed — nomic-embed-text (137M params, ~270 MB VRAM)
+#  This model co-resides with any chat model on the P1000.
+#  Build: (not needed — pull directly)
+#    ollama pull nomic-embed-text
+#
+#  Notes:
+#  - 768-dim embeddings, 8192-token context window
+#  - ~270 MB VRAM = fits alongside a 3B chat model (2.4 + 0.27 = 2.67 GB)
+#  - Used by Open WebUI RAG, LangChain/LlamaIndex retrievers
+#  - No Modelfile customization needed; document for reference only
+# ──────────────────────────────────────────────────────────────────────
+
+FROM nomic-embed-text
+
+# The embedding model has no tunable generation parameters.
+# It uses the full 8192-token context window by default.
+# num_gpu 99 = all layers on GPU (fits easily at 270 MB).
+PARAMETER num_gpu 99

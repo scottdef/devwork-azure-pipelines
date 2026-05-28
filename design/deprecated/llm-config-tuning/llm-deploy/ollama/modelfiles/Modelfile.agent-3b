@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────────────────────────────
+#  Modelfile.agent-3b — Tool-calling / function-calling agent
+#  VRAM: ~2.4 GB (full GPU offload)
+#  Build: ollama create p1000-agent -f Modelfile.agent-3b
+#
+#  This model is tuned for agent loops: low temperature, tight context,
+#  and a system prompt that enforces structured tool-call output.
+# ──────────────────────────────────────────────────────────────────────
+
+FROM qwen2.5:3b
+
+# ── GPU / memory ─────────────────────────────────────────────────────
+PARAMETER num_gpu       99
+PARAMETER num_ctx       4096        # agents rarely need deep history
+PARAMETER num_predict   1024        # short tool-call + brief answers
+
+# ── CPU ──────────────────────────────────────────────────────────────
+PARAMETER num_thread    10
+
+# ── Sampling — deterministic for reliable tool calls ─────────────────
+PARAMETER temperature   0.0         # greedy — most reliable for tool JSON
+PARAMETER top_k         1
+PARAMETER repeat_penalty 1.0        # no penalty — agent loops repeat patterns
+
+# ── Stop tokens ──────────────────────────────────────────────────────
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+# ── System prompt ────────────────────────────────────────────────────
+SYSTEM """You are an autonomous tool-calling agent. When you need external
+information or must perform an action, you MUST use the provided tools by
+emitting a function call. Rules:
+1. Never fabricate tool results — wait for the actual response.
+2. Use ONE tool per step; chain calls across turns.
+3. If no tool fits, answer directly from your knowledge.
+4. Keep reasoning concise — spend tokens on precision, not verbosity.
+5. When you have enough information, provide a final answer.
+6. Never invent tool names that were not provided to you."""

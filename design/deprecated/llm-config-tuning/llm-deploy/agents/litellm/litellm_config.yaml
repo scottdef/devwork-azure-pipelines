@@ -1,0 +1,116 @@
+# ──────────────────────────────────────────────────────────────────────
+#  litellm_config.yaml — unified OpenAI-compatible proxy
+#
+#  All agents hit http://localhost:4000/v1/chat/completions and use
+#  model aliases (local-fast, local-heavy, code, embed).  LiteLLM
+#  routes to the correct backend (Ollama, LM Studio, remote vLLM).
+#
+#  Hardware context:
+#    Master: Quadro P1000 4 GB, i9-10900, 32 GB RAM
+#    Slaves: uncomment remote entries when available
+# ──────────────────────────────────────────────────────────────────────
+
+model_list:
+  # ── Local Ollama backends (this P340 box) ──────────────────────────
+  - model_name: local-fast              # 3B full GPU — agent loops
+    litellm_params:
+      model: ollama/p1000-agent
+      api_base: http://localhost:11434
+      timeout: 120
+      stream: true
+      max_tokens: 1024
+      temperature: 0.0
+
+  - model_name: local-chat              # 3B full GPU — general chat
+    litellm_params:
+      model: ollama/p1000-chat
+      api_base: http://localhost:11434
+      timeout: 120
+      stream: true
+      max_tokens: 2048
+
+  - model_name: code                    # 3B coder — full GPU
+    litellm_params:
+      model: ollama/p1000-coder
+      api_base: http://localhost:11434
+      timeout: 180
+      stream: true
+      max_tokens: 4096
+      temperature: 0.1
+
+  - model_name: local-heavy             # 7B hybrid CPU/GPU — slow but smart
+    litellm_params:
+      model: ollama/p1000-heavy
+      api_base: http://localhost:11434
+      timeout: 300                      # 7B partial offload is slow
+      stream: true
+      max_tokens: 2048
+      temperature: 0.5
+
+  - model_name: embed                   # nomic-embed-text
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: http://localhost:11434
+
+  # ── Local LM Studio backend (alternative inference) ────────────────
+  - model_name: lmstudio
+    litellm_params:
+      model: openai/qwen2.5-3b-instruct
+      api_base: http://localhost:1234/v1
+      api_key: "not-needed"
+      timeout: 120
+
+  # ── Remote slaves (uncomment when available) ───────────────────────
+  # - model_name: remote-smart          # e.g. vLLM on RTX 4090 slave
+  #   litellm_params:
+  #     model: openai/qwen2.5-32b-instruct-awq
+  #     api_base: http://100.x.y.z:8000/v1  # Tailscale IP
+  #     api_key: "sk-slave-key"
+  #     timeout: 300
+  #     max_tokens: 4096
+
+  # - model_name: remote-smart          # duplicate for load balancing
+  #   litellm_params:
+  #     model: openai/qwen2.5-32b-instruct-awq
+  #     api_base: http://100.x.y.w:8000/v1
+  #     api_key: "sk-slave-key-2"
+  #     timeout: 300
+
+  # - model_name: image                 # Stable Diffusion on slave B
+  #   litellm_params:
+  #     model: openai/sdxl
+  #     api_base: http://100.x.y.v:7860
+  #     api_key: "sd-key"
+
+# ── Routing strategy ─────────────────────────────────────────────────
+router_settings:
+  routing_strategy: "simple-shuffle"    # or: least-busy, latency-based-routing
+  num_retries: 2
+  timeout: 300
+  allowed_fails: 3
+  cooldown_time: 60                     # seconds before retrying a failed backend
+  retry_after: 5
+
+  # Fallback chains: if remote-smart fails → local-heavy → local-fast
+  fallbacks:
+    - remote-smart: [local-heavy, local-fast]
+    - local-heavy: [local-fast]
+    - code: [local-fast]
+
+  # Auto-escalate if prompt exceeds the smaller model's context window
+  context_window_fallbacks:
+    - local-fast: [local-heavy]
+
+# ── General settings ─────────────────────────────────────────────────
+general_settings:
+  master_key: "sk-litellm-local"
+  database_url: null                    # set to postgres:// for key management
+  store_model_in_db: false
+
+litellm_settings:
+  drop_params: true                     # silently drop unsupported params
+  set_verbose: false
+  cache: false                          # enable redis cache for production
+  num_retries: 2
+  request_timeout: 300
+  telemetry: false

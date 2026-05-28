@@ -1,0 +1,119 @@
+{
+  "$schema": "https://lmstudio.ai/schemas/server-config.json",
+  "_comment": [
+    "LM Studio headless server config for Quadro P1000 (4 GB VRAM).",
+    "Start with: lms server start --port 1234 --cors --config ./server-config.json",
+    "Or via GUI: Settings → Local Server → Load Config"
+  ],
+
+  "server": {
+    "port": 1234,
+    "host": "127.0.0.1",
+    "cors": true,
+    "apiKeys": []
+  },
+
+  "defaults": {
+    "contextLength": 4096,
+    "maxPredictedTokens": 2048,
+
+    "gpu": {
+      "offloadLayers": -1,
+      "limitToDedicatedGpuMemory": true,
+      "flashAttention": true,
+      "kCacheQuantization": "q8_0",
+      "vCacheQuantization": "q8_0"
+    },
+
+    "cpu": {
+      "threads": 10,
+      "batchSize": 512
+    },
+
+    "sampling": {
+      "temperature": 0.7,
+      "topP": 0.9,
+      "topK": 40,
+      "repeatPenalty": 1.1,
+      "presencePenalty": 0.0,
+      "frequencyPenalty": 0.0
+    },
+
+    "concurrency": {
+      "maxConcurrentPredictions": 1,
+      "maxLoadedModels": 1,
+      "keepAliveSeconds": 900
+    }
+  },
+
+  "profiles": {
+    "agent": {
+      "_comment": "Deterministic settings for tool-calling agent loops",
+      "contextLength": 4096,
+      "maxPredictedTokens": 1024,
+      "sampling": {
+        "temperature": 0.0,
+        "topK": 1,
+        "repeatPenalty": 1.0
+      }
+    },
+    "code": {
+      "_comment": "Long context, low temperature for code generation",
+      "contextLength": 8192,
+      "maxPredictedTokens": 4096,
+      "sampling": {
+        "temperature": 0.1,
+        "topK": 20
+      }
+    },
+    "creative": {
+      "_comment": "Higher temperature for creative writing / brainstorming",
+      "contextLength": 4096,
+      "maxPredictedTokens": 2048,
+      "sampling": {
+        "temperature": 0.9,
+        "topP": 0.95,
+        "topK": 50
+      }
+    },
+    "heavy-7b-hybrid": {
+      "_comment": "7B model with partial GPU offload — set layers manually",
+      "contextLength": 4096,
+      "maxPredictedTokens": 2048,
+      "gpu": {
+        "offloadLayers": 16,
+        "limitToDedicatedGpuMemory": true,
+        "flashAttention": true,
+        "kCacheQuantization": "q8_0",
+        "vCacheQuantization": "q8_0"
+      }
+    },
+    "cpu-only": {
+      "_comment": "Force everything to CPU — for models that exceed 4 GB",
+      "gpu": {
+        "offloadLayers": 0
+      }
+    }
+  },
+
+  "modelRecommendations": {
+    "_comment": "Models verified to fit on Quadro P1000 4 GB at Q4_K_M",
+    "fullGpu": [
+      "qwen2.5-3b-instruct",
+      "qwen2.5-coder-3b-instruct",
+      "llama-3.2-3b-instruct",
+      "phi-3.5-mini-instruct",
+      "gemma-2-2b-it"
+    ],
+    "partialGpu16Layers": [
+      "qwen2.5-7b-instruct",
+      "mistral-7b-instruct-v0.3",
+      "llama-3.1-8b-instruct"
+    ],
+    "cpuOnly": [
+      "qwen2.5-14b-instruct",
+      "gemma-2-27b-it",
+      "deepseek-r1-distill-qwen-32b"
+    ]
+  }
+}
