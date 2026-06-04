@@ -1,0 +1,84 @@
+###############################################################################
+# sync-test-repo.yml — Sync test branch to synapse-repo-test
+#
+# Lives in: synapse-repo-dev
+#
+# Trigger: PR successfully merged to the 'test' branch
+# Action:  Pushes the test branch to synapse-repo-test using the GitHub App
+#          token, which bypasses branch protection rules on the target repo.
+#
+# The target repo (synapse-repo-test) receives an exact copy of the dev
+# repo's test branch — same commit history, same artifact files, same
+# parameter overrides.  The test repo's deploy workflow then fires on
+# the push event and handles deployment to the test workspace.
+###############################################################################
+name: "Sync → Test Repo"
+
+on:
+  pull_request:
+    branches: [test]
+    types: [closed]
+
+env:
+  TARGET_REPO: ${{ github.repository_owner }}/synapse-repo-test
+  TARGET_BRANCH: test
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: "Sync test branch → synapse-repo-test"
+    runs-on: ubuntu-latest
+    # Only run when the PR was actually merged (not just closed)
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Checkout dev repo (test branch)
+        uses: actions/checkout@v4
+        with:
+          ref: test
+          fetch-depth: 0  # full history for push
+
+      # ── Generate GitHub App token ──
+      # Option A: Use pre-stored token (simpler)
+      # Option B: Generate at runtime from app credentials (more secure)
+      #
+      # Option A — uncomment if using a stored PAT or long-lived token:
+      # - name: Set token
+      #   id: token
+      #   run: echo "token=${{ secrets.GH_APP_TOKEN }}" >> $GITHUB_OUTPUT
+
+      # Option B — generate short-lived installation token:
+      - name: Generate GitHub App token
+        id: token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: "synapse-repo-test"
+
+      # ── Sync ──
+      - name: Push test branch to target repo
+        id: sync
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          chmod +x scripts/sync-branch-to-repo.sh
+          ./scripts/sync-branch-to-repo.sh \
+            "test" \
+            "${{ env.TARGET_REPO }}" \
+            "$TOKEN" \
+            "${{ env.TARGET_BRANCH }}"
+
+      - name: Summary
+        run: |
+          echo "## Branch Sync → Test Repo" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | \`${{ github.repository }}:test\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | \`${{ env.TARGET_REPO }}:${{ env.TARGET_BRANCH }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ steps.sync.outputs.source_sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merged by | @${{ github.event.pull_request.merged_by.login }} |" >> $GITHUB_STEP_SUMMARY

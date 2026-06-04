@@ -1,0 +1,145 @@
+###############################################################################
+# rollback-test.yml — Roll back the test workspace to a previous release
+#
+# Lives in: synapse-repo-test
+#
+# Manual trigger only.  Any user with permission to run workflows in
+# this repository can execute the rollback.
+#
+# Steps:
+#   1. Checks out this repo at the specified release tag
+#   2. Validates the full artifact set → generates ARM template
+#   3. Strips linked services + dependsOn
+#   4. Deploys the FULL template with DeleteArtifactsNotInTemplate: true
+#      (reverts the workspace to the exact state at that tag, minus linked svcs)
+#
+# To find available tags:
+#   gh api repos/{owner}/synapse-repo-test/tags --jq '.[].name' | grep release/
+###############################################################################
+name: "Rollback Test"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to roll back to (e.g. release/test/20260507.143022)"
+        required: true
+        type: string
+      confirm:
+        description: "Type ROLLBACK to confirm"
+        required: true
+        type: string
+
+env:
+  WORKSPACE: "synapse-workspace-test"
+  RESOURCE_GROUP: "rg-synapse-test"
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Gate ──────────────────────────────────────────────────────────────────
+  validate-inputs:
+    name: "Validate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'ROLLBACK'
+        run: |
+          echo "::error::You must type ROLLBACK to confirm. Got: '${{ inputs.confirm }}'"
+          exit 1
+
+      - name: Verify tag exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh api "repos/${{ github.repository }}/git/ref/tags/${{ inputs.release_tag }}" >/dev/null 2>&1; then
+            echo "::error::Tag '${{ inputs.release_tag }}' not found in this repository"
+            echo ""
+            echo "Available release tags:"
+            gh api "repos/${{ github.repository }}/tags" --paginate --jq '.[].name' \
+              | grep '^release/' | head -20
+            exit 1
+          fi
+          echo "Tag verified: ${{ inputs.release_tag }}"
+
+  # ─── Rollback ──────────────────────────────────────────────────────────────
+  rollback:
+    name: "Rollback → Test"
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - name: Checkout at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Show tag info
+        run: |
+          echo "Rolling back to: ${{ inputs.release_tag }}"
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Date: $(git log -1 --format=%ci)"
+          echo "Message: $(git log -1 --format=%s)"
+
+      # ── Phase 1: Validate (generate ARM template from tagged state) ──
+      - name: Validate
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: ${{ github.workspace }}
+          operation: validate
+
+      - name: Verify template generated
+        run: test -f "ExportedArtifacts/TemplateForWorkspace.json"
+
+      # ── Phase 2: Strip linked services + dependsOn ──
+      - name: Strip for rollback
+        run: |
+          chmod +x scripts/strip-for-rollback.sh
+          ./scripts/strip-for-rollback.sh \
+            ExportedArtifacts/TemplateForWorkspace.json \
+            ExportedArtifacts/TemplateParametersForWorkspace.json
+
+      # ── Phase 3: Deploy full template (rollback) ──
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy (rollback)
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ExportedArtifacts/TemplateForWorkspace.json
+          ParametersFile: ExportedArtifacts/TemplateParametersForWorkspace.json
+          OverrideArmParameters: ./parameters/test.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: deploy
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      - name: Summary
+        run: |
+          echo "## Rollback Complete :rewind:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Workspace | \`${{ env.WORKSPACE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rolled back to | \`${{ inputs.release_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`$(git rev-parse --short HEAD)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Initiated by | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | Full rollback (DeleteArtifactsNotInTemplate: true) |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,180 @@
+###############################################################################
+# rollback-prod.yml — Roll back the prod workspace to a previous release
+#
+# Lives in: synapse-repo-prod
+#
+# Manual trigger only.  The triggering user MUST be a member of the
+# 'cicd-admins-team' in the GitHub organization.  The workflow verifies
+# team membership before proceeding.
+#
+# Uses the GitHub App token to check team membership (requires org
+# members:read permission) since GITHUB_TOKEN cannot read org teams.
+###############################################################################
+name: "Rollback Prod"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to roll back to (e.g. release/prod/20260507.143022)"
+        required: true
+        type: string
+      confirm:
+        description: "Type ROLLBACK to confirm"
+        required: true
+        type: string
+
+env:
+  WORKSPACE: "synapse-workspace-prod"
+  RESOURCE_GROUP: "rg-synapse-prod"
+  REQUIRED_TEAM: "cicd-admins-team"
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Gate: verify team membership + inputs ─────────────────────────────────
+  authorize:
+    name: "Authorize"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'ROLLBACK'
+        run: |
+          echo "::error::You must type ROLLBACK to confirm."
+          exit 1
+
+      # ── Verify the triggering user is on cicd-admins-team ──
+      # GITHUB_TOKEN cannot read org team membership.  We use the
+      # GitHub App token (GH_APP_TOKEN) which has org members:read.
+      - name: Verify team membership
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_APP_TOKEN }}
+          script: |
+            const org = context.repo.owner;
+            const team = '${{ env.REQUIRED_TEAM }}';
+            const user = context.actor;
+
+            core.info(`Checking if @${user} is a member of ${org}/${team}...`);
+
+            try {
+              const { data } = await github.rest.teams.getMembershipForUserInOrg({
+                org: org,
+                team_slug: team,
+                username: user,
+              });
+
+              if (data.state !== 'active') {
+                core.setFailed(
+                  `@${user} has '${data.state}' membership in ${team} — active membership required.`
+                );
+                return;
+              }
+
+              core.info(`@${user} is an active member of ${team} (role: ${data.role})`);
+
+            } catch (error) {
+              if (error.status === 404) {
+                core.setFailed(
+                  `@${user} is not a member of ${org}/${team}. ` +
+                  `Only members of ${team} can roll back production.`
+                );
+              } else {
+                core.setFailed(`Team membership check failed: ${error.message}`);
+              }
+            }
+
+      - name: Verify tag exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh api "repos/${{ github.repository }}/git/ref/tags/${{ inputs.release_tag }}" >/dev/null 2>&1; then
+            echo "::error::Tag '${{ inputs.release_tag }}' not found"
+            echo ""
+            echo "Available release tags:"
+            gh api "repos/${{ github.repository }}/tags" --paginate --jq '.[].name' \
+              | grep '^release/' | head -20
+            exit 1
+          fi
+
+  # ─── Rollback ──────────────────────────────────────────────────────────────
+  rollback:
+    name: "Rollback → Prod"
+    needs: authorize
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Show tag info
+        run: |
+          echo "Rolling back to: ${{ inputs.release_tag }}"
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Date: $(git log -1 --format=%ci)"
+          echo "Message: $(git log -1 --format=%s)"
+
+      # ── Phase 1: Validate ──
+      - name: Validate
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: ${{ github.workspace }}
+          operation: validate
+
+      - name: Verify template
+        run: test -f "ExportedArtifacts/TemplateForWorkspace.json"
+
+      # ── Phase 2: Strip ──
+      - name: Strip for rollback
+        run: |
+          chmod +x scripts/strip-for-rollback.sh
+          ./scripts/strip-for-rollback.sh \
+            ExportedArtifacts/TemplateForWorkspace.json \
+            ExportedArtifacts/TemplateParametersForWorkspace.json
+
+      # ── Phase 3: Deploy ──
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy (rollback)
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ExportedArtifacts/TemplateForWorkspace.json
+          ParametersFile: ExportedArtifacts/TemplateParametersForWorkspace.json
+          OverrideArmParameters: ./parameters/prod.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: deploy
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      - name: Summary
+        run: |
+          echo "## Production Rollback Complete :rewind:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Workspace | \`${{ env.WORKSPACE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rolled back to | \`${{ inputs.release_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`$(git rev-parse --short HEAD)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Authorized by | @${{ github.actor }} (member of ${{ env.REQUIRED_TEAM }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | Full rollback (DeleteArtifactsNotInTemplate: true) |" >> $GITHUB_STEP_SUMMARY

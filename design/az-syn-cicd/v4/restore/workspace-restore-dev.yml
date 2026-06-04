@@ -1,0 +1,219 @@
+###############################################################################
+# workspace-restore.yml — Backup & restore for synapse-workspace-dev
+#
+# Lives in: synapse-repo-dev
+#
+# Manual trigger.  Two operations:
+#
+#   snapshot  — Tags the current branch HEAD as a point-in-time backup.
+#               No deployment.  Creates: snapshot/dev/<timestamp>
+#
+#   restore   — Deploys the branch (or a specific ref) to the workspace.
+#               Creates a pre-restore snapshot first so the operation is
+#               reversible.  Deploys the FULL template with
+#               DeleteArtifactsNotInTemplate: true (workspace matches ref).
+#
+# This is the Synapse equivalent of database backup/restore:
+#   - Branch = backup file
+#   - Snapshot tags = point-in-time recovery points
+#   - Restore = overwrite the workspace with a backup
+###############################################################################
+name: "Workspace Backup & Restore (Dev)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation to perform"
+        required: true
+        type: choice
+        options:
+          - snapshot
+          - restore
+      restore_ref:
+        description: "Branch, tag, or SHA to restore from (default: dev branch HEAD)"
+        required: false
+        type: string
+        default: ""
+      confirm:
+        description: "For restore: type RESTORE to confirm"
+        required: false
+        type: string
+
+env:
+  WORKSPACE: "synapse-workspace-dev"
+  RESOURCE_GROUP: "rg-synapse-dev"
+  BRANCH: "dev"
+  ENV_NAME: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+  # ═════════════════════════════════════════════════════════════════════════
+  # SNAPSHOT — Tag the current branch as a recovery point
+  # ═════════════════════════════════════════════════════════════════════════
+  snapshot:
+    name: "Create snapshot"
+    if: inputs.operation == 'snapshot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+
+      - name: Create snapshot tag
+        id: snap
+        run: |
+          SHA=$(git rev-parse HEAD)
+          TAG="snapshot/${{ env.ENV_NAME }}/$(date +'%Y%m%d.%H%M%S')"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "Snapshot by @${{ github.actor }} at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          git push origin "$TAG"
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Snapshot Created :camera:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | \`${{ steps.snap.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ steps.snap.outputs.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ env.BRANCH }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Created by | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Use this tag to restore: \`${{ steps.snap.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ═════════════════════════════════════════════════════════════════════════
+  # RESTORE — Deploy a ref to the workspace (full reset)
+  # ═════════════════════════════════════════════════════════════════════════
+  restore-gate:
+    name: "Validate restore"
+    if: inputs.operation == 'restore'
+    runs-on: ubuntu-latest
+    outputs:
+      restore_ref: ${{ steps.ref.outputs.value }}
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'RESTORE'
+        run: |
+          echo "::error::Type RESTORE to confirm. Got: '${{ inputs.confirm }}'"
+          exit 1
+
+      - name: Resolve ref
+        id: ref
+        run: |
+          REF="${{ inputs.restore_ref }}"
+          if [ -z "$REF" ]; then
+            REF="${{ env.BRANCH }}"
+          fi
+          echo "value=${REF}" >> $GITHUB_OUTPUT
+          echo "Restore target: ${REF}"
+
+  restore-pre-snapshot:
+    name: "Pre-restore snapshot"
+    needs: restore-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+
+      - name: Tag pre-restore state
+        run: |
+          SHA=$(git rev-parse HEAD)
+          TAG="pre-restore/${{ env.ENV_NAME }}/$(date +'%Y%m%d.%H%M%S')"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" \
+            -m "Pre-restore snapshot before restoring from ${{ needs.restore-gate.outputs.restore_ref }}"
+          git push origin "$TAG"
+
+          echo "::notice::Pre-restore snapshot: ${TAG}"
+          echo "If this restore needs to be undone, use: ${TAG}"
+
+  restore-deploy:
+    name: "Restore → ${{ needs.restore-gate.outputs.restore_ref }}"
+    needs: [restore-gate, restore-pre-snapshot]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout restore ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.restore-gate.outputs.restore_ref }}
+
+      - name: Show restore info
+        run: |
+          echo "Restoring from: ${{ needs.restore-gate.outputs.restore_ref }}"
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Date: $(git log -1 --format=%ci)"
+
+      # ── Validate full repo ──
+      - name: Validate
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: ${{ github.workspace }}
+          operation: validate
+
+      # ── Strip linked services + dependsOn ──
+      - name: Strip
+        run: |
+          chmod +x scripts/strip-for-rollback.sh
+          ./scripts/strip-for-rollback.sh \
+            ExportedArtifacts/TemplateForWorkspace.json \
+            ExportedArtifacts/TemplateParametersForWorkspace.json
+
+      # ── Deploy full template ──
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy (full restore)
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ExportedArtifacts/TemplateForWorkspace.json
+          ParametersFile: ExportedArtifacts/TemplateParametersForWorkspace.json
+          OverrideArmParameters: ./parameters/${{ env.ENV_NAME }}.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: true
+          operation: deploy
+
+      - name: Start triggers
+        if: always()
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      - name: Summary
+        run: |
+          echo "## Workspace Restored :arrows_counterclockwise:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Workspace | \`${{ env.WORKSPACE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Restored from | \`${{ needs.restore-gate.outputs.restore_ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`$(git rev-parse --short HEAD)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Restored by | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DeleteArtifactsNotInTemplate | \`true\` |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,67 @@
+###############################################################################
+# sync-prod-repo.yml — Sync prod branch to synapse-repo-prod
+#
+# Lives in: synapse-repo-dev
+#
+# Trigger: PR from test branch successfully merged to 'prod' branch
+# Action:  Pushes the prod branch to synapse-repo-prod using the GitHub App
+#          token, bypassing branch protection on the target repo.
+###############################################################################
+name: "Sync → Prod Repo"
+
+on:
+  pull_request:
+    branches: [prod]
+    types: [closed]
+
+env:
+  TARGET_REPO: ${{ github.repository_owner }}/synapse-repo-prod
+  TARGET_BRANCH: prod
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: "Sync prod branch → synapse-repo-prod"
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Checkout dev repo (prod branch)
+        uses: actions/checkout@v4
+        with:
+          ref: prod
+          fetch-depth: 0
+
+      - name: Generate GitHub App token
+        id: token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: "synapse-repo-prod"
+
+      - name: Push prod branch to target repo
+        id: sync
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          chmod +x scripts/sync-branch-to-repo.sh
+          ./scripts/sync-branch-to-repo.sh \
+            "prod" \
+            "${{ env.TARGET_REPO }}" \
+            "$TOKEN" \
+            "${{ env.TARGET_BRANCH }}"
+
+      - name: Summary
+        run: |
+          echo "## Branch Sync → Prod Repo" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | \`${{ github.repository }}:prod\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | \`${{ env.TARGET_REPO }}:${{ env.TARGET_BRANCH }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ steps.sync.outputs.source_sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merged by | @${{ github.event.pull_request.merged_by.login }} |" >> $GITHUB_STEP_SUMMARY
