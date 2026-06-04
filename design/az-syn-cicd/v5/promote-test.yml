@@ -1,0 +1,154 @@
+###############################################################################
+# promote-test.yml — Delta promotion: dev → test
+#
+# Trigger: PR from dev targeting test branch
+#
+# Stages ONLY the files changed since the last promotion (promoted/test tag)
+# into the ArtifactsFolder.  Validate receives the minimal set.
+###############################################################################
+name: "Promote → Test (delta)"
+
+on:
+  pull_request:
+    branches: [test]
+    types: [opened, synchronize, reopened]
+
+env:
+  WORKSPACE: "synapse-workspace-test"
+  RESOURCE_GROUP: "rg-synapse-test"
+  TAG: "promoted/test"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    name: "Stage → Validate → Deploy"
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      # ── Compute delta since last promotion ──
+      - name: Compute delta
+        id: diff
+        run: |
+          if git rev-parse "${{ env.TAG }}" >/dev/null 2>&1; then
+            BASE=$(git rev-parse "${{ env.TAG }}")
+            echo "Last promotion: ${BASE:0:8}"
+            git diff --name-only "${BASE}...HEAD" -- \
+              pipeline/ dataset/ notebook/ trigger/ dataflow/ sqlscript/ linkedService/ \
+              > /tmp/changed.txt 2>/dev/null || true
+          else
+            echo "First promotion — staging all artifacts"
+            find . \( -path './pipeline/*' -o -path './dataset/*' -o -path './notebook/*' \
+              -o -path './trigger/*' -o -path './dataflow/*' -o -path './sqlscript/*' \
+              -o -path './linkedService/*' \) -name '*.json' \
+              | sed 's|^\./||' > /tmp/changed.txt
+          fi
+          COUNT=$(grep -c . /tmp/changed.txt || true)
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          echo "${COUNT} files in delta"
+
+      - name: Exit if nothing changed
+        if: steps.diff.outputs.count == '0'
+        run: echo "::notice::No changes since last promotion"
+
+      # ── Stage changed files ──
+      - name: Stage artifacts
+        if: steps.diff.outputs.count != '0'
+        id: stage
+        run: |
+          chmod +x scripts/stage-changed-artifacts.sh
+          ./scripts/stage-changed-artifacts.sh . ./staged /tmp/changed.txt
+
+      # ── Validate staged → ARM template ──
+      - name: Validate
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: "${{ github.workspace }}/staged"
+          operation: validate
+
+      - name: Locate template
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        id: paths
+        run: |
+          for dir in "staged/ExportedArtifacts" "ExportedArtifacts"; do
+            if [ -f "${dir}/TemplateForWorkspace.json" ]; then
+              echo "template_path=${dir}/TemplateForWorkspace.json" >> $GITHUB_OUTPUT
+              echo "params_path=${dir}/TemplateParametersForWorkspace.json" >> $GITHUB_OUTPUT
+              echo "Found template in ${dir}/"
+              exit 0
+            fi
+          done
+          echo "::error::Template not generated"
+          exit 1
+
+      # ── Strip ──
+      - name: Strip template
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        id: strip
+        run: |
+          chmod +x scripts/strip-template.sh
+          ./scripts/strip-template.sh \
+            "${{ steps.paths.outputs.template_path }}" \
+            "${{ steps.paths.outputs.params_path }}"
+
+      # ── Deploy ──
+      - name: Azure Login
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ${{ steps.paths.outputs.template_path }}
+          ParametersFile: ${{ steps.paths.outputs.params_path }}
+          OverrideArmParameters: ./parameters/test.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: false
+          operation: deploy
+
+      - name: Start triggers
+        if: always() && steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      # ── Move promotion tag ──
+      - name: Update promotion tags
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: |
+          SHA=$(git rev-parse HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -d "${{ env.TAG }}" 2>/dev/null || true
+          git push origin ":refs/tags/${{ env.TAG }}" 2>/dev/null || true
+          git tag -a "${{ env.TAG }}" "$SHA" -m "Promoted to test $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          git push origin "${{ env.TAG }}"
+
+          REL="release/test/$(date +'%Y%m%d.%H%M%S')"
+          git tag -a "$REL" "$SHA" -m "Test release ${SHA:0:8}"
+          git push origin "$REL"
+          echo "::notice::Tagged: ${REL}"

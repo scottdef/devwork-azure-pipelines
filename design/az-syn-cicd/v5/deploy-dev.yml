@@ -1,0 +1,165 @@
+###############################################################################
+# deploy-dev.yml — Delta deployment to dev workspace
+#
+# Trigger: PR to dev branch
+#
+# Unlike the previous approach that validates the full repo and filters the
+# ARM template after, this workflow builds a STAGED ArtifactsFolder containing
+# ONLY the changed files.  The validate operation receives the minimal set
+# and generates ARM templates with only those resources.
+#
+# Flow:
+#   1. git diff → list changed files
+#   2. Copy changed files to staging directory (exclude linked services)
+#   3. Validate staged directory → ARM template with only changed resources
+#   4. Strip dependsOn from generated template
+#   5. Deploy with DeleteArtifactsNotInTemplate: false
+###############################################################################
+name: "Deploy → Dev (delta)"
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "pipeline/**"
+      - "dataset/**"
+      - "notebook/**"
+      - "trigger/**"
+      - "dataflow/**"
+      - "sqlscript/**"
+      - "linkedService/**"
+
+env:
+  WORKSPACE: "synapse-workspace-dev"
+  RESOURCE_GROUP: "rg-synapse-dev"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: deploy-dev-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: "Stage → Validate → Deploy"
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Step 1: Identify changed files ──
+      - name: Diff changed files
+        id: diff
+        run: |
+          git diff --name-only origin/dev...${{ github.sha }} -- \
+            pipeline/ dataset/ notebook/ trigger/ dataflow/ sqlscript/ linkedService/ \
+            > /tmp/changed.txt 2>/dev/null || true
+          COUNT=$(grep -c . /tmp/changed.txt || true)
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          echo "${COUNT} changed artifact file(s):"
+          cat /tmp/changed.txt
+
+      - name: Exit if nothing changed
+        if: steps.diff.outputs.count == '0'
+        run: echo "::notice::No deployable artifacts — skipping"
+
+      # ── Step 2: Build staged ArtifactsFolder ──
+      - name: Stage changed artifacts
+        if: steps.diff.outputs.count != '0'
+        id: stage
+        run: |
+          chmod +x scripts/stage-changed-artifacts.sh
+          ./scripts/stage-changed-artifacts.sh \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/staged" \
+            /tmp/changed.txt
+
+      # ── Step 3: Validate staged directory → ARM template ──
+      - name: Validate
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: "${{ github.workspace }}/staged"
+          operation: validate
+
+      - name: Verify template
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: |
+          TEMPLATE="staged/ExportedArtifacts/TemplateForWorkspace.json"
+          PARAMS="staged/ExportedArtifacts/TemplateParametersForWorkspace.json"
+          # The action may place ExportedArtifacts at different paths
+          # depending on version — check both locations
+          if [ ! -f "$TEMPLATE" ]; then
+            TEMPLATE="ExportedArtifacts/TemplateForWorkspace.json"
+            PARAMS="ExportedArtifacts/TemplateParametersForWorkspace.json"
+          fi
+          test -f "$TEMPLATE" || { echo "::error::Template not generated"; exit 1; }
+          echo "template_path=${TEMPLATE}" >> $GITHUB_OUTPUT
+          echo "params_path=${PARAMS}" >> $GITHUB_OUTPUT
+
+          COUNT=$(jq '.resources | length' "$TEMPLATE")
+          echo "Generated template: ${COUNT} resources"
+        id: paths
+
+      # ── Step 4: Strip dependsOn + any leftover linked services ──
+      - name: Strip template
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        id: strip
+        run: |
+          chmod +x scripts/strip-template.sh
+          ./scripts/strip-template.sh \
+            "${{ steps.paths.outputs.template_path }}" \
+            "${{ steps.paths.outputs.params_path }}"
+
+      # ── Step 5: Deploy ──
+      - name: Azure Login
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy
+        if: steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ${{ steps.paths.outputs.template_path }}
+          ParametersFile: ${{ steps.paths.outputs.params_path }}
+          OverrideArmParameters: ./parameters/dev.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: false
+          operation: deploy
+
+      - name: Start triggers
+        if: always() && steps.diff.outputs.count != '0' && steps.stage.outputs.skip_deploy != 'true'
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      - name: PR comment
+        if: steps.strip.outputs.resource_count
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Delta Deploy → Dev\n| Metric | Value |\n|---|---|\n| Files staged | ${{ steps.stage.outputs.staged_count }} |\n| Resources deployed | ${{ steps.strip.outputs.resource_count }} |\n| ArtifactsFolder | staged (changed files only) |`
+            });

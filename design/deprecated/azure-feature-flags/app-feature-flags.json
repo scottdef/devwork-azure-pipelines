@@ -1,0 +1,18 @@
+[
+  {
+    "name": "enable-dark-mode",
+    "enabled": true
+  },
+  {
+    "name": "beta-dashboard",
+    "enabled": false
+  },
+  {
+    "name": "new-checkout-flow",
+    "enabled": true
+  },
+  {
+    "name": "experimental-api-v2",
+    "enabled": false
+  }
+]

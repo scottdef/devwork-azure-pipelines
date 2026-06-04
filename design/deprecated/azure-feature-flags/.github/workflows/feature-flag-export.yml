@@ -1,0 +1,140 @@
+# ────────────────────────────────────────────────────────────────────────────
+# feature-flag-export.yml
+#
+# Exports all feature flags from Azure App Configuration and commits them
+# to the `feature-flags` branch in a file named <app-config-name>.json.
+#
+# Triggers:
+#   • Scheduled (daily at 06:00 UTC — adjust as needed)
+#   • Manual dispatch
+#   • Called by the update workflow after successful apply
+# ────────────────────────────────────────────────────────────────────────────
+name: "Feature Flag Export"
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Feature Flag Update"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: write     # needed to push to feature-flags branch
+
+env:
+  APP_CONFIG_NAME: ${{ vars.APP_CONFIG_NAME }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+
+jobs:
+  export:
+    name: Export Feature Flags
+    runs-on: ubuntu-latest
+    environment: dev
+    # Only run on successful upstream workflow (or direct trigger)
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so we can switch branches
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Azure Login (managed identity / OIDC) ──────────────────────────
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Export flags to JSON ────────────────────────────────────────────
+      - name: Export flags from App Configuration
+        id: export
+        run: |
+          OUTPUT_FILE="${APP_CONFIG_NAME}.json"
+          echo "output_file=${OUTPUT_FILE}" >> "$GITHUB_OUTPUT"
+
+          echo "::group::Fetching flags from ${APP_CONFIG_NAME}"
+          RAW=$(az appconfig feature list \
+            --name "${APP_CONFIG_NAME}" \
+            --resource-group "${RESOURCE_GROUP}" \
+            --output json)
+          echo "::endgroup::"
+
+          # Transform to canonical [{name, enabled}] sorted by name
+          echo "${RAW}" | python3 -c "
+          import json, sys
+          flags = json.load(sys.stdin)
+          out = []
+          for f in flags:
+              name = f.get('name', '')
+              if 'enabled' in f:
+                  enabled = f['enabled']
+              elif 'state' in f:
+                  enabled = f['state'].lower() == 'on'
+              else:
+                  enabled = False
+              out.append({'name': name, 'enabled': enabled})
+          out.sort(key=lambda x: x['name'])
+          print(json.dumps(out, indent=2))
+          " > "${OUTPUT_FILE}"
+
+          FLAG_COUNT=$(python3 -c "import json; print(len(json.load(open('${OUTPUT_FILE}'))))")
+          echo "flag_count=${FLAG_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Exported ${FLAG_COUNT} flags → ${OUTPUT_FILE}"
+
+      # ── Push to feature-flags branch ────────────────────────────────────
+      - name: Commit and push to feature-flags branch
+        env:
+          OUTPUT_FILE: ${{ steps.export.outputs.output_file }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="feature-flags"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Save the export file before branch switch
+          cp "${OUTPUT_FILE}" "/tmp/${OUTPUT_FILE}"
+
+          # Switch to or create the target branch
+          if git ls-remote --exit-code --heads origin "${BRANCH}" > /dev/null 2>&1; then
+            git checkout "${BRANCH}"
+            git pull origin "${BRANCH}" --rebase
+          else
+            git checkout --orphan "${BRANCH}"
+            git rm -rf . 2>/dev/null || true
+          fi
+
+          # Restore export file
+          cp "/tmp/${OUTPUT_FILE}" "./${OUTPUT_FILE}"
+          git add "${OUTPUT_FILE}"
+
+          if git diff --cached --quiet; then
+            echo "No changes — App Configuration state matches existing export"
+          else
+            git commit -m "feature-flag export: ${APP_CONFIG_NAME} @ ${TIMESTAMP}"
+            git push origin "${BRANCH}"
+            echo "Pushed ${OUTPUT_FILE} to branch ${BRANCH}"
+          fi
+
+      # ── Summary ─────────────────────────────────────────────────────────
+      - name: Job Summary
+        if: always()
+        run: |
+          echo "## Feature Flag Export" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Parameter | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| App Configuration | \`${APP_CONFIG_NAME}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Flags exported | ${{ steps.export.outputs.flag_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Output file | \`${{ steps.export.outputs.output_file }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target branch | \`feature-flags\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | \`${{ github.event_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
