@@ -1,0 +1,126 @@
+###############################################################################
+# deploy-dev.yml — Delta deployment to dev workspace
+#
+# Trigger: PR to dev branch
+# Scope:   Only artifacts changed in the PR branch vs dev
+# Deploy:  Incremental (DeleteArtifactsNotInTemplate: false)
+###############################################################################
+name: "Deploy → Dev (delta)"
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "pipeline/**"
+      - "dataset/**"
+      - "notebook/**"
+      - "trigger/**"
+      - "dataflow/**"
+      - "sqlscript/**"
+      - "linkedService/**"
+
+env:
+  WORKSPACE: "synapse-workspace-dev"
+  RESOURCE_GROUP: "rg-synapse-dev"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: deploy-dev-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: "Validate → Filter → Deploy"
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Diff: PR branch vs dev ──
+      - name: Identify changed artifacts
+        id: diff
+        run: |
+          git diff --name-only origin/dev...${{ github.sha }} -- \
+            pipeline/ dataset/ notebook/ trigger/ dataflow/ sqlscript/ linkedService/ \
+            > /tmp/changed.txt 2>/dev/null || true
+          COUNT=$(grep -c . /tmp/changed.txt || true)
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          echo "${COUNT} changed artifact file(s)"
+          [ "$COUNT" -gt 0 ] && cat /tmp/changed.txt
+
+      - name: Exit early if nothing changed
+        if: steps.diff.outputs.count == '0'
+        run: echo "::notice::No Synapse artifacts in this PR — skipping deploy"
+
+      # ── Phase 1: Validate full repo → complete ARM template ──
+      - name: Validate
+        if: steps.diff.outputs.count != '0'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          ArtifactsFolder: ${{ github.workspace }}
+          operation: validate
+
+      # ── Phase 2: Filter to changed + strip ──
+      - name: Filter and strip
+        if: steps.diff.outputs.count != '0'
+        id: filter
+        run: |
+          chmod +x scripts/filter-and-strip.sh
+          ./scripts/filter-and-strip.sh \
+            ExportedArtifacts/TemplateForWorkspace.json \
+            ExportedArtifacts/TemplateParametersForWorkspace.json \
+            /tmp/changed.txt
+
+      # ── Phase 3: Deploy delta ──
+      - name: Azure Login
+        if: steps.diff.outputs.count != '0' && steps.filter.outputs.skip_deploy != 'true'
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.SYNAPSE_SPN_ID }}","clientSecret":"${{ secrets.SYNAPSE_SPN_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Stop triggers
+        if: steps.diff.outputs.count != '0' && steps.filter.outputs.skip_deploy != 'true'
+        run: |
+          chmod +x scripts/toggle-triggers.sh
+          ./scripts/toggle-triggers.sh stop ${{ env.WORKSPACE }}
+
+      - name: Deploy
+        if: steps.diff.outputs.count != '0' && steps.filter.outputs.skip_deploy != 'true'
+        uses: Azure/synapse-workspace-deployment@V1.9.1
+        with:
+          TargetWorkspaceName: ${{ env.WORKSPACE }}
+          TemplateFile: ExportedArtifacts/TemplateForWorkspace.json
+          ParametersFile: ExportedArtifacts/TemplateParametersForWorkspace.json
+          OverrideArmParameters: ./parameters/dev.parameters.yaml
+          environment: Azure Public
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          clientId: ${{ secrets.SYNAPSE_SPN_ID }}
+          clientSecret: ${{ secrets.SYNAPSE_SPN_SECRET }}
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          DeleteArtifactsNotInTemplate: false
+          operation: deploy
+
+      - name: Start triggers
+        if: always() && steps.diff.outputs.count != '0' && steps.filter.outputs.skip_deploy != 'true'
+        run: ./scripts/toggle-triggers.sh start ${{ env.WORKSPACE }}
+
+      - name: PR comment
+        if: steps.filter.outputs.resource_count
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Delta Deploy → Dev\n| Metric | Value |\n|---|---|\n| Artifacts changed | ${{ steps.filter.outputs.artifact_count }} |\n| Resources deployed | ${{ steps.filter.outputs.resource_count }} |\n| Mode | incremental |`
+            });
