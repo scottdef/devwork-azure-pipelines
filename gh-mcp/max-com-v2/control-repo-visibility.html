@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repository Visibility Control — Kickbutt Compliance</title>
+    <link rel="stylesheet" href="../style.css">
+    <style>
+        .doc-container { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        .breadcrumb { margin-bottom: 2rem; }
+        .breadcrumb a { color: var(--info); text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb span { color: var(--text-secondary); }
+        .doc-header { margin-bottom: 2.5rem; }
+        .doc-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .doc-meta { display: flex; gap: 1.5rem; flex-wrap: wrap; color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.75rem; }
+        .doc-meta span { display: inline-flex; align-items: center; gap: 0.35rem; }
+        .doc-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: rgba(88,166,255,0.12); color: var(--info); }
+        .doc-section { margin-bottom: 2.5rem; }
+        .doc-section h2 { font-size: 1.35rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); }
+        .doc-section p, .doc-section li { color: var(--text-secondary); line-height: 1.75; }
+        .doc-section ul, .doc-section ol { padding-left: 1.5rem; margin-top: 0.5rem; }
+        .doc-section li { margin-bottom: 0.5rem; }
+        .doc-section code { background: var(--secondary-bg); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.9em; color: var(--text-primary); }
+        .check-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+        .check-item strong { color: var(--text-primary); }
+        .ref-link { color: var(--info); text-decoration: none; display: block; margin-bottom: 0.5rem; }
+        .ref-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🛡️ Kickbutt Compliance</h1>
+            <p class="subtitle">Control Documentation</p>
+        </div>
+    </header>
+    <div class="doc-container">
+        <nav class="breadcrumb">
+            <a href="../index.html">Trust Center</a>
+            <span> / </span>
+            <span>Repository Visibility Control</span>
+        </nav>
+        <div class="doc-header">
+            <h1>Repository Visibility Control</h1>
+            <p style="color: var(--text-secondary); font-size: 1.05rem; margin-top: 0.5rem;">Monitors repository visibility policies ensuring sensitive repositories remain private, public exposure stays below threshold, and naming conventions are enforced.</p>
+            <div class="doc-meta">
+                <span><span class="doc-badge">Data Protection</span></span>
+                <span>⏱ Schedule: Every 6 hours</span>
+                <span>📄 Workflow: <code>control-repo-visibility.yml</code></span>
+            </div>
+        </div>
+
+        <section class="doc-section">
+            <h2>What This Control Checks</h2>
+            <div class="check-item"><strong>Public Repository Ratio</strong><p>Counts public vs. private repositories and checks that public repositories do not exceed 10% of total. Excessive public exposure increases attack surface.</p></div>
+<div class="check-item"><strong>Sensitive Repository Detection</strong><p>Scans for repositories matching sensitive name patterns (<code>secret</code>, <code>config</code>, <code>infrastructure</code>, <code>terraform</code>, <code>vault</code>, <code>credentials</code>) and ensures none are publicly accessible.</p></div>
+        </section>
+
+        <section class="doc-section">
+            <h2>Pass / Fail Criteria</h2>
+            <ul>
+<li><strong>PASS</strong>: Public repos ≤ 10% of total <em>and</em> no sensitive repos are public</li>
+<li><strong>FAIL</strong>: Public repos &gt; 10% <em>or</em> any sensitive-named repos are public</li>
+</ul>
+        </section>
+
+        <section class="doc-section">
+            <h2>Remediation Steps</h2>
+            <ol>
+<li>Navigate to the public repository in question on GitHub</li>
+<li>Go to <strong>Settings → General → Danger Zone</strong></li>
+<li>Click <strong>Change repository visibility</strong> and switch to <strong>Private</strong></li>
+<li>For bulk changes, use the GitHub API: <code>gh api -X PATCH /repos/{owner}/{repo} -f visibility=private</code></li>
+<li>Consider creating an organization ruleset that prevents changing repos to public</li>
+</ol>
+        </section>
+
+        <section class="doc-section">
+            <h2>References</h2>
+            <a class="ref-link" href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility" target="_blank">GitHub Docs: Repository Visibility</a>
+<a class="ref-link" href="https://docs.github.com/en/organizations/managing-organization-settings/restricting-repository-visibility-changes-in-your-organization" target="_blank">GitHub Docs: Restricting Visibility Changes</a>
+        </section>
+    </div>
+    <footer>
+        <div class="container">
+            <p>Powered by GitHub Actions | Built with ❤️ by DevOps</p>
+        </div>
+    </footer>
+</body>
+</html>

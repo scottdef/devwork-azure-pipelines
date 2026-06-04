@@ -1,0 +1,123 @@
+name: Update Trust Center
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/update-trust-center.yml'
+      - 'scripts/**'
+      - 'trust-center/**'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  update-trust-center:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq bc
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || {
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+            && sudo mkdir -p -m 755 /etc/apt/keyrings \
+            && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+               | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+            && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+               | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+            && sudo apt update && sudo apt install gh -y
+          }
+          gh --version
+
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth status
+
+      - name: Generate trust center status
+        run: |
+          chmod +x scripts/generate-trust-center.sh
+          ./scripts/generate-trust-center.sh
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate documentation pages
+        run: |
+          chmod +x scripts/generate-docs.sh
+          ./scripts/generate-docs.sh
+
+      - name: Deploy to gh-pages branch
+        run: |
+          # Always deploy (docs may have changed even if status didn't)
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            git fetch origin gh-pages
+            git checkout gh-pages
+            git pull origin gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf .
+          fi
+
+          # Copy trust-center files to root of gh-pages
+          git checkout main -- trust-center/
+          
+          # Flatten: move trust-center/* to root
+          cp -r trust-center/* .
+          rm -rf trust-center
+
+          git add -A
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update trust center — $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            git push origin gh-pages
+            echo "✅ Trust center deployed to gh-pages"
+          else
+            echo "ℹ️  No changes to deploy"
+          fi
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "### 🛡️ Trust Center Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "trust-center/status.json" ]; then
+            overall=$(jq -r '.overall_status' trust-center/status.json)
+            passing=$(jq -r '.summary.passing' trust-center/status.json)
+            failing=$(jq -r '.summary.failing' trust-center/status.json)
+            rate=$(jq -r '.summary.average_pass_rate // "N/A"' trust-center/status.json)
+
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Overall | **${overall}** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | ${passing} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | ${failing} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Avg Pass Rate | ${rate}% |" >> $GITHUB_STEP_SUMMARY
+          fi

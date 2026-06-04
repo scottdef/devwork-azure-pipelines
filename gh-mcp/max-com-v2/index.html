@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kickbutt Compliance — Trust Center</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+    <div class="container header-inner">
+        <div class="header-brand">
+            <span class="logo">🛡️</span>
+            <div>
+                <h1>Kickbutt Compliance</h1>
+                <p class="subtitle">Enterprise Trust Center</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <div class="refresh-indicator" id="refresh-indicator">
+                <span class="pulse-dot"></span>
+                <span id="refresh-text">Loading…</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+
+    <!-- ── Overall Status Banner ──────────────────────────── -->
+    <section class="status-banner" id="status-banner">
+        <div class="banner-icon" id="banner-icon">⏳</div>
+        <div class="banner-body">
+            <span class="banner-label" id="banner-label">Loading…</span>
+            <span class="banner-time" id="banner-time">—</span>
+        </div>
+    </section>
+
+    <!-- ── Summary Cards ──────────────────────────────────── -->
+    <section class="summary-grid" id="summary-grid">
+        <div class="summary-card">
+            <span class="summary-value" id="sum-total">—</span>
+            <span class="summary-label">Controls</span>
+        </div>
+        <div class="summary-card card-pass">
+            <span class="summary-value" id="sum-passing">—</span>
+            <span class="summary-label">Passing</span>
+        </div>
+        <div class="summary-card card-fail">
+            <span class="summary-value" id="sum-failing">—</span>
+            <span class="summary-label">Failing</span>
+        </div>
+        <div class="summary-card">
+            <span class="summary-value" id="sum-rate">—</span>
+            <span class="summary-label">Avg Pass Rate</span>
+        </div>
+    </section>
+
+    <!-- ── Controls Table ─────────────────────────────────── -->
+    <section class="controls-section">
+        <div class="section-head">
+            <h2>Security Controls</h2>
+            <p class="section-desc">Continuous automated compliance checks on GitHub Enterprise Cloud</p>
+        </div>
+
+        <div class="controls-table-wrap">
+            <table class="controls-table" id="controls-table">
+                <thead>
+                    <tr>
+                        <th class="col-control">Control</th>
+                        <th class="col-history">Last 5 Runs</th>
+                        <th class="col-status">Current</th>
+                        <th class="col-rate">Pass Rate</th>
+                        <th class="col-links">Links</th>
+                    </tr>
+                </thead>
+                <tbody id="controls-tbody">
+                    <tr>
+                        <td colspan="5" class="loading-cell">Loading control statuses…</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Category Breakdown ─────────────────────────────── -->
+    <section class="categories-section" id="categories-section" style="display:none;">
+        <h2>Compliance Areas</h2>
+        <div class="categories-grid" id="categories-grid"></div>
+    </section>
+
+    <!-- ── Info Cards ─────────────────────────────────────── -->
+    <section class="info-grid">
+        <div class="info-card">
+            <h3>📋 About Our Controls</h3>
+            <p>Security controls run as GitHub Actions workflows that validate organization policies, repository configurations, and access controls. Each workflow exits with a pass or fail conclusion recorded by GitHub.</p>
+        </div>
+        <div class="info-card">
+            <h3>🔄 Update Frequency</h3>
+            <p>Controls execute every 6 hours. This dashboard regenerates every hour, querying the GitHub Actions API for the latest results. The page auto-refreshes every 5 minutes.</p>
+        </div>
+        <div class="info-card">
+            <h3>📊 History & Trends</h3>
+            <p>The "Last 5 Runs" column shows status lights for the five most recent workflow executions. Hover over each dot for run details. Trends are calculated by comparing recent vs. older results.</p>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <div class="container footer-inner">
+        <p>Powered by GitHub Actions · Built with ❤️ by DevOps</p>
+        <p class="footer-note">Generated: <span id="generation-time">—</span></p>
+    </div>
+</footer>
+
+<script src="status.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+{
+  "overall_status": "degraded",
+  "generated_at": "2025-11-13T18:00:00Z",
+  "repository": "acme-corp/kickbutt-compliance",
+  "summary": {
+    "total_controls": 4,
+    "passing": 2,
+    "failing": 1,
+    "unknown": 1,
+    "average_pass_rate": 73,
+    "categories": [
+      { "name": "Access Control", "total": 2, "passing": 1 },
+      { "name": "Data Protection", "total": 1, "passing": 1 },
+      { "name": "Change Management", "total": 1, "passing": 0 }
+    ]
+  },
+  "controls": [
+    {
+      "name": "control-org-settings.yml",
+      "description": "Validates organization-level security settings including two-factor authentication enforcement, default repository permissions, and member privilege boundaries.",
+      "category": "Access Control",
+      "status": "success",
+      "last_run": "2025-11-13T17:45:12Z",
+      "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100001",
+      "all_runs_url": "https://github.com/acme-corp/kickbutt-compliance/actions/workflows/control-org-settings.yml",
+      "docs_url": "docs/control-org-settings.html",
+      "pass_rate": 100,
+      "trend": "stable",
+      "history": [
+        { "status": "success", "created_at": "2025-11-13T17:45:12Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100001", "run_number": 42, "duration_seconds": 38 },
+        { "status": "success", "created_at": "2025-11-13T11:45:08Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100000", "run_number": 41, "duration_seconds": 35 },
+        { "status": "success", "created_at": "2025-11-13T05:45:05Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/99999", "run_number": 40, "duration_seconds": 41 },
+        { "status": "success", "created_at": "2025-11-12T23:45:02Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/99998", "run_number": 39, "duration_seconds": 36 },
+        { "status": "success", "created_at": "2025-11-12T17:45:00Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/99997", "run_number": 38, "duration_seconds": 39 }
+      ]
+    },
+    {
+      "name": "control-repo-visibility.yml",
+      "description": "Monitors repository visibility policies ensuring sensitive repositories remain private, public exposure stays below threshold, and naming conventions are enforced.",
+      "category": "Data Protection",
+      "status": "success",
+      "last_run": "2025-11-13T17:50:22Z",
+      "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100005",
+      "all_runs_url": "https://github.com/acme-corp/kickbutt-compliance/actions/workflows/control-repo-visibility.yml",
+      "docs_url": "docs/control-repo-visibility.html",
+      "pass_rate": 80,
+      "trend": "improving",
+      "history": [
+        { "status": "success", "created_at": "2025-11-13T17:50:22Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100005", "run_number": 37, "duration_seconds": 52 },
+        { "status": "success", "created_at": "2025-11-13T11:50:18Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100004", "run_number": 36, "duration_seconds": 48 },
+        { "status": "failure", "created_at": "2025-11-13T05:50:15Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100003", "run_number": 35, "duration_seconds": 63 },
+        { "status": "success", "created_at": "2025-11-12T23:50:10Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100002", "run_number": 34, "duration_seconds": 45 },
+        { "status": "success", "created_at": "2025-11-12T17:50:08Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100001", "run_number": 33, "duration_seconds": 50 }
+      ]
+    },
+    {
+      "name": "control-repo-rulesets.yml",
+      "description": "Verifies branch protection rules, organization-level rulesets, required status checks, and pull request review requirements on critical repositories.",
+      "category": "Change Management",
+      "status": "failure",
+      "last_run": "2025-11-13T17:55:30Z",
+      "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100010",
+      "all_runs_url": "https://github.com/acme-corp/kickbutt-compliance/actions/workflows/control-repo-rulesets.yml",
+      "docs_url": "docs/control-repo-rulesets.html",
+      "pass_rate": 40,
+      "trend": "degrading",
+      "history": [
+        { "status": "failure", "created_at": "2025-11-13T17:55:30Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100010", "run_number": 29, "duration_seconds": 71 },
+        { "status": "failure", "created_at": "2025-11-13T11:55:25Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100009", "run_number": 28, "duration_seconds": 68 },
+        { "status": "success", "created_at": "2025-11-13T05:55:20Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100008", "run_number": 27, "duration_seconds": 55 },
+        { "status": "failure", "created_at": "2025-11-12T23:55:15Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100007", "run_number": 26, "duration_seconds": 70 },
+        { "status": "success", "created_at": "2025-11-12T17:55:10Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100006", "run_number": 25, "duration_seconds": 58 }
+      ]
+    },
+    {
+      "name": "control-org-custom-role.yml",
+      "description": "Audits custom organization role definitions, validates least-privilege assignments, and checks for overly permissive role configurations.",
+      "category": "Access Control",
+      "status": "success",
+      "last_run": "2025-11-13T18:00:05Z",
+      "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100015",
+      "all_runs_url": "https://github.com/acme-corp/kickbutt-compliance/actions/workflows/control-org-custom-role.yml",
+      "docs_url": "docs/control-org-custom-role.html",
+      "pass_rate": 80,
+      "trend": "stable",
+      "history": [
+        { "status": "success", "created_at": "2025-11-13T18:00:05Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100015", "run_number": 22, "duration_seconds": 44 },
+        { "status": "success", "created_at": "2025-11-13T12:00:02Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100014", "run_number": 21, "duration_seconds": 40 },
+        { "status": "failure", "created_at": "2025-11-13T06:00:00Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100013", "run_number": 20, "duration_seconds": 61 },
+        { "status": "success", "created_at": "2025-11-12T18:00:00Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100012", "run_number": 19, "duration_seconds": 42 },
+        { "status": "success", "created_at": "2025-11-12T12:00:00Z", "run_url": "https://github.com/acme-corp/kickbutt-compliance/actions/runs/100011", "run_number": 18, "duration_seconds": 38 }
+      ]
+    }
+  ]
+}
