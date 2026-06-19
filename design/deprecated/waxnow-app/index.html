@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WaxNow — In-Home Waxing, On Demand</title>
+<style>
+  :root{--pink:#d6336c;--pink-light:#e8437d;--ink:#2b2b32;--bg:#faf4f6;--card:#fff;--muted:#888;--border:#eee;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif}
+  body{background:var(--bg);color:var(--ink);min-height:100vh}
+
+  /* Header */
+  header{background:var(--pink);color:#fff;padding:18px 22px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(214,51,108,.25)}
+  header svg{flex-shrink:0}
+  header .brand{font-weight:700;font-size:20px}
+  header .tagline{font-size:12px;opacity:.85;margin-top:2px}
+
+  /* Layout */
+  main{max-width:780px;margin:0 auto;padding:18px}
+
+  /* Nav */
+  .nav{display:flex;gap:8px;margin-bottom:16px}
+  .nav button{padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;border:2px solid transparent;cursor:pointer;transition:all .15s}
+  .nav button.active{background:var(--pink);color:#fff;border-color:var(--pink)}
+  .nav button:not(.active){background:#fff;color:var(--ink);border-color:var(--border)}
+  .nav button:not(.active):hover{border-color:var(--pink);color:var(--pink)}
+
+  /* Cards */
+  .card{background:var(--card);border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:box-shadow .15s}
+  .card:hover{box-shadow:0 4px 18px rgba(0,0,0,.1)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+  /* Buttons */
+  .btn{background:var(--pink);color:#fff;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;font-weight:600;font-size:14px;transition:background .15s}
+  .btn:hover{background:var(--pink-light)}
+  .btn-secondary{background:#f0eaec;color:var(--ink);border:0;border-radius:10px;padding:10px 16px;cursor:pointer;font-weight:600;font-size:14px}
+  .btn-secondary:hover{background:#e4dce0}
+
+  /* Form controls */
+  select,input[type=text],input[type=date],input[type=time]{padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;width:100%;font-size:14px;transition:border-color .15s}
+  select:focus,input:focus{outline:none;border-color:var(--pink)}
+  .field{margin-top:10px}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+
+  /* Pill / badge */
+  .pill{background:#ffe3ec;color:var(--pink);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;display:inline-block}
+  .pill-green{background:#e6f9ed;color:#1a7a3a}
+
+  /* Stars */
+  .stars{cursor:pointer;font-size:22px;color:#f6b73c;user-select:none}
+  .stars span:hover{transform:scale(1.2);display:inline-block}
+
+  /* Typography */
+  h2{font-size:16px;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .provider-name{font-size:18px;font-weight:700}
+
+  /* Status badge */
+  .status{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;font-size:13px;font-weight:600}
+  .status-enroute{background:#fff3cd;color:#856404}
+  .status-completed{background:#d4edda;color:#155724}
+
+  /* Empty state */
+  .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+  .empty svg{margin-bottom:12px;opacity:.4}
+
+  /* Confirmation modal overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+  .modal{background:#fff;border-radius:18px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+  .modal h2{font-size:20px;margin-bottom:12px}
+  .modal .detail{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f4f4f4;font-size:14px}
+  .modal .detail:last-of-type{border:none}
+  .modal .total{font-size:18px;font-weight:700;margin-top:8px}
+  .modal .actions{display:flex;gap:10px;margin-top:18px}
+  .modal .actions button{flex:1}
+
+  /* Responsive */
+  @media(max-width:500px){
+    header{padding:14px 16px}
+    main{padding:12px}
+    .card{padding:14px}
+    .nav button{padding:8px 14px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="13" stroke="#fff" stroke-width="2"/><path d="M9 14c0-3 2.5-6 5-6s5 3 5 6-2.5 6-5 6-5-3-5-6z" fill="#fff" opacity=".3"/><circle cx="14" cy="12" r="3" fill="#fff"/></svg>
+  <div>
+    <div class="brand">WaxNow</div>
+    <div class="tagline">Licensed estheticians to your door</div>
+  </div>
+</header>
+
+<main>
+  <div class="nav">
+    <button id="nav-browse" class="active" onclick="show('browse')">Book a Service</button>
+    <button id="nav-bookings" onclick="show('bookings')">My Bookings</button>
+  </div>
+  <div id="browse"></div>
+  <div id="bookings" style="display:none"></div>
+  <div id="modal-root"></div>
+</main>
+
+<script>
+// ─── Seed data: licensed, mobile-registered MA providers ───
+const PROVIDERS = [
+  {
+    id: 1,
+    name: "Ana R.",
+    lic: "AE-Type6 #44128",
+    mobileReg: "MOB-0091",
+    rating: 4.9,
+    reviews: 127,
+    bio: "5 years specializing in hard-wax Brazilian technique. Certified by Hive Beauty Education.",
+    services: { "Bikini Line": 45, "Brazilian": 65, "Full Leg": 70, "Underarm": 20 }
+  },
+  {
+    id: 2,
+    name: "Mariana S.",
+    lic: "AE-Type6 #51902",
+    mobileReg: "MOB-0144",
+    rating: 4.8,
+    reviews: 94,
+    bio: "Gentle-wax specialist. European Wax Center trained, now independent.",
+    services: { "Bikini Line": 50, "Brazilian": 70, "Underarm": 22, "Lip & Chin": 18 }
+  },
+  {
+    id: 3,
+    name: "Jordan T.",
+    lic: "AE-Type6 #60017",
+    mobileReg: "MOB-0210",
+    rating: 4.7,
+    reviews: 61,
+    bio: "All-gender waxing. Stonhart Academy certified. Specializing in sensitive skin.",
+    services: { "Brazilian": 68, "Back": 55, "Chest": 50, "Full Arm": 35 }
+  },
+  {
+    id: 4,
+    name: "Priya K.",
+    lic: "AE-Type6 #58441",
+    mobileReg: "MOB-0287",
+    rating: 5.0,
+    reviews: 38,
+    bio: "Sugar wax specialist — all-natural, less irritation. Catherine Hinds graduate.",
+    services: { "Brazilian (Sugar)": 75, "Bikini Line (Sugar)": 55, "Full Leg (Sugar)": 80, "Underarm (Sugar)": 25 }
+  }
+];
+
+const PLATFORM_FEE = 0.20; // 20% commission
+
+// ─── Simple localStorage "database" ───
+const db = {
+  get: () => JSON.parse(localStorage.getItem("waxnow_bookings") || "[]"),
+  save: (b) => localStorage.setItem("waxnow_bookings", JSON.stringify(b))
+};
+
+// ─── Navigation ───
+function show(id) {
+  document.getElementById('browse').style.display = id === 'browse' ? 'block' : 'none';
+  document.getElementById('bookings').style.display = id === 'bookings' ? 'block' : 'none';
+  document.getElementById('nav-browse').className = id === 'browse' ? 'active' : '';
+  document.getElementById('nav-bookings').className = id === 'bookings' ? 'active' : '';
+  if (id === 'browse') renderBrowse();
+  else renderBookings();
+}
+
+// ─── Browse / Book ───
+function renderBrowse() {
+  const el = document.getElementById('browse');
+  el.innerHTML = PROVIDERS.map(p => `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="provider-name">${p.name}</div>
+          <div class="muted" style="margin-top:2px">${p.bio}</div>
+          <div style="margin-top:6px">
+            <span class="pill">★ ${p.rating}</span>
+            <span class="muted" style="margin-left:6px">${p.reviews} reviews</span>
+          </div>
+          <div class="muted" style="margin-top:4px;font-size:11px">License: ${p.lic} · Mobile Reg: ${p.mobileReg}</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Service</label>
+        <select id="svc-${p.id}">
+          ${Object.entries(p.services).map(([s, pr]) =>
+            `<option value="${s}|${pr}">${s} — $${pr}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Your address</label>
+        <input type="text" id="addr-${p.id}" placeholder="123 Main St, Boston, MA" />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <div class="field" style="flex:1">
+          <label>Date</label>
+          <input type="date" id="date-${p.id}" value="${todayStr()}" min="${todayStr()}" />
+        </div>
+        <div class="field" style="flex:1">
+          <label>Time</label>
+          <input type="time" id="time-${p.id}" value="14:00" />
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn" onclick="confirmBook(${p.id})">Book Now</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function confirmBook(pid) {
+  const p = PROVIDERS.find(x => x.id === pid);
+  const [svc, price] = document.getElementById('svc-' + pid).value.split('|');
+  const addr = document.getElementById('addr-' + pid).value || "(address pending)";
+  const date = document.getElementById('date-' + pid).value;
+  const time = document.getElementById('time-' + pid).value;
+  const fee = Math.round(+price * PLATFORM_FEE * 100) / 100;
+  const total = +price;
+  const eta = 8 + Math.floor(Math.random() * 22);
+
+  // Show confirmation modal
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <h2>Confirm Your Booking</h2>
+        <div class="detail"><span>Provider</span><strong>${p.name}</strong></div>
+        <div class="detail"><span>Service</span><strong>${svc}</strong></div>
+        <div class="detail"><span>Location</span><strong>${addr}</strong></div>
+        <div class="detail"><span>Date & Time</span><strong>${formatDate(date)} at ${formatTime(time)}</strong></div>
+        <div class="detail"><span>Service price</span><span>$${(+price).toFixed(2)}</span></div>
+        <div class="detail"><span>Platform fee (included)</span><span class="muted">$${fee.toFixed(2)}</span></div>
+        <div class="total row"><span>You pay</span><span>$${total.toFixed(2)}</span></div>
+        <div class="actions">
+          <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+          <button class="btn" onclick="placeBooking(${pid},'${svc.replace(/'/g,"\\'")}',${price},'${addr.replace(/'/g,"\\'")}','${date}','${time}',${eta},${fee})">Confirm</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function placeBooking(pid, svc, price, addr, date, time, eta, fee) {
+  const p = PROVIDERS.find(x => x.id === pid);
+  const booking = {
+    id: Date.now(),
+    provider: p.name,
+    providerId: p.id,
+    svc,
+    price: +price,
+    commission: fee,
+    addr,
+    date,
+    time,
+    eta,
+    status: "Provider en route",
+    rating: 0
+  };
+  const all = db.get();
+  all.push(booking);
+  db.save(all);
+  closeModal();
+  show('bookings');
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+// ─── Bookings ───
+function renderBookings() {
+  const el = document.getElementById('bookings');
+  const all = db.get();
+
+  if (!all.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="#ccc" stroke-width="2"/><path d="M16 28c2 3 5 5 8 5s6-2 8-5" stroke="#ccc" stroke-width="2" fill="none"/><circle cx="18" cy="20" r="2" fill="#ccc"/><circle cx="30" cy="20" r="2" fill="#ccc"/></svg>
+        <div style="font-size:16px;font-weight:600;margin-bottom:4px">No bookings yet</div>
+        <div>Book your first in-home waxing service above!</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = all.slice().reverse().map(b => {
+    const statusClass = b.status === "Completed" ? "status-completed" : "status-enroute";
+    return `
+    <div class="card">
+      <div class="row">
+        <h2>${b.svc}</h2>
+        <span class="pill" style="font-size:14px">$${b.price}</span>
+      </div>
+      <div class="muted" style="margin-top:4px">${b.provider} · ${formatDate(b.date)} at ${formatTime(b.time)}</div>
+      <div class="muted">📍 ${b.addr}</div>
+      <div style="margin-top:8px">
+        <span class="status ${statusClass}">${b.status === "Completed" ? "✓" : "🚗"} ${b.status}${b.status !== "Completed" ? " · ETA ~" + b.eta + " min" : ""}</span>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f4f4f4">
+        <span class="muted" style="font-size:12px">Rate your experience:</span>
+        <div style="margin-top:4px">
+          ${[1,2,3,4,5].map(n =>
+            `<span class="stars" onclick="rate(${b.id},${n})">${n <= b.rating ? '★' : '☆'}</span>`
+          ).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function rate(id, stars) {
+  const all = db.get();
+  const b = all.find(x => x.id === id);
+  if (b) {
+    b.rating = stars;
+    b.status = "Completed";
+    db.save(all);
+    renderBookings();
+  }
+}
+
+// ─── Helpers ───
+function formatDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${+m}/${+day}/${y}`;
+}
+
+function formatTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hr = +h;
+  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+}
+
+// ─── Init ───
+show('browse');
+</script>
+</body>
+</html>
