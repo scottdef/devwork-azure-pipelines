@@ -37,3 +37,29 @@ Audit Compensating Control Settings
 1. Evidence of the script set to audit the compensating control settings to establish 'Compliance as code"
 2. Evidence that out of expected values are reported as a result of the automated script and remediated as needed
 3. Evidence showing the automated script runs weedy
+
+
+
+PAT Lifetime & Scope
+1. Evidence that PAT configuration is set to max lifetime of 30 days and this config can't be changed by individual users
+2. Evidence that any PATs with admin scopes have documented justification and approval
+3. Evidence that all fine-grained PATs have documented admin approval
+4. Evidence that PATs must be configured via terraform at the organization level
+5. Evidence of expiration reminders, including the automated script and the reminder sent to individuals
+6. Evidence of audits of the expired PATs
+7. Evidence of the automated weedy script running to identify expired PATs and review of output, with any changes identified
+
+
+
+OAuth App & GitHub App Restrictions
+1. Evidence that users are not allowed to install and use Oauth and/or GitHub apps
+2. Evidence that, if apps are installed and used, they have documented approval from an admin
+3. Evidence of the "whitelisted" applications and configuration to allow only those
+4. Evidence that (1) GitHub audit logs capture app installations and (2) these are monitored and addressed when non-compliance arises
+
+
+
+SSH Keys
+1. Evidence of GitHub logs showing the use of SSH keys
+2. Evidence of the alerting when SSH key use is identified
+3. Evidence showing users leveraging SSH keys were notified and removed keys

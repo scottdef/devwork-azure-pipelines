@@ -221,6 +221,119 @@ CONTROLS: list[Control] = [
             ),
         ],
     ),
+    Control(
+        slug="pat-lifetime-scope",
+        title="PAT Lifetime & Scope",
+        summary=(
+            "Personal access tokens constrained by policy: a 30-day maximum lifetime "
+            "that users cannot override, documented approval for admin and "
+            "fine-grained scopes, Terraform-managed org configuration, expiration "
+            "reminders, and automated auditing of expired tokens."
+        ),
+        evidence=[
+            Evidence(
+                "max-lifetime-30-days",
+                "30-day max lifetime, not user-changeable",
+                "Evidence that PAT configuration is set to max lifetime of 30 days and "
+                "this config can't be changed by individual users.",
+            ),
+            Evidence(
+                "admin-scope-justification",
+                "Admin-scope PATs justified & approved",
+                "Evidence that any PATs with admin scopes have documented "
+                "justification and approval.",
+            ),
+            Evidence(
+                "fine-grained-admin-approval",
+                "Fine-grained PATs admin-approved",
+                "Evidence that all fine-grained PATs have documented admin approval.",
+            ),
+            Evidence(
+                "terraform-org-config",
+                "PATs configured via Terraform at org level",
+                "Evidence that PATs must be configured via Terraform at the "
+                "organization level.",
+            ),
+            Evidence(
+                "expiration-reminders",
+                "Expiration reminders",
+                "Evidence of expiration reminders, including the automated script and "
+                "the reminder sent to individuals.",
+            ),
+            Evidence(
+                "expired-pat-audits",
+                "Audits of expired PATs",
+                "Evidence of audits of the expired PATs.",
+            ),
+            Evidence(
+                "automated-weekly-scan",
+                "Weekly automated expired-PAT scan",
+                "Evidence of the automated weekly script running to identify expired "
+                "PATs and review of output, with any changes identified.",
+            ),
+        ],
+    ),
+    Control(
+        slug="oauth-github-app-restrictions",
+        title="OAuth App & GitHub App Restrictions",
+        summary=(
+            "OAuth and GitHub App installations restricted to an approved allowlist "
+            "with documented admin approval, and installations captured in audit logs "
+            "and monitored for non-compliance."
+        ),
+        evidence=[
+            Evidence(
+                "apps-not-allowed",
+                "App installation restricted",
+                "Evidence that users are not allowed to install and use OAuth and/or "
+                "GitHub apps.",
+            ),
+            Evidence(
+                "documented-app-approval",
+                "Installed apps have admin approval",
+                "Evidence that, if apps are installed and used, they have documented "
+                "approval from an admin.",
+            ),
+            Evidence(
+                "whitelisted-apps",
+                "Allowlisted applications only",
+                'Evidence of the "whitelisted" applications and configuration to allow '
+                "only those.",
+            ),
+            Evidence(
+                "audit-log-monitoring",
+                "App installs logged & monitored",
+                "Evidence that (1) GitHub audit logs capture app installations and "
+                "(2) these are monitored and addressed when non-compliance arises.",
+            ),
+        ],
+    ),
+    Control(
+        slug="ssh-keys",
+        title="SSH Keys",
+        summary=(
+            "SSH key usage surfaced in GitHub logs, alerted on, and remediated by "
+            "notifying users and removing their keys."
+        ),
+        evidence=[
+            Evidence(
+                "logs-ssh-key-use",
+                "Logs showing SSH key use",
+                "Evidence of GitHub logs showing the use of SSH keys.",
+            ),
+            Evidence(
+                "alerting-ssh-key-use",
+                "Alerting on SSH key use",
+                "Evidence of the alerting when SSH key use is identified.",
+            ),
+            Evidence(
+                "notify-and-remove",
+                "Users notified & keys removed",
+                "Evidence showing users leveraging SSH keys were notified and removed "
+                "keys.",
+            ),
+        ],
+    ),
 ]
 
 SITE_TITLE = "Compliance Evidence Center"

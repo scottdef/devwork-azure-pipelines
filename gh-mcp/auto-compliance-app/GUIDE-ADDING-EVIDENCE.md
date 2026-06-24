@@ -155,6 +155,9 @@ ships as **`.github/workflows/collect-mfa-evidence.yml`**. It:
 | Repository permissions | `gh api` collaborator/team permission dumps, quarterly |
 | Dynatrace logs | Dynatrace API export of ingest config + retention settings |
 | Compensating controls | Reuse the existing `control-*.yml` check output as a snapshot |
+| PAT lifetime & scope | `gh api /orgs/{org}/...` token policy + expired-token scan; Terraform plan |
+| OAuth/GitHub app restrictions | `gh api` org app allowlist/installations + audit-log queries |
+| SSH keys | GitHub audit-log / `gh api` queries for key usage + alerting hooks |
 
 ### Things to get right
 - **Token scope:** the default `GITHUB_TOKEN` **cannot** read org 2FA/member data. Use

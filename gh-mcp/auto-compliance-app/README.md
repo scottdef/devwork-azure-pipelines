@@ -76,6 +76,9 @@ Defined in [`comp-cons.md`](comp-cons.md):
 - Repository Permissions
 - Dynatrace Logs Integration
 - Audit Compensating Control Settings
+- PAT Lifetime & Scope
+- OAuth App & GitHub App Restrictions
+- SSH Keys
 
 ## Related automation
 
