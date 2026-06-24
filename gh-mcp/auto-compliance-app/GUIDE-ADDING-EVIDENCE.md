@@ -172,10 +172,23 @@ HTML
 | oauth-github-app-restrictions | access policy, allowlist, audit-log monitoring | app approval register |
 | ssh-keys | audit-log SSH usage, alerting rule | notify-and-remove log |
 
+### Authentication (GitHub App — recommended)
+The default `GITHUB_TOKEN` **cannot** read org 2FA/members/PAT policy or the audit
+log. `collect-evidence.yml` authenticates as a **GitHub App** via
+`actions/create-github-app-token`, minting a short-lived org-scoped installation
+token (higher rate limits, least-privilege). Configure:
+- `EVIDENCE_APP_ID` + `EVIDENCE_APP_KEY` (App ID and private-key PEM) as secrets.
+- App permissions (read-only): *Organization* → Administration + Members;
+  *Repository* → Administration + Metadata. Install the App on the org. For many
+  orgs, use an enterprise-owned App installed per org.
+- A classic PAT (`admin:org`) or fine-grained PAT also works — just set it as
+  `GH_TOKEN` instead of the App-token step.
+
 ### Things to get right
-- **Token scope:** the default `GITHUB_TOKEN` **cannot** read org 2FA/members/PAT
-  policy or the audit log. Provide `ORG_AUDIT_TOKEN` (fine-grained PAT or GitHub App,
-  `admin:org` read; audit-log read for SSH/app-install items).
+- **Audit-log items** (`ssh-keys`, oauth `audit-log-monitoring`): App-token support
+  for the audit-log API is limited. If they come back empty, set `GH_TOKEN` to a
+  classic PAT with `read:audit_log`/`admin:enterprise` (from an enterprise owner),
+  or collect those from Dynatrace.
 - **Dynatrace:** set `DT_ENV_URL` + `DT_API_TOKEN`, or that collector emits sample.
 - **PR creation setting:** enable *Settings → Actions → General → "Allow GitHub
   Actions to create and approve pull requests"*.

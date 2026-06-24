@@ -5,14 +5,25 @@ name: Collect Evidence
 # workflow rebuilds and publishes the site once the PR merges. (main is
 # PR-protected; the Pages deploy is artifact-based, so it still publishes.)
 #
-# Setup / secrets:
-#   - Settings > Actions > General > "Allow GitHub Actions to create and approve
-#     pull requests" must be enabled.
-#   - ORG_AUDIT_TOKEN — token with `admin:org` read (fine-grained PAT or GitHub
-#     App). The default GITHUB_TOKEN cannot read org 2FA/members/PAT policy or the
-#     audit log. SSH-key / app-install audit-log items also need audit-log read.
-#   - DT_ENV_URL + DT_API_TOKEN — Dynatrace environment URL + API token (the
-#     dynatrace collector falls back to sample content when these are absent).
+# Authentication — GitHub App (recommended):
+#   The collectors run as a GitHub App installation token (short-lived, higher
+#   rate limits, least-privilege). Configure a GitHub App and store:
+#     - EVIDENCE_APP_ID   — the App's ID
+#     - EVIDENCE_APP_KEY  — the App's private key (PEM contents)
+#   App permissions (read-only): Organization > Administration + Members;
+#   Repository > Administration + Metadata. Install it on the org to collect from.
+#   For multiple orgs, use an enterprise-owned App installed per org.
+#
+#   Audit-log items (ssh-keys, oauth audit-log-monitoring): the GitHub audit-log
+#   API support for App tokens is limited. If those items return empty, either
+#   (a) set GH_TOKEN to a classic PAT with `read:audit_log`/`admin:enterprise`
+#   from an (enterprise) owner, or (b) collect them from Dynatrace instead.
+#
+# Other secrets:
+#   - DT_ENV_URL + DT_API_TOKEN — Dynatrace URL + API token (the dynatrace
+#     collector falls back to sample content when these are absent).
+#   - The PR step uses the default GITHUB_TOKEN; enable Settings > Actions >
+#     General > "Allow GitHub Actions to create and approve pull requests".
 #
 # Collectors are resilient: each writes only the items it can, and manual items
 # (approval registers, process docs) are left untouched in live mode.
@@ -47,16 +58,26 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ORG: ${{ github.repository_owner }}
-      GH_TOKEN: ${{ secrets.ORG_AUDIT_TOKEN }}
       DT_ENV_URL: ${{ secrets.DT_ENV_URL }}
       DT_API_TOKEN: ${{ secrets.DT_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
+      # Mint a short-lived installation token scoped to the org being collected.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.EVIDENCE_APP_ID }}
+          private-key: ${{ secrets.EVIDENCE_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y jq bc
 
       - name: Run collectors (live)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -uo pipefail
           sel="${{ github.event.inputs.control || 'all' }}"
