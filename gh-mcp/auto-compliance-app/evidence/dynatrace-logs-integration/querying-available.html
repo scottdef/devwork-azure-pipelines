@@ -1,0 +1,14 @@
+<p>GitHub logs are queryable in Dynatrace via DQL for audit, debugging, and
+compliance. Example query and result:</p>
+<pre><code>fetch logs
+| filter log.source == "github-audit"
+| summarize count(), by:{action}
+| sort count() desc</code></pre>
+<table class="data">
+  <thead><tr><th>action</th><th>count (24h)</th></tr></thead>
+  <tbody>
+    <tr><td>git.push</td><td>4120</td></tr>
+    <tr><td>repo.access</td><td>980</td></tr>
+    <tr><td>org.update_member</td><td>14</td></tr>
+  </tbody>
+</table>

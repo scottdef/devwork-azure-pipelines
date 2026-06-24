@@ -1,0 +1,6 @@
+<p>A scheduled script identifies tokens expiring within 7 days and emails the owner.</p>
+<pre><code># tokens expiring in <= 7 days -> notify owner
+for t in $(list_org_tokens --expiring 7d); do
+  notify "$(token_owner "$t")" "PAT $t expires on $(token_expiry "$t")"
+done</code></pre>
+<p><em>Sample reminder:</em> "Your PAT <code>ci-deploy</code> expires 2026-06-30. Rotate via Terraform."</p>

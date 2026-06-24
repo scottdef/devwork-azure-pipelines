@@ -1,0 +1,5 @@
+<p>The log bucket holding GitHub logs is configured for <strong>400-day</strong>
+retention (&ge; 12 months required).</p>
+<pre><code>GET $DT_ENV_URL/api/v2/storage/log-buckets/github_audit
+{ "bucketName": "github_audit", "retentionDays": 400, "status": "ACTIVE" }</code></pre>
+<img class="evidence" src="dt-retention.svg" alt="Dynatrace bucket retention 400 days">

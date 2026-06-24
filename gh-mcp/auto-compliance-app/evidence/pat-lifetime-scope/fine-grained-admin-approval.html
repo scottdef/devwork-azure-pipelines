@@ -1,0 +1,5 @@
+<p>All fine-grained PATs targeting org resources are approved by an admin via the
+organization's PAT approval flow.</p>
+<pre><code>gh api "/orgs/$ORG/personal-access-tokens" \
+  --jq '.[] | [.owner.login, .token_name, .access_granted_at] | @tsv'</code></pre>
+<p><em>Manual evidence — refresh with the approvals export + reviewer sign-off.</em></p>

@@ -1,6 +1,6 @@
 # Compliance Evidence Center — Makefile
 
-.PHONY: help build serve clean run-controls status
+.PHONY: help build serve clean sample run-controls status
 
 help: ## Show this help message
 	@echo "Compliance Evidence Center - Makefile Commands"
@@ -17,6 +17,13 @@ serve: build ## Build, then serve the site locally at http://localhost:8000
 
 clean: ## Remove the generated _site/ directory
 	@rm -rf _site && echo "✅ Removed _site/"
+
+sample: ## Seed/refresh sample evidence for all controls (won't clobber existing files)
+	@for f in scripts/collect/*.sh; do \
+		[ "$$(basename $$f)" = "_lib.sh" ] && continue; \
+		bash "$$f" --sample; \
+	done
+	@echo "✅ Sample evidence seeded — run 'make build' to regenerate the site"
 
 run-controls: ## Trigger the automated compliance-check workflows (requires gh CLI)
 	@gh workflow run control-org-settings.yml

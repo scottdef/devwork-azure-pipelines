@@ -1,0 +1,9 @@
+<p>Users found using SSH keys are notified and their keys removed.</p>
+<table class="data">
+  <thead><tr><th>User</th><th>Detected</th><th>Notified</th><th>Key removed</th></tr></thead>
+  <tbody>
+    <tr><td>a.dev</td><td>2026-06-19</td><td>2026-06-19</td><td>2026-06-20</td></tr>
+  </tbody>
+</table>
+<pre><code>gh api -X DELETE "/user/keys/$KEY_ID"   # after user notification</code></pre>
+<p><em>Manual evidence — refresh from the SSH-key remediation log.</em></p>

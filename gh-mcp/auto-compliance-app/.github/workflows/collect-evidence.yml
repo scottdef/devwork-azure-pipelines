@@ -1,0 +1,83 @@
+name: Collect Evidence
+
+# Runs the per-control collectors in scripts/collect/ in LIVE mode to refresh
+# evidence from real APIs, then opens a single PR with the changes. The deploy
+# workflow rebuilds and publishes the site once the PR merges. (main is
+# PR-protected; the Pages deploy is artifact-based, so it still publishes.)
+#
+# Setup / secrets:
+#   - Settings > Actions > General > "Allow GitHub Actions to create and approve
+#     pull requests" must be enabled.
+#   - ORG_AUDIT_TOKEN — token with `admin:org` read (fine-grained PAT or GitHub
+#     App). The default GITHUB_TOKEN cannot read org 2FA/members/PAT policy or the
+#     audit log. SSH-key / app-install audit-log items also need audit-log read.
+#   - DT_ENV_URL + DT_API_TOKEN — Dynatrace environment URL + API token (the
+#     dynatrace collector falls back to sample content when these are absent).
+#
+# Collectors are resilient: each writes only the items it can, and manual items
+# (approval registers, process docs) are left untouched in live mode.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      control:
+        description: 'Control to collect (or all)'
+        type: choice
+        default: all
+        options:
+          - all
+          - user-id-auditing
+          - multi-factor-authentication
+          - repository-visibility
+          - repository-permissions
+          - dynatrace-logs-integration
+          - compensating-control-settings
+          - pat-lifetime-scope
+          - oauth-github-app-restrictions
+          - ssh-keys
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    env:
+      ORG: ${{ github.repository_owner }}
+      GH_TOKEN: ${{ secrets.ORG_AUDIT_TOKEN }}
+      DT_ENV_URL: ${{ secrets.DT_ENV_URL }}
+      DT_API_TOKEN: ${{ secrets.DT_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y jq bc
+
+      - name: Run collectors (live)
+        run: |
+          set -uo pipefail
+          sel="${{ github.event.inputs.control || 'all' }}"
+          if [ "$sel" = "all" ]; then
+            for f in scripts/collect/*.sh; do
+              [ "$(basename "$f")" = "_lib.sh" ] && continue
+              echo "::group::$(basename "$f")"
+              bash "$f" --live || echo "::warning::collector failed: $f"
+              echo "::endgroup::"
+            done
+          else
+            bash "scripts/collect/$sel.sh" --live
+          fi
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: evidence/auto-refresh
+          title: "Evidence refresh (automated)"
+          commit-message: "Automated evidence refresh"
+          body: |
+            Automated evidence collection refresh from `scripts/collect/`.
+            Review the diff (and the `status` on each item), then merge to publish.
+          add-paths: evidence/**

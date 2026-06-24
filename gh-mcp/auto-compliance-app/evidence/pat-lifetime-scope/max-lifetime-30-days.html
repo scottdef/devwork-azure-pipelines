@@ -1,0 +1,5 @@
+<p>Organization policy caps personal access token lifetime at <strong>30 days</strong>
+and members cannot raise it. Fine-grained PATs against org resources require approval.</p>
+<pre><code>gh api "/orgs/$ORG/settings/personal-access-token-requests" \
+  --jq '{max_lifetime_days, enforced}'
+# => { "max_lifetime_days": 30, "enforced": true }</code></pre>

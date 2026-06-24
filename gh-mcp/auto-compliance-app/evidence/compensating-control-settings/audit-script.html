@@ -1,0 +1,6 @@
+<p>Compensating control settings are audited as code by the
+<code>control-*.yml</code> workflows, each asserting an expected GitHub
+configuration and failing the run when reality drifts.</p>
+<pre><code>two_factor=$(gh api "/orgs/$ORG" --jq '.two_factor_requirement_enabled')
+[ "$two_factor" = "true" ] || { echo "::error::2FA not enforced"; exit 1; }</code></pre>
+<p>Controls: org settings, repo visibility, repo rulesets, custom roles.</p>

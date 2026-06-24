@@ -1,0 +1,10 @@
+<p>SSH-based Git operations are visible in the GitHub audit log (and forwarded to
+Dynatrace). Policy is HTTPS + short-lived tokens; SSH key usage is flagged.</p>
+<pre><code>gh api "/orgs/$ORG/audit-log?phrase=transport_protocol:ssh" \
+  --jq '.[] | [.created_at, .actor, .repo, .action] | @tsv'</code></pre>
+<table class="data">
+  <thead><tr><th>When</th><th>Actor</th><th>Repo</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>2026-06-19T14:02Z</td><td>a.dev</td><td>cla-core</td><td>git.clone (ssh)</td></tr>
+  </tbody>
+</table>

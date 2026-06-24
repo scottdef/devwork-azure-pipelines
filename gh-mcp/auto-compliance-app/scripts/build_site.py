@@ -405,6 +405,8 @@ dl.fields dt:last-of-type, dl.fields dd:last-of-type { border-bottom: none; }
 .pill { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
 .pill.ok { background: #dafbe1; color: #1a7f37; }
 .pill.pending { background: #fff1cc; color: #9a6700; }
+.pill.sample { background: #fff1cc; color: #9a6700; }
+.pill.manual { background: #ddf4ff; color: #0969da; }
 pre { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
 pre code { background: none; padding: 0; }
 table.data { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; }
@@ -522,12 +524,14 @@ def render_evidence(
     )
 
     if documented:
-        pill = '<span class="pill ok">documented</span>'
+        status = meta.get("status", "documented")
+        pill_cls = {"sample": "sample", "manual": "manual"}.get(status, "ok")
+        pill = f'<span class="pill {pill_cls}">{html.escape(status)}</span>'
         content = f"""
 <h2>Evidence</h2>
 {source_html}
 """
-        default_status = meta.get("status", "documented")
+        default_status = status
     else:
         pill = '<span class="pill pending">pending</span>'
         content = """

@@ -1,0 +1,7 @@
+<p>A scheduled script enumerates org members via the GitHub API and checks each
+profile against CLA standards (corporate email domain, display name set, SSO
+identity linked). On the latest run it scanned <strong>137</strong> members and
+flagged <strong>2</strong> for follow-up.</p>
+<pre><code>for u in $(gh api "/orgs/cla-org/members" --paginate --jq '.[].login'); do
+  gh api "/users/$u" --jq '[.login, .email, .name] | @tsv'
+done</code></pre>

@@ -1,0 +1,10 @@
+<p>Only explicitly approved (allowlisted) applications are installed:</p>
+<table class="data">
+  <thead><tr><th>App</th><th>Type</th><th>Approved</th></tr></thead>
+  <tbody>
+    <tr><td>Terraform Cloud</td><td>GitHub App</td><td>yes</td></tr>
+    <tr><td>Dynatrace</td><td>GitHub App</td><td>yes</td></tr>
+    <tr><td>CodeQL</td><td>GitHub App</td><td>yes</td></tr>
+  </tbody>
+</table>
+<pre><code>gh api "/orgs/$ORG/installations" --jq '.installations[].app_slug'</code></pre>

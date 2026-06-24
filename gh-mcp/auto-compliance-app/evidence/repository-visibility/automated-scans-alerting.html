@@ -1,0 +1,7 @@
+<p>A scheduled scan re-checks visibility weekly (this collector) and posts an alert
+to the security channel if any repository is public.</p>
+<pre><code>pub=$(gh api "/orgs/$ORG/repos?per_page=100" \
+        --jq '[.[]|select(.visibility=="public")]|length')
+[ "$pub" -gt 0 ] && curl -s -X POST "$ALERT_WEBHOOK" \
+  -d "{\"text\":\"⚠️ $pub public repo(s) detected in $ORG\"}"</code></pre>
+<p><em>Live runs link the scan run URL and any alert posted.</em></p>

@@ -1,0 +1,5 @@
+<p>Two-factor authentication is <strong>enforced at the organization level</strong>
+(<code>two_factor_requirement_enabled = true</code>). Members cannot turn 2FA
+off for their account while remaining in the org; disabling it removes them.</p>
+<pre><code>gh api "/orgs/cla-org" --jq '.two_factor_requirement_enabled'   # =&gt; true</code></pre>
+<img class="evidence" src="2fa-org-setting.svg" alt="Require two-factor authentication enabled">

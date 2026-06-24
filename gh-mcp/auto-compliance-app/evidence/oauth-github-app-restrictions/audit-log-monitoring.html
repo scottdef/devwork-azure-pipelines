@@ -1,0 +1,5 @@
+<p>App installations are captured in the GitHub audit log and monitored; unapproved
+installs trigger an alert and review.</p>
+<pre><code>gh api "/orgs/$ORG/audit-log?phrase=action:integration_installation" \
+  --jq '.[] | [.created_at, .name, .actor] | @tsv'</code></pre>
+<p><em>Live runs attach recent installation events and any alert raised.</em></p>

@@ -1,0 +1,6 @@
+<p>A Dynatrace alerting rule fires when SSH transport is observed in GitHub logs,
+notifying the security channel.</p>
+<pre><code>fetch logs
+| filter log.source == "github-audit" and transport_protocol == "ssh"
+| // alert: notify #security when count() > 0</code></pre>
+<p><em>Live runs link the alert configuration and most recent firing.</em></p>

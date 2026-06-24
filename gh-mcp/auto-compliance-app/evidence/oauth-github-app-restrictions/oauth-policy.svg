@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="100" viewBox="0 0 540 100" font-family="-apple-system, Segoe UI, sans-serif">
+  <rect x="0.5" y="0.5" width="539" height="99" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="20" y="30" font-size="14" font-weight="700" fill="#1f2328">Third-party application access policy</text>
+  <line x1="20" y1="42" x2="520" y2="42" stroke="#d0d7de"/>
+  <circle cx="30" cy="68" r="6" fill="#1a7f37"/>
+  <text x="46" y="73" font-size="13" fill="#1f2328">Access restricted — admin approval required for OAuth &amp; GitHub Apps</text>
+</svg>

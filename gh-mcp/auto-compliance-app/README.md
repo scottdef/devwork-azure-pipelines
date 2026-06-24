@@ -38,6 +38,7 @@ over time.
 ```bash
 make build     # generate _site/
 make serve     # build + serve at http://localhost:8000
+make sample    # seed/refresh sample evidence for all controls
 make clean     # remove _site/
 ```
 
@@ -80,12 +81,19 @@ Defined in [`comp-cons.md`](comp-cons.md):
 - OAuth App & GitHub App Restrictions
 - SSH Keys
 
-## Related automation
+## Automated evidence collection
 
-The `control-*.yml` workflows are standalone automated compliance checks (org
-settings, repo visibility, rulesets, custom roles) that pass/fail on a cron. They are
-not part of the site build but are a natural source of real evidence to drop into the
-evidence documents.
+Per-control collector scripts in `scripts/collect/` gather evidence from real APIs
+(`gh api`, Dynatrace) and write it into the `evidence/` tree. The
+`collect-evidence.yml` workflow runs them weekly (or on demand, per control) and
+opens a PR with the refresh. Locally, `make sample` runs every collector in
+`--sample` mode to seed realistic sample evidence (all 9 controls render fully
+documented out of the box). See
+[`GUIDE-ADDING-EVIDENCE.md`](GUIDE-ADDING-EVIDENCE.md) §4.
+
+The `control-*.yml` workflows are separate standalone compliance checks (org
+settings, repo visibility, rulesets, custom roles) that pass/fail on a cron and feed
+the compensating-controls evidence.
 
 ---
 

@@ -1,0 +1,6 @@
+<p>GitHub audit and webhook logs are forwarded to Dynatrace via the Generic Log
+Ingest pipeline. The ingest source <code>github-audit</code> is active and
+receiving events.</p>
+<pre><code>curl -s "$DT_ENV_URL/api/v2/logs/ingest" \
+  -H "Authorization: Api-Token $DT_API_TOKEN"   # 200 OK, source: github-audit</code></pre>
+<p><em>Live runs attach the ingest source status and last-received timestamp.</em></p>

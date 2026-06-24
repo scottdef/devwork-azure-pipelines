@@ -1,0 +1,5 @@
+<p>Third-party application access is restricted: the org requires admin approval and
+members cannot install OAuth/GitHub apps freely. OAuth App access policy is
+<code>enabled</code> (approval required).</p>
+<pre><code>gh api "/orgs/cla-org" --jq '.members_can_create_oauth_app_tokens'</code></pre>
+<img class="evidence" src="oauth-policy.svg" alt="Third-party access policy: restricted">

@@ -1,0 +1,10 @@
+<p>Default repository visibility is set to <code>private</code> and member
+repo-creation is disabled via Terraform (org settings as code):</p>
+<pre><code>resource "github_organization_settings" "cla" {
+  default_repository_permission           = "read"
+  members_can_create_public_repositories  = false
+  members_can_create_private_repositories = false
+  members_can_create_internal_repositories = false
+}</code></pre>
+<p><em>Manual evidence — refresh by pinning the current Terraform file/commit and a
+<code>terraform plan</code> showing no drift.</em></p>

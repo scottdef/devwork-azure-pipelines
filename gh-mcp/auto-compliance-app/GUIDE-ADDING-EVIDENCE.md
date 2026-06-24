@@ -118,58 +118,71 @@ Pages. See `README.md` for Pages setup.
 
 ## 4. Automating evidence gathering
 
-Anything you can collect from a CLI/API can be written into the `evidence/` tree by a
-scheduled job, then published through the normal PR → deploy flow. A complete example
-ships as **`.github/workflows/collect-mfa-evidence.yml`**. It:
+Evidence collection is automated by **per-control collector scripts** in
+`scripts/collect/`, driven by one workflow,
+**`.github/workflows/collect-evidence.yml`**.
 
-1. Runs weekly (`cron`) or on demand (`workflow_dispatch`).
-2. Queries the GitHub API for org 2FA status.
-3. Writes `evidence/multi-factor-authentication/all-accounts-2fa.html` + `.meta`,
-   stamping the live count, date, and a `status` of `reviewed` or `needs remediation`.
-4. Opens a **pull request** with the refreshed evidence.
+### The collector framework
+- `scripts/collect/<control-slug>.sh` — one per control. Each emits its evidence
+  via helpers in `scripts/collect/_lib.sh` (`emit`, `emit_manual`, `emit_asset`).
+- **Two modes:**
+  - **live** (default, used in CI): queries real APIs (`gh api`, Dynatrace) and
+    refreshes only the **API-automatable** items, stamping `status: reviewed` (or
+    `needs remediation`). Manual items are left untouched.
+  - **sample** (`--sample`): writes realistic sample content for **all** items
+    (`status: sample`/`manual`) and never clobbers an existing file (use `--force`
+    to overwrite). This is what `make sample` runs to seed the demo evidence.
+- Run one locally:
+  ```bash
+  scripts/collect/multi-factor-authentication.sh --sample      # safe, no API
+  ORG=cla-org GH_TOKEN=$TOKEN \
+    scripts/collect/multi-factor-authentication.sh --live      # real data
+  ```
 
-```yaml
-- name: Gather 2FA status and write evidence
-  env:
-    ORG: ${{ github.repository_owner }}
-    GH_TOKEN: ${{ secrets.ORG_AUDIT_TOKEN }}
-  run: |
-    dir="evidence/multi-factor-authentication"; mkdir -p "$dir"
-    disabled="$(gh api "/orgs/$ORG/members?filter=2fa_disabled" --jq 'length')"
-    cat > "$dir/all-accounts-2fa.html" <<HTML
-    <p>$disabled members without 2FA as of $(date -u +%F).</p>
-    HTML
-- uses: peter-evans/create-pull-request@v6
-  with:
-    branch: evidence/mfa-2fa-refresh
-    title: "Evidence refresh: MFA — all accounts 2FA"
-    add-paths: evidence/multi-factor-authentication/*
+### The workflow
+`collect-evidence.yml` runs weekly (`cron`) and on demand (`workflow_dispatch`
+with a `control` selector = `all` or one slug). It runs the collector(s) in live
+mode and opens **one PR** with the refreshed `evidence/`. On merge, the deploy
+workflow republishes.
+
+### Writing a collector item
+In `scripts/collect/<control>.sh`, pipe an HTML body into `emit` (automatable) or
+`emit_manual` (human-maintained):
+
+```bash
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"; parse_args "$@"; C="multi-factor-authentication"
+
+if is_sample; then disabled=0; else disabled="$(gh_jq "/orgs/$ORG/members?filter=2fa_disabled" 'length')"; fi
+emit "$C" all-accounts-2fa "Security Engineering" "GitHub REST API" \
+  "$(is_sample && echo sample || echo reviewed)" <<HTML
+<p>$disabled members without 2FA as of $(today).</p>
+HTML
 ```
 
-### Patterns by control
-| Control | Automatable source |
-| --- | --- |
-| User ID auditing | `gh api` user/profile queries on a weekly schedule |
-| MFA | `gh api /orgs/{org}/members?filter=2fa_disabled` (see example) |
-| Repository visibility | `gh api /orgs/{org}/repos --jq '.[].visibility'`; Terraform plan output |
-| Repository permissions | `gh api` collaborator/team permission dumps, quarterly |
-| Dynatrace logs | Dynatrace API export of ingest config + retention settings |
-| Compensating controls | Reuse the existing `control-*.yml` check output as a snapshot |
-| PAT lifetime & scope | `gh api /orgs/{org}/...` token policy + expired-token scan; Terraform plan |
-| OAuth/GitHub app restrictions | `gh api` org app allowlist/installations + audit-log queries |
-| SSH keys | GitHub audit-log / `gh api` queries for key usage + alerting hooks |
+### What each collector pulls
+| Control | Automatable (live) | Manual (sample/human-maintained) |
+| --- | --- | --- |
+| user-id-auditing | profile audit script + weekly run history | notifications, suspensions |
+| multi-factor-authentication | `members?filter=2fa_disabled`, org 2FA setting | new-user onboarding doc |
+| repository-visibility | repo visibility counts, member-create settings, scan/alert | Terraform default-visibility |
+| repository-permissions | collaborator/team permission dump | — |
+| dynatrace-logs-integration | Dynatrace ingest/query/retention (sample if no `DT_*`) | — |
+| compensating-control-settings | `control-*.yml` results + schedule | — |
+| pat-lifetime-scope | PAT policy, reminders, expired-token audit + scan | scope approvals, Terraform |
+| oauth-github-app-restrictions | access policy, allowlist, audit-log monitoring | app approval register |
+| ssh-keys | audit-log SSH usage, alerting rule | notify-and-remove log |
 
 ### Things to get right
-- **Token scope:** the default `GITHUB_TOKEN` **cannot** read org 2FA/member data. Use
-  a fine-grained PAT or GitHub App token with `admin:org` (read) as a secret
-  (`ORG_AUDIT_TOKEN` in the example).
+- **Token scope:** the default `GITHUB_TOKEN` **cannot** read org 2FA/members/PAT
+  policy or the audit log. Provide `ORG_AUDIT_TOKEN` (fine-grained PAT or GitHub App,
+  `admin:org` read; audit-log read for SSH/app-install items).
+- **Dynatrace:** set `DT_ENV_URL` + `DT_API_TOKEN`, or that collector emits sample.
 - **PR creation setting:** enable *Settings → Actions → General → "Allow GitHub
-  Actions to create and approve pull requests"* for the PR step to work.
-- **Why a PR, not a direct push:** `main` is PR-protected. The modern Pages deploy
-  uploads an artifact (it never pushes to a branch), so deployment is unaffected — but
-  evidence changes still land via PR review, which is exactly what an auditor wants:
-  a human-reviewed trail. See the deployment notes in `README.md` / `CLAUDE.md`.
-- **Keep secrets out of evidence:** write counts and settings, not tokens or raw PII.
+  Actions to create and approve pull requests"*.
+- **Why a PR, not a direct push:** `main` is PR-protected. The Pages deploy uploads an
+  artifact (never pushes to a branch), so deployment is unaffected — and evidence still
+  lands via reviewed PR, exactly the audit trail you want.
+- **Keep secrets out of evidence:** write counts/settings, not tokens or raw PII.
 
 ---
 

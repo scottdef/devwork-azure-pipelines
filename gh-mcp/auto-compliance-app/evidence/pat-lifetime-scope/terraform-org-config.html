@@ -1,0 +1,8 @@
+<p>PAT policy is configured via Terraform at the org level (settings as code):</p>
+<pre><code>resource "github_organization_settings" "cla" {
+  # personal access tokens
+  personal_access_token_max_lifetime_days = 30
+  personal_access_tokens_enabled          = true
+}</code></pre>
+<p><em>Manual evidence — refresh by pinning the Terraform file/commit and a clean
+<code>terraform plan</code>.</em></p>
