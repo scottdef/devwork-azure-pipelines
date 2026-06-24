@@ -55,9 +55,16 @@ No `gh-pages` branch is used.
 
 ## Adding or editing evidence
 
-1. Edit [`comp-cons.md`](comp-cons.md) (the source of truth for controls/requirements).
-2. Mirror the change in the `CONTROLS` list in `scripts/build_site.py`.
-3. `make build` and review locally with `make serve`.
+Real evidence content lives in the `evidence/` source tree (not in generated
+`_site/`). For each item, drop an HTML body fragment at
+`evidence/<control-slug>/<evidence-slug>.html` (plus an optional `.meta` provenance
+file and any screenshot/data assets); the build injects it and marks the item
+**documented**. To change *which* items exist, edit [`comp-cons.md`](comp-cons.md)
+and mirror it in the `CONTROLS` list in `scripts/build_site.py`.
+
+See **[`GUIDE-ADDING-EVIDENCE.md`](GUIDE-ADDING-EVIDENCE.md)** for the full manual and
+automated workflows (there's a worked MFA example and an example collection workflow,
+`collect-mfa-evidence.yml`). Then `make build` and review with `make serve`.
 
 ## Controls covered
 

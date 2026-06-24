@@ -1,0 +1,6 @@
+# Provenance for the all-accounts-2fa evidence item.
+# Recognized keys: date, by, source, status
+date: 2026-06-24
+by: S. DeFranc (Security Engineering)
+source: GitHub REST API — /orgs/cla-org/members?filter=2fa_disabled
+status: reviewed

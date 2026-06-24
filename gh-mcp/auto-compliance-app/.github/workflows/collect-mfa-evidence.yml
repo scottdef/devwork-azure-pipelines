@@ -1,0 +1,67 @@
+name: Collect MFA Evidence
+
+# EXAMPLE automation: refreshes the "all accounts have 2FA" evidence item every
+# week by querying the GitHub API, writing the evidence fragment + provenance into
+# the evidence/ source tree, and opening a PR (main is PR-protected). The deploy
+# workflow rebuilds the site once the PR merges.
+#
+# Requirements:
+#   - Settings > Actions > General > "Allow GitHub Actions to create and approve
+#     pull requests" must be enabled (for the create-pull-request step).
+#   - The default GITHUB_TOKEN cannot read org 2FA status. Provide a token with
+#     `admin:org` read scope (a fine-grained PAT or GitHub App token) as the
+#     ORG_AUDIT_TOKEN secret.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    env:
+      ORG: ${{ github.repository_owner }}
+      GH_TOKEN: ${{ secrets.ORG_AUDIT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gather 2FA status and write evidence
+        run: |
+          set -euo pipefail
+          dir="evidence/multi-factor-authentication"
+          mkdir -p "$dir"
+          date_utc="$(date -u +%Y-%m-%d)"
+
+          disabled="$(gh api "/orgs/$ORG/members?filter=2fa_disabled" --jq 'length')"
+          total="$(gh api "/orgs/$ORG/members" --paginate --jq 'length' | paste -sd+ - | bc)"
+          if [ "$disabled" -eq 0 ]; then status="reviewed"; else status="needs remediation"; fi
+
+          cat > "$dir/all-accounts-2fa.html" <<HTML
+          <p>As of $date_utc, the <code>$ORG</code> organization has <strong>$total</strong>
+          members, of which <strong>$disabled</strong> do not have two-factor authentication
+          enabled (queried via the GitHub REST API).</p>
+          <pre><code>gh api "/orgs/$ORG/members?filter=2fa_disabled" --jq 'length'  # =&gt; $disabled</code></pre>
+          HTML
+
+          cat > "$dir/all-accounts-2fa.meta" <<META
+          date: $date_utc
+          by: collect-mfa-evidence.yml (automated)
+          source: GitHub REST API — /orgs/$ORG/members?filter=2fa_disabled
+          status: $status
+          META
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: evidence/mfa-2fa-refresh
+          title: "Evidence refresh: MFA — all accounts 2FA"
+          commit-message: "Automated MFA 2FA evidence refresh"
+          body: |
+            Automated weekly refresh of the MFA "all accounts have 2FA" evidence.
+            Review the API result, then merge to publish via the deploy workflow.
+          add-paths: evidence/multi-factor-authentication/*

@@ -1,0 +1,30 @@
+<p>
+  All members of the <code>cla-org</code> GitHub organization have two-factor
+  authentication (2FA) enabled. This was verified by querying the GitHub REST API
+  for members whose 2FA is disabled; the result was zero. Organization policy also
+  <em>requires</em> 2FA at the org level, so non-compliant members cannot remain in
+  the organization.
+</p>
+
+<h3>Verification command &amp; result</h3>
+<pre><code>$ gh api "/orgs/cla-org/members?filter=2fa_disabled" --jq 'length'
+0
+
+$ gh api "/orgs/cla-org/members" --paginate --jq 'length' | paste -sd+ | bc
+137</code></pre>
+<p>137 members total, 0 without 2FA &rarr; <strong>100% compliant</strong>.</p>
+
+<h3>Sample of member 2FA status</h3>
+<table class="data">
+  <thead><tr><th>Login</th><th>Role</th><th>2FA enabled</th></tr></thead>
+  <tbody>
+    <tr><td>a-admin</td><td>admin</td><td>yes</td></tr>
+    <tr><td>b-engineer</td><td>member</td><td>yes</td></tr>
+    <tr><td>c-contractor</td><td>member</td><td>yes</td></tr>
+  </tbody>
+</table>
+
+<h3>Org setting screenshot</h3>
+<p>Organization &rarr; Settings &rarr; Authentication security, showing
+  "Require two-factor authentication for everyone" enabled:</p>
+<img class="evidence" src="2fa-org-setting.svg" alt="GitHub org setting: require two-factor authentication enabled">

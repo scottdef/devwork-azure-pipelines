@@ -226,6 +226,17 @@ CONTROLS: list[Control] = [
 SITE_TITLE = "Compliance Evidence Center"
 SITE_SUBTITLE = "CLA GitHub Security & Compliance — control evidence repository"
 
+# Real evidence content lives here (kept out of generated output). For each
+# evidence item the build looks for an optional HTML body fragment and an
+# optional `.meta` sidecar; if absent it renders the TODO placeholder.
+#
+#   evidence/<control-slug>/<evidence-slug>.html   body fragment (injected)
+#   evidence/<control-slug>/<evidence-slug>.meta   key: value provenance
+#   evidence/<control-slug>/<anything-else>        assets, copied verbatim
+#
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EVIDENCE_SRC = os.path.join(REPO_ROOT, "evidence")
+
 # --------------------------------------------------------------------------- #
 # Rendering
 # --------------------------------------------------------------------------- #
@@ -278,6 +289,15 @@ dl.fields dd { margin: 0; padding: 9px 14px; border-bottom: 1px solid var(--line
 dl.fields dt:last-of-type, dl.fields dd:last-of-type { border-bottom: none; }
 .todo { border: 1px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); background: var(--code); margin: 14px 0; }
 .todo strong { color: var(--ink); }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+.pill.ok { background: #dafbe1; color: #1a7f37; }
+.pill.pending { background: #fff1cc; color: #9a6700; }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+pre code { background: none; padding: 0; }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; }
+table.data th, table.data td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+table.data th { background: var(--code); }
+img.evidence { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; }
 footer.site { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
 @media (max-width: 600px) {
@@ -333,11 +353,53 @@ def fmt_size(n: int) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Evidence document (templated placeholder)
+# Evidence source loading (real content) + document rendering
 # --------------------------------------------------------------------------- #
 
 
-def render_evidence(control: Control, ev: Evidence, generated: str) -> str:
+def parse_meta(path: str) -> dict[str, str]:
+    """Parse a simple `key: value` provenance sidecar (blank/`#` lines ignored)."""
+    meta: dict[str, str] = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or ":" not in line:
+                continue
+            key, val = line.split(":", 1)
+            meta[key.strip().lower()] = val.strip()
+    return meta
+
+
+def load_evidence_source(control: Control, ev: Evidence) -> tuple[str | None, dict[str, str]]:
+    """Return (body_fragment_html_or_None, meta_dict) for an evidence item."""
+    base = os.path.join(EVIDENCE_SRC, control.slug)
+    frag = os.path.join(base, ev.slug + ".html")
+    metap = os.path.join(base, ev.slug + ".meta")
+    body = None
+    if os.path.isfile(frag):
+        with open(frag, encoding="utf-8") as fh:
+            body = fh.read()
+    meta = parse_meta(metap) if os.path.isfile(metap) else {}
+    return body, meta
+
+
+def _prov(meta: dict[str, str], key: str, default: str) -> str:
+    return html.escape(meta.get(key, default))
+
+
+def ev_documented(control: Control, ev: Evidence) -> bool:
+    return os.path.isfile(os.path.join(EVIDENCE_SRC, control.slug, ev.slug + ".html"))
+
+
+def render_evidence(
+    control: Control,
+    ev: Evidence,
+    generated: str,
+    source_html: str | None = None,
+    meta: dict[str, str] | None = None,
+) -> str:
+    meta = meta or {}
+    documented = source_html is not None
     crumbs_html = crumbs(
         ("Home", "../../../index.html"),
         ("Controls", "../../index.html"),
@@ -345,15 +407,17 @@ def render_evidence(control: Control, ev: Evidence, generated: str) -> str:
         ("Evidence", "index.html"),
         (ev.title, None),
     )
-    body = f"""
-<h2>{html.escape(ev.title)}</h2>
-<p class="lede">{html.escape(control.title)}</p>
 
-<div class="req">
-  <div class="label">Requirement</div>
-  {html.escape(ev.requirement)}
-</div>
-
+    if documented:
+        pill = '<span class="pill ok">documented</span>'
+        content = f"""
+<h2>Evidence</h2>
+{source_html}
+"""
+        default_status = meta.get("status", "documented")
+    else:
+        pill = '<span class="pill pending">pending</span>'
+        content = """
 <h2>Evidence summary</h2>
 <div class="todo">
   <strong>TODO — attach evidence.</strong><br>
@@ -368,15 +432,26 @@ def render_evidence(control: Control, ev: Evidence, generated: str) -> str:
   API/script output here. Keep artifacts inside this folder so the evidence
   remains self-contained and downloadable for offline review.
 </div>
+"""
+        default_status = "pending"
 
+    body = f"""
+<h2>{html.escape(ev.title)} {pill}</h2>
+<p class="lede">{html.escape(control.title)}</p>
+
+<div class="req">
+  <div class="label">Requirement</div>
+  {html.escape(ev.requirement)}
+</div>
+{content}
 <h2>Provenance</h2>
 <dl class="fields">
   <dt>Control</dt><dd>{html.escape(control.title)}</dd>
   <dt>Evidence ID</dt><dd><code>{html.escape(control.slug)}/{html.escape(ev.slug)}</code></dd>
-  <dt>Collection date</dt><dd>TODO</dd>
-  <dt>Collected by</dt><dd>TODO</dd>
-  <dt>Source / system</dt><dd>TODO (e.g. GitHub API, Terraform plan, Dynatrace query)</dd>
-  <dt>Review status</dt><dd>TODO (draft / reviewed / accepted)</dd>
+  <dt>Collection date</dt><dd>{_prov(meta, "date", "TODO")}</dd>
+  <dt>Collected by</dt><dd>{_prov(meta, "by", "TODO")}</dd>
+  <dt>Source / system</dt><dd>{_prov(meta, "source", "TODO (e.g. GitHub API, Terraform plan, Dynatrace query)")}</dd>
+  <dt>Review status</dt><dd>{_prov(meta, "status", default_status)}</dd>
 </dl>
 """
     return page(f"{ev.title} — {control.title}", crumbs_html, body, generated=generated)
@@ -436,21 +511,43 @@ def build(out_dir: str) -> None:
     os.makedirs(controls_dir)
 
     # ---- per-control pages + evidence docs -------------------------------- #
+    documented_counts: dict[str, int] = {}
     for control in CONTROLS:
         cdir = os.path.join(controls_dir, control.slug)
         edir = os.path.join(cdir, "evidence")
         os.makedirs(edir)
 
-        # evidence documents
+        # copy any source assets (screenshots, exports, etc.) into the output so
+        # injected fragments can reference them relatively and they ship in the zip.
+        src_ctrl_dir = os.path.join(EVIDENCE_SRC, control.slug)
+        consumed = {f"{ev.slug}.html" for ev in control.evidence}
+        consumed |= {f"{ev.slug}.meta" for ev in control.evidence}
+        if os.path.isdir(src_ctrl_dir):
+            for entry in os.listdir(src_ctrl_dir):
+                if entry in consumed:
+                    continue
+                s = os.path.join(src_ctrl_dir, entry)
+                d = os.path.join(edir, entry)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+
+        # evidence documents (inject real source content when present)
+        documented = 0
         for i, ev in enumerate(control.evidence, 1):
+            source_html, meta = load_evidence_source(control, ev)
+            if source_html is not None:
+                documented += 1
             fname = f"{i:02d}-{ev.slug}.html"
             with open(os.path.join(edir, fname), "w") as fh:
-                fh.write(render_evidence(control, ev, generated))
+                fh.write(render_evidence(control, ev, generated, source_html, meta))
+        documented_counts[control.slug] = documented
 
         # evidence directory listing
         ev_rows = [
             listing_row(
-                "📄",
+                "✅" if ev_documented(control, ev) else "📄",
                 f"{i:02d}-{ev.slug}.html",
                 f"{i:02d}-{ev.slug}.html",
                 fmt_size(os.path.getsize(os.path.join(edir, f"{i:02d}-{ev.slug}.html"))),
@@ -483,7 +580,7 @@ def build(out_dir: str) -> None:
             href = f"evidence/{i:02d}-{ev.slug}.html"
             report_rows.append(
                 listing_row(
-                    "📄",
+                    "✅" if ev_documented(control, ev) else "📄",
                     ev.title,
                     href,
                     fmt_size(os.path.getsize(os.path.join(edir, f"{i:02d}-{ev.slug}.html"))),
@@ -503,7 +600,7 @@ def build(out_dir: str) -> None:
   <a class="btn" href="../{control.slug}.zip" download>⬇ Download all evidence (.zip)</a>
   <a class="btn secondary" href="evidence/index.html">Browse evidence folder →</a>
 </p>
-<h2>Required evidence ({len(control.evidence)})</h2>
+<h2>Required evidence ({documented_counts[control.slug]}/{len(control.evidence)} documented)</h2>
 {listing_table(report_rows)}
 """
         with open(os.path.join(cdir, "index.html"), "w") as fh:
@@ -529,7 +626,7 @@ def build(out_dir: str) -> None:
                 "📁",
                 control.title,
                 f"{control.slug}/index.html",
-                f"{len(control.evidence)} items",
+                f"{documented_counts[control.slug]}/{len(control.evidence)} documented",
                 date_only,
                 f'<a href="{control.slug}/index.html">open</a>'
                 f'<a href="{control.slug}.zip" download>zip ({zip_size})</a>',
@@ -558,7 +655,7 @@ def build(out_dir: str) -> None:
                 "📁",
                 control.title,
                 f"controls/{control.slug}/index.html",
-                f"{len(control.evidence)} items",
+                f"{documented_counts[control.slug]}/{len(control.evidence)} documented",
                 date_only,
                 f'<a href="controls/{control.slug}/index.html">open</a>'
                 f'<a href="controls/{control.slug}.zip" download>zip ({zip_size})</a>',
@@ -570,7 +667,7 @@ def build(out_dir: str) -> None:
   is a self-contained folder of HTML evidence files; download a control's
   <code>.zip</code> for a complete offline copy.
 </p>
-<h2>Controls ({len(CONTROLS)}) &middot; {total_ev} evidence items</h2>
+<h2>Controls ({len(CONTROLS)}) &middot; {sum(documented_counts.values())}/{total_ev} evidence items documented</h2>
 {listing_table(home_rows)}
 <p style="margin-top:18px"><a class="btn secondary" href="controls/index.html">Open full directory listing →</a></p>
 """
