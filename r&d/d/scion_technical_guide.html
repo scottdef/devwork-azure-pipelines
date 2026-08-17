@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Chosen Palette: Warm Minimalist Slate & Sand (Grounded in #fbf9f5, charcoal text #2c2a29, muted sage green #3b5e4f, Go slate blue #2a4e6c, and warm teak accents) -->
+    <!-- Application Structure Plan:
+         Designed as a single-page technical manual and operational dashboard with 6 logical sections:
+         1. Philosophical Foundations & Topology: Explains process isolation, Plan 9 namespace mapping, and interactive HTML-based system topology explorer.
+         2. Lifecycle & Declarative Mechanics: Visualizes Scion process state transitions (init -> start -> suspend -> resume -> stop) and interactive YAML blueprint inspector.
+         3. ADK & Standard Go 1.23 Engine: Details why deterministic Go 1.23 binaries replace brittle LLM loops, highlighting `log/slog` and `sciontool` IPC.
+         4. Enterprise Use Case Workbench: Interactive tabbed sandbox for the 3 core enterprise use cases (Org Compliance Auditor, IssueOps Azure Terraform, CSP Refactoring Swarm).
+         5. Interactive Telemetry & Metrics Sandbox: Real-time Chart.js charts visualizing Copilot seat metrics vs ruleset compliance and Swarm consensus timing.
+         6. Scion Operator Cheatsheet: Searchable, filterable command table covering CLI operations, infrastructure flags, and YAML schema.
+         This non-linear architecture allows systems architects to inspect high-level principles or jump directly into runnable Go code and CLI commands. -->
+    <!-- Visualization & Content Choices:
+         - System Topology -> Goal: Organize -> Interactive HTML/CSS Grid Node Explorer -> User clicks nodes (Hub, Broker, Worktree, Container, sciontool) to view provenance and IPC metadata -> No SVG needed, pure clean CSS layout.
+         - Process Lifecycle -> Goal: Process Flow -> Clickable State Pipeline -> User toggles states (Suspend, Resume, Detach) to view container tear-down mechanics -> Clear, deterministic state display.
+         - Enterprise Auditing Data -> Goal: Compare/Inform -> Dynamic Bar & Donut Chart (Chart.js Canvas) -> Shows Copilot seat usage vs active security rulesets -> Highly readable Canvas charts with auto-wrapping labels.
+         - CSP Swarm Telemetry -> Goal: Relationship/Change -> Line Chart (Chart.js Canvas) -> Visualizes Generator vs Auditor consensus convergence across turns -> Dynamic Canvas chart.
+         - Scion Cheatsheet -> Goal: Organize -> Searchable HTML Data Table -> Real-time string filtering across categories -> Fast navigation. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Scion: Autonomous Operations Architecture</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sand: {
+                            50: '#fbf9f5',
+                            100: '#f4efe6',
+                            200: '#e7e2d7',
+                            800: '#433f38',
+                            900: '#2c2a29',
+                        },
+                        sage: {
+                            600: '#3b5e4f',
+                            700: '#2f4c3f',
+                        },
+                        goblue: {
+                            600: '#2a4e6c',
+                            700: '#1d3850',
+                        },
+                        teak: '#8c6d46',
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        /* Custom scrollbar for minimalist Unix feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f4efe6;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-sand-50 text-sand-900 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-sand-200 bg-sand-100/80 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="font-mono text-lg font-bold tracking-tight text-goblue-600 bg-sand-200/60 px-2.5 py-1 rounded border border-sand-200">
+                    $ scion --version
+                </span>
+                <span class="text-xs uppercase tracking-widest font-mono text-sand-800 hidden sm:inline-block">
+                    Standard Go 1.23 Engine
+                </span>
+            </div>
+            <nav class="hidden md:flex space-x-1 text-sm font-medium">
+                <button onclick="scrollToSection('philosophy')" class="px-3 py-1.5 rounded-md hover:bg-sand-200 transition">Philosophy</button>
+                <button onclick="scrollToSection('lifecycle')" class="px-3 py-1.5 rounded-md hover:bg-sand-200 transition">Lifecycle</button>
+                <button onclick="scrollToSection('adk')" class="px-3 py-1.5 rounded-md hover:bg-sand-200 transition">Go 1.23 ADK</button>
+                <button onclick="scrollToSection('usecases')" class="px-3 py-1.5 rounded-md hover:bg-sand-200 transition">Use Cases</button>
+                <button onclick="scrollToSection('telemetry')" class="px-3 py-1.5 rounded-md hover:bg-sand-200 transition">Telemetry</button>
+                <button onclick="scrollToSection('cheatsheet')" class="px-3 py-1.5 bg-goblue-600 text-white rounded-md hover:bg-goblue-700 transition">Cheatsheet</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+
+        <!-- Hero Section -->
+        <section class="bg-white rounded-xl border border-sand-200 p-6 md:p-8 shadow-sm">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div class="space-y-3 max-w-3xl">
+                    <div class="inline-flex items-center space-x-2 text-xs font-mono bg-sage-600/10 text-sage-600 px-2.5 py-1 rounded-full font-semibold">
+                        <span>PERSPECTIVE: THOMPSON & PIKE</span>
+                    </div>
+                    <h1 class="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-sand-900">
+                        The Architecture of Autonomous Operations: Google Scion
+                    </h1>
+                    <p class="text-sand-800 text-base leading-relaxed">
+                        Computing systems are exercises in managing complexity. Complex frameworks fail under rigid execution graphs and opaque state machines. Scion provides orthogonal primitives: treating LLM harnesses as isolated container processes coordinating via shared filesystems, distinct credentials, and explicit IPC state markers.
+                    </p>
+                </div>
+                <div class="bg-sand-100 p-4 rounded-lg border border-sand-200 w-full md:w-auto font-mono text-xs space-y-2">
+                    <div class="text-sand-800 font-bold border-b border-sand-200 pb-1">Core Operational Invariants</div>
+                    <div class="flex items-center justify-between gap-4"><span>Process Boundary:</span><span class="text-goblue-600 font-semibold">Container Namespace</span></div>
+                    <div class="flex items-center justify-between gap-4"><span>Workspace Boundary:</span><span class="text-goblue-600 font-semibold">git worktree</span></div>
+                    <div class="flex items-center justify-between gap-4"><span>Identity Primitive:</span><span class="text-goblue-600 font-semibold">Signed JWT + CEL</span></div>
+                    <div class="flex items-center justify-between gap-4"><span>Language Standard:</span><span class="text-goblue-600 font-semibold">Go 1.23 stdlib</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: Philosophy & System Topology -->
+        <section id="philosophy" class="space-y-6">
+            <div class="border-l-4 border-sage-600 pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">1. Philosophy & Architectural Topology</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    An introduction to Scion's design rationale. Understand how Scion separates the control plane (Hub) from the execution plane (Runtime Broker) and maps agents directly to isolated OS processes. Click any topology node below to examine its metadata and invariants.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Interactive Topology Box -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-sand-200 p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-mono font-bold text-base text-sand-900">System Topology Map</h3>
+                            <span class="text-xs font-mono text-sand-800">Click node to inspect architecture</span>
+                        </div>
+
+                        <!-- System Node Layout (HTML Grid) -->
+                        <div class="space-y-4">
+                            <div id="node-hub" onclick="inspectNode('hub')" class="p-4 rounded-lg border-2 border-goblue-600 bg-goblue-600/5 cursor-pointer hover:bg-goblue-600/10 transition flex justify-between items-center">
+                                <div>
+                                    <div class="font-mono font-bold text-goblue-600 text-sm">Control Plane: Scion Hub</div>
+                                    <div class="text-xs text-sand-800">State Repository, User Identities, REST/WebSocket APIs, CEL Evaluator</div>
+                                </div>
+                                <span class="font-mono text-xs bg-goblue-600 text-white px-2 py-0.5 rounded">Central Hub</span>
+                            </div>
+
+                            <div class="flex justify-center text-sand-800 font-mono text-xs">│ Dispatch Command / JWT Provenance Token │</div>
+
+                            <div id="node-broker" onclick="inspectNode('broker')" class="p-4 rounded-lg border-2 border-sage-600 bg-sage-600/5 cursor-pointer hover:bg-sage-600/10 transition flex justify-between items-center">
+                                <div>
+                                    <div class="font-mono font-bold text-sage-600 text-sm">Execution Layer: Runtime Broker Daemon</div>
+                                    <div class="text-xs text-sand-800">Manages Docker / Podman / K8s runtimes, hydrates templates, injects secrets</div>
+                                </div>
+                                <span class="font-mono text-xs bg-sage-600 text-white px-2 py-0.5 rounded">Broker Node</span>
+                            </div>
+
+                            <div class="flex justify-center text-sand-800 font-mono text-xs">│ Provisions Workspace & Container Namespace │</div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div id="node-container" onclick="inspectNode('container')" class="p-4 rounded-lg border-2 border-sand-800 bg-sand-100 cursor-pointer hover:bg-sand-200 transition">
+                                    <div class="font-mono font-bold text-xs text-sand-900">Agent Container (Isolated)</div>
+                                    <div class="text-xs text-sand-800 mt-1">Runs Claude / Gemini / Go Binary</div>
+                                    <div class="text-[10px] font-mono text-sage-600 mt-2">Mounted: git worktree</div>
+                                </div>
+                                <div id="node-sciontool" onclick="inspectNode('sciontool')" class="p-4 rounded-lg border-2 border-teak bg-teak/10 cursor-pointer hover:bg-teak/20 transition">
+                                    <div class="font-mono font-bold text-xs text-teak">IPC Bridge: /bin/sciontool</div>
+                                    <div class="text-xs text-sand-800 mt-1">Telemetry, log piping, state updates</div>
+                                    <div class="text-[10px] font-mono text-teak mt-2">Status signaling -> Hub</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-sand-800 mt-4 pt-3 border-t border-sand-200">
+                        Orthogonal Design: Agents communicate through explicit CLI messages or filesystem writes, avoiding monolithic shared-memory state machines.
+                    </div>
+                </div>
+
+                <!-- Inspector Card -->
+                <div class="bg-sand-100 rounded-xl border border-sand-200 p-6 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-mono font-bold text-sm text-sand-900 border-b border-sand-200 pb-2 mb-3">
+                            Node Inspector: <span id="node-title" class="text-goblue-600">Scion Hub</span>
+                        </h3>
+                        <p id="node-description" class="text-xs text-sand-800 leading-relaxed mb-4">
+                            The Hub represents the core state authority. It retains user credentials, tracks active projects, exposes REST and WebSocket interfaces, and evaluates Common Expression Language (CEL) policy checks before authorizing state updates.
+                        </p>
+                        <div class="space-y-2 font-mono text-xs">
+                            <div class="text-sand-800 font-semibold">Key Attributes:</div>
+                            <ul id="node-attributes" class="list-disc list-inside text-sand-800 space-y-1">
+                                <li>State Store: PostgreSQL / SQLite</li>
+                                <li>Auth Primitive: Cryptographic JWT</li>
+                                <li>Access Control: CEL Policies</li>
+                                <li>Deployment: Workstation or HA K8s</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-white p-3 rounded border border-sand-200 font-mono text-[11px] text-sand-800">
+                        <span class="text-sage-600 font-bold">// CEL Access Policy Example</span><br>
+                        agent.claims.template_id == 'security-auditor' &amp;&amp;<br>
+                        request.method == 'GET'
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Operational Mechanics & Declarative Blueprints -->
+        <section id="lifecycle" class="space-y-6">
+            <div class="border-l-4 border-goblue-600 pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">2. Operational Mechanics & Declarative Blueprints</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    Scion agents execute under clear operational lifecycles. Learn how `scion suspend` and `scion resume` preserve context while destroying containers to reclaim compute, and explore the `scion-agent.yaml` blueprint structure.
+                </p>
+            </div>
+
+            <!-- Lifecycle Visualizer -->
+            <div class="bg-white rounded-xl border border-sand-200 p-6 shadow-sm space-y-6">
+                <h3 class="font-mono font-bold text-base text-sand-900">Agent Lifecycle Mechanics</h3>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+                    <button onclick="setLifecycleStep('init')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-sand-900">1. scion init</span>
+                        <span class="text-[10px] text-sand-800 mt-1">Namespace UUID</span>
+                    </button>
+                    <button onclick="setLifecycleStep('start')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-goblue-600">2. scion start</span>
+                        <span class="text-[10px] text-sand-800 mt-1">Spawn Container</span>
+                    </button>
+                    <button onclick="setLifecycleStep('attach')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-sage-600">3. attach/msg</span>
+                        <span class="text-[10px] text-sand-800 mt-1">tmux / IPC Pipe</span>
+                    </button>
+                    <button onclick="setLifecycleStep('suspend')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-teak">4. suspend</span>
+                        <span class="text-[10px] text-sand-800 mt-1">Record Context</span>
+                    </button>
+                    <button onclick="setLifecycleStep('resume')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-goblue-600">5. resume</span>
+                        <span class="text-[10px] text-sand-800 mt-1">Re-provision + Flag</span>
+                    </button>
+                    <button onclick="setLifecycleStep('stop')" class="p-3 rounded border border-sand-200 bg-sand-50 hover:bg-sand-200 transition flex flex-col items-center">
+                        <span class="font-mono font-bold text-xs text-red-700">6. stop/delete</span>
+                        <span class="text-[10px] text-sand-800 mt-1">Purge Worktree</span>
+                    </button>
+                </div>
+
+                <!-- Step Description Banner -->
+                <div id="lifecycle-detail-box" class="p-4 rounded-lg bg-sand-100 border border-sand-200 font-mono text-xs space-y-1">
+                    <div class="font-bold text-goblue-600" id="lifecycle-step-title">Select a lifecycle step above to inspect process behavior.</div>
+                    <div class="text-sand-800" id="lifecycle-step-desc">Lifecycle transitions dictate whether process state is held in memory, flushed to Hub database, or completely purged from host storage.</div>
+                </div>
+
+                <!-- Template YAML Display -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-mono text-xs font-bold text-sand-800">Declarative Blueprint: .scion/agents/org-auditor/scion-agent.yaml</span>
+                        <span class="text-[10px] font-mono bg-sand-200 px-2 py-0.5 rounded text-sand-800">Schema Version 1</span>
+                    </div>
+                    <pre class="bg-sand-900 text-sand-50 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed"><code>schema_version: "1"
+name: org-auditor
+description: "Evaluates GitHub Enterprise billing and repo protection compliance."
+default_harness_config: gemini
+image: ghcr.io/internal/org-auditor-agent:v1.0.0
+detached: true
+task_flag: "--directive"
+env:
+  GITHUB_ORG_NAME: "acme-corp"
+secrets:
+  - name: GITHUB_TOKEN
+    type: environment
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    max_duration: "1h"
+    max_turns: 50</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: ADK & Standard Go 1.23 Engine -->
+        <section id="adk" class="space-y-6">
+            <div class="border-l-4 border-teak pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">3. The Agent Development Kit (ADK) & Go 1.23</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    LLMs are non-deterministic text generators. Demanding that they directly handle critical system interactions causes fragile execution loops. The correct architectural pattern encapsulates the LLM inside a compiled Go 1.23 binary using `net/http` and `log/slog`, calling `sciontool` for explicit state updates.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-sand-200 p-6 shadow-sm space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-3">
+                        <h3 class="font-mono font-bold text-sm text-sand-900 border-b border-sand-200 pb-2">Why Standard Go 1.23?</h3>
+                        <p class="text-xs text-sand-800 leading-relaxed">
+                            Go 1.23 introduces enhanced routing in `net/http`, standardized structured logging via `log/slog`, and sequence iteration via `iter`. A compiled Go ADK agent produces a single static binary with zero runtime dependencies.
+                        </p>
+                        <div class="bg-sand-100 p-3 rounded text-xs font-mono space-y-1">
+                            <div class="text-goblue-600 font-bold">Standard Injection Points:</div>
+                            <div class="text-sand-800">• SCION_AGENT_ID</div>
+                            <div class="text-sand-800">• SCION_WORKSPACE</div>
+                            <div class="text-sand-800">• /usr/local/bin/sciontool</div>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="font-mono text-xs font-bold text-sand-800">IPC Bridge Implementation (main.go snippet)</span>
+                            <span class="text-[10px] font-mono bg-sage-600 text-white px-2 py-0.5 rounded">Go 1.23 Standard Library</span>
+                        </div>
+                        <pre class="bg-sand-900 text-sand-50 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed"><code>package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"os/exec"
+)
+
+// executeScionTool bridges the Go agent back to the Scion Hub control plane.
+func executeScionTool(command, message string) {
+	cmd := exec.Command("sciontool", "status", command, message)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		slog.Error("Failed to execute sciontool", "error", err, "command", command)
+	}
+}
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	workspace := os.Getenv("SCION_WORKSPACE")
+	slog.Info("ADK Binary Initialized", "workspace", workspace)
+
+	// Signal task progress back to Hub
+	executeScionTool("task_completed", "Audit finished successfully.")
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Enterprise Use Case Workbench -->
+        <section id="usecases" class="space-y-6">
+            <div class="border-l-4 border-sage-600 pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">4. Enterprise Use Case Workbench</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    Explore three production-grade use cases built for GitHub Enterprise operations. Switch tabs to inspect code implementations, system prompts, and interaction topology.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-sand-200 shadow-sm overflow-hidden">
+                <!-- Use Case Tabs -->
+                <div class="flex border-b border-sand-200 bg-sand-100 overflow-x-auto font-mono text-xs">
+                    <button id="tab-btn-1" onclick="switchUseCase(1)" class="px-5 py-3 border-b-2 border-goblue-600 font-bold text-goblue-600 bg-white transition whitespace-nowrap">
+                        1. GitHub Org Auditor (Go 1.23)
+                    </button>
+                    <button id="tab-btn-2" onclick="switchUseCase(2)" class="px-5 py-3 border-b-2 border-transparent text-sand-800 hover:text-sand-900 transition whitespace-nowrap">
+                        2. Azure IaC IssueOps (Gemini CLI)
+                    </button>
+                    <button id="tab-btn-3" onclick="switchUseCase(3)" class="px-5 py-3 border-b-2 border-transparent text-sand-800 hover:text-sand-900 transition whitespace-nowrap">
+                        3. Multi-Agent CSP Swarm (Alpha/Beta)
+                    </button>
+                </div>
+
+                <!-- Tab Content Container -->
+                <div class="p-6">
+                    <!-- Use Case 1 -->
+                    <div id="usecase-1" class="space-y-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="space-y-3">
+                                <h3 class="font-mono font-bold text-base text-sand-900">Autonomous GitHub Org Auditor</h3>
+                                <p class="text-xs text-sand-800 leading-relaxed">
+                                    A deterministic Go 1.23 binary executing within a scheduled Scion container. Queries the GitHub API to verify organizational rulesets and inspect Copilot seat allocations, writing Markdown artifacts and automatically opening remediation issues if rulesets are missing.
+                                </p>
+                                <div class="bg-sand-100 p-3 rounded border border-sand-200 text-xs font-mono space-y-1">
+                                    <div class="text-sand-900 font-bold">Key Attributes:</div>
+                                    <div class="text-sand-800">- Harness: Pure ADK Binary</div>
+                                    <div class="text-sand-800">- Secrets: GITHUB_TOKEN (Memory only)</div>
+                                    <div class="text-sand-800">- Output: Workspace org_audit_report.md</div>
+                                    <div class="text-sand-800">- IPC: sciontool status update</div>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-2 space-y-2">
+                                <div class="flex justify-between items-center font-mono text-xs">
+                                    <span class="font-bold text-sand-800">Go 1.23 Auditor Implementation (main.go)</span>
+                                </div>
+                                <pre class="bg-sand-900 text-sand-50 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed max-h-96"><code>// FetchCopilotBilling retrieves current Copilot seat metrics via standard net/http
+func (c *GitHubClient) FetchCopilotBilling(ctx context.Context) (int, error) {
+	reqURL := fmt.Sprintf("https://api.github.com/orgs/%s/copilot/billing", c.org)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var data struct { SeatCount int `json:"seat_count"` }
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, err
+	}
+	return data.SeatCount, nil
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Use Case 2 -->
+                    <div id="usecase-2" class="hidden space-y-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="space-y-3">
+                                <h3 class="font-mono font-bold text-base text-sand-900">Azure IaC IssueOps Self-Service</h3>
+                                <p class="text-xs text-sand-800 leading-relaxed">
+                                    Developers open a GitHub Issue describing required cloud resources. A webhook triggers a Scion agent executing in a dedicated <code>git worktree</code> branch. Azure credentials are injected securely via OIDC env secrets. The agent runs <code>terraform init/plan</code> and automatically opens a Pull Request.
+                                </p>
+                                <div class="bg-sand-100 p-3 rounded border border-sand-200 text-xs font-mono space-y-1">
+                                    <div class="text-sand-900 font-bold">Key Invariants:</div>
+                                    <div class="text-sand-800">- Harness: Gemini CLI</div>
+                                    <div class="text-sand-800">- Isolation: Separate git worktree</div>
+                                    <div class="text-sand-800">- Boundary: No terraform apply</div>
+                                    <div class="text-sand-800">- Constraint: No provisioners</div>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-2 space-y-2">
+                                <div class="flex justify-between items-center font-mono text-xs">
+                                    <span class="font-bold text-sand-800">Agent Operational System Prompt (system-prompt.md)</span>
+                                </div>
+                                <pre class="bg-sand-900 text-sand-50 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed max-h-96"><code>OPERATIONAL CONTEXT:
+1. You execute within an isolated Git worktree branch.
+2. The terraform CLI and gh (GitHub CLI) tools are available in PATH.
+3. AzureRM credentials are provided via ARM_* environment variables.
+
+EXECUTION LOOP:
+1. Parse the provided GitHub issue text specifying Azure resources.
+2. Write required azurerm resource blocks in main.tf.
+3. Execute terraform fmt, terraform init, and terraform plan.
+4. If plan succeeds, commit and open Pull Request via 'gh pr create'.
+5. Execute 'sciontool status task_completed "PR Generated successfully."'.
+
+CONSTRAINTS:
+- ABSOLUTELY NO local-exec or remote-exec provisioners.
+- Apply tag ManagedBy = "Scion-IssueOps" to all resources.</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Use Case 3 -->
+                    <div id="usecase-3" class="hidden space-y-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="space-y-3">
+                                <h3 class="font-mono font-bold text-base text-sand-900">Multi-Agent CSP Refactoring Swarm</h3>
+                                <p class="text-xs text-sand-800 leading-relaxed">
+                                    Inspired by Communicating Sequential Processes (CSP). Agent Alpha (Generator) mutates code to adopt Go 1.23 iterators. Agent Beta (Auditor) is restricted via CEL rules to read-only access, analyzing code and sending asynchronous feedback over the Scion IPC message bus until consensus is reached.
+                                </p>
+                                <div class="bg-sand-100 p-3 rounded border border-sand-200 text-xs font-mono space-y-1">
+                                    <div class="text-sand-900 font-bold">CSP Architecture:</div>
+                                    <div class="text-sand-800">- Alpha: Write permission to parser.go</div>
+                                    <div class="text-sand-800">- Beta: Read-only static analysis</div>
+                                    <div class="text-sand-800">- Channel: scion message IPC</div>
+                                    <div class="text-sand-800">- Security: CEL policy enforced</div>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-2 space-y-2">
+                                <div class="flex justify-between items-center font-mono text-xs">
+                                    <span class="font-bold text-sand-800">Swarm Orchestrator Loop (orchestrate_swarm.sh)</span>
+                                </div>
+                                <pre class="bg-sand-900 text-sand-50 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed max-h-96"><code>#!/usr/bin/env bash
+# CSP Event Loop mapping Alpha's signals to Beta's input
+while true; do
+    ALPHA_LOG=$(scion logs generator-alpha | tail -n 5)
+    
+    if [[ "$ALPHA_LOG" == *"READY FOR REVIEW"* ]]; then
+        echo "Generator signaled completion. Triggering Auditor..."
+        scion message auditor-beta "The file parser.go is ready. Execute review."
+        
+        sleep 15
+        BETA_LOG=$(scion logs auditor-beta | tail -n 10)
+        
+        if [[ "$BETA_LOG" == *"APPROVED"* ]]; then
+            echo "Consensus achieved. Terminating swarm."
+            scion stop generator-alpha && scion stop auditor-beta
+            break
+        else
+            echo "Auditor rejected changes. Routing feedback to Generator."
+            scion message generator-alpha "Auditor feedback: $BETA_LOG. Please correct."
+        fi
+    fi
+    sleep 5
+done</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Interactive Telemetry & Metrics Sandbox -->
+        <section id="telemetry" class="space-y-6">
+            <div class="border-l-4 border-goblue-600 pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">5. Interactive Telemetry & Metrics Sandbox</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    Scion normalization pipes OTEL metrics and structured logs directly back to the Hub. Interact with the charts below to explore organizational auditing stats and swarm convergence timelines.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Chart 1: Copilot Billing & Compliance -->
+                <div class="bg-white rounded-xl border border-sand-200 p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-mono font-bold text-sm text-sand-900">GitHub Org Copilot & Compliance Audit</h3>
+                            <span class="text-[10px] font-mono bg-sand-200 px-2 py-0.5 rounded text-sand-800">Live API Telemetry</span>
+                        </div>
+                        <p class="text-xs text-sand-800 mb-4">
+                            Active Copilot seats vs Org Ruleset Enforcement across enterprise repositories.
+                        </p>
+                        <div class="chart-container">
+                            <canvas id="complianceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-sand-200 flex justify-between items-center text-xs font-mono">
+                        <span class="text-sand-800">Simulate Org Scan:</span>
+                        <button onclick="updateAuditChart()" class="px-3 py-1 bg-sand-200 hover:bg-sand-300 rounded font-semibold transition">Trigger Audit Run</button>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Swarm Convergence -->
+                <div class="bg-white rounded-xl border border-sand-200 p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-mono font-bold text-sm text-sand-900">CSP Swarm Turn Convergence Time</h3>
+                            <span class="text-[10px] font-mono bg-sand-200 px-2 py-0.5 rounded text-sand-800">Generator / Auditor IPC</span>
+                        </div>
+                        <p class="text-xs text-sand-800 mb-4">
+                            Evaluation score convergence across refinement turns between Alpha &amp; Beta agents.
+                        </p>
+                        <div class="chart-container">
+                            <canvas id="swarmChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-sand-200 flex justify-between items-center text-xs font-mono">
+                        <span class="text-sand-800">Swarm State:</span>
+                        <span class="text-sage-600 font-bold" id="swarm-status">Consensus Reached (Turn 4)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 6: Scion Operator Cheatsheet -->
+        <section id="cheatsheet" class="space-y-6">
+            <div class="border-l-4 border-teak pl-4">
+                <h2 class="text-2xl font-bold font-mono text-sand-900">6. Scion Operator's Interactive Cheatsheet</h2>
+                <p class="text-sand-800 text-sm mt-1">
+                    An exhaustive reference guide for Scion CLI execution, infrastructure setup, and declarative YAML directives. Use the filter buttons or search box to quickly inspect commands.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-sand-200 p-6 shadow-sm space-y-4">
+                <!-- Search & Filter Controls -->
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                    <input type="text" id="cheat-search" onkeyup="filterCheatsheet()" placeholder="Filter commands (e.g., 'suspend', 'broker', 'limits')..." class="px-3 py-2 border border-sand-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-goblue-600 w-full sm:w-80">
+                    <div class="flex space-x-2 font-mono text-xs overflow-x-auto">
+                        <button onclick="setCheatFilter('all')" class="px-3 py-1.5 rounded bg-sand-200 text-sand-900 font-bold hover:bg-sand-300 transition">All</button>
+                        <button onclick="setCheatFilter('lifecycle')" class="px-3 py-1.5 rounded bg-sand-100 text-sand-800 hover:bg-sand-200 transition">Lifecycle</button>
+                        <button onclick="setCheatFilter('infra')" class="px-3 py-1.5 rounded bg-sand-100 text-sand-800 hover:bg-sand-200 transition">Infra &amp; Auth</button>
+                        <button onclick="setCheatFilter('yaml')" class="px-3 py-1.5 rounded bg-sand-100 text-sand-800 hover:bg-sand-200 transition">YAML Schema</button>
+                    </div>
+                </div>
+
+                <!-- Cheatsheet Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left font-mono text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-sand-100 border-b border-sand-200 text-sand-900">
+                                <th class="p-3">Command / Directive</th>
+                                <th class="p-3">Category</th>
+                                <th class="p-3">Description &amp; Operational Context</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cheatsheet-body" class="divide-y divide-sand-200">
+                            <!-- Rows populated dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-sand-200 bg-sand-100 mt-12 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-xs text-sand-800 space-y-1">
+            <div>Google Scion Architecture Guide • Authored in the Thompson &amp; Pike Engineering Persona</div>
+            <div class="text-[10px] text-sand-800">Built with Standard Go 1.23 Primitives • Single-Page Interactive Manual</div>
+        </div>
+    </footer>
+
+    <!-- Embedded JavaScript Logic -->
+    <script>
+        // --- 1. Node Inspector Logic ---
+        const nodeData = {
+            hub: {
+                title: "Scion Hub (Control Plane)",
+                desc: "The Hub represents the core state authority. It retains user credentials, tracks active projects, exposes REST/WebSocket interfaces, and evaluates Common Expression Language (CEL) policy checks before authorizing state updates.",
+                attrs: [
+                    "State Store: PostgreSQL / SQLite",
+                    "Auth Primitive: Cryptographic JWT",
+                    "Access Control: CEL Policies",
+                    "Deployment: Workstation or HA K8s"
+                ]
+            },
+            broker: {
+                title: "Runtime Broker Daemon",
+                desc: "A persistent service daemon executing on host nodes. It receives lifecycle commands from the Hub, provisions git worktrees, injects secrets, and manages container execution via Docker, Podman, or Kubernetes.",
+                attrs: [
+                    "Pluggable Runtimes: Docker/Podman/K8s",
+                    "Workspace Provisioning: git worktree checkout",
+                    "Secret Management: Memory injection",
+                    "Log Pipeline: Stdout/Stderr streaming"
+                ]
+            },
+            container: {
+                title: "Agent Container (Isolated Namespace)",
+                desc: "An isolated container environment running a deep agent harness or standard Go 1.23 binary. Possesses dedicated credentials, isolated environment variables, and a mount point for file operations.",
+                attrs: [
+                    "Harness: Claude, Gemini, or ADK Binary",
+                    "Isolation: Container network & filesystem",
+                    "Resource Bounds: CPU/Memory/Max turns",
+                    "Mount: .scion/agents/worktree"
+                ]
+            },
+            sciontool: {
+                title: "IPC Bridge (/bin/sciontool)",
+                desc: "A statically compiled binary injected at /usr/local/bin/sciontool. Serves as the primary IPC bridge between the containerized agent process and the Scion Hub control plane.",
+                attrs: [
+                    "IPC Command: sciontool status <state> <msg>",
+                    "Telemetry: Structured logging pipe",
+                    "Status Codes: task_completed, task_failed",
+                    "Security: Bound to agent JWT claims"
+                ]
+            }
+        };
+
+        function inspectNode(nodeKey) {
+            const data = nodeData[nodeKey];
+            if (!data) return;
+
+            document.getElementById('node-title').innerText = data.title;
+            document.getElementById('node-description').innerText = data.desc;
+            
+            const attrList = document.getElementById('node-attributes');
+            attrList.innerHTML = '';
+            data.attrs.forEach(attr => {
+                const li = document.createElement('li');
+                li.innerText = attr;
+                attrList.appendChild(li);
+            });
+        }
+
+        // --- 2. Lifecycle Visualizer Logic ---
+        const lifecycleSteps = {
+            init: {
+                title: "1. scion project init",
+                desc: "Creates a .scion namespace directory in the repository, binding the local filesystem tree to a unique UUID registered with the Hub."
+            },
+            start: {
+                title: "2. scion start <name> [task]",
+                desc: "Dispatches an agent startup command to the Broker. The broker checks out a fresh git worktree and spawns the container with injected credentials."
+            },
+            attach: {
+                title: "3. scion attach / scion message",
+                desc: "Attaches host terminal directly to internal tmux session or asynchronously pushes structured prompt updates into the agent's input queue."
+            },
+            suspend: {
+                title: "4. scion suspend <name>",
+                desc: "Destroys the active container to reclaim memory/CPU resources while saving conversational turn context into the Hub database."
+            },
+            resume: {
+                title: "5. scion resume <name>",
+                desc: "Re-provisions a fresh container, mounts the existing git worktree, and passes --continue or --resume flags to resume session state."
+            },
+            stop: {
+                title: "6. scion stop / delete",
+                desc: "Sends SIGTERM to the containerized process, tears down container context, and optionally purges the isolated git worktree directory."
+            }
+        };
+
+        function setLifecycleStep(stepKey) {
+            const info = lifecycleSteps[stepKey];
+            if (!info) return;
+            document.getElementById('lifecycle-step-title').innerText = info.title;
+            document.getElementById('lifecycle-step-desc').innerText = info.desc;
+        }
+
+        // --- 3. Use Case Tab Switcher ---
+        function switchUseCase(tabNum) {
+            [1, 2, 3].forEach(n => {
+                const ucEl = document.getElementById(`usecase-${n}`);
+                const btnEl = document.getElementById(`tab-btn-${n}`);
+                if (n === tabNum) {
+                    ucEl.classList.remove('hidden');
+                    btnEl.className = "px-5 py-3 border-b-2 border-goblue-600 font-bold text-goblue-600 bg-white transition whitespace-nowrap";
+                } else {
+                    ucEl.classList.add('hidden');
+                    btnEl.className = "px-5 py-3 border-b-2 border-transparent text-sand-800 hover:text-sand-900 transition whitespace-nowrap";
+                }
+            });
+        }
+
+        // --- 4. Smooth Navigation Scroll ---
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // --- 5. Interactive Cheatsheet Data & Filtering ---
+        const cheatData = [
+            { cmd: "scion project init", cat: "lifecycle", desc: "Creates .scion namespace in current repo directory." },
+            { cmd: "scion start <name> [task]", cat: "lifecycle", desc: "Spawns containerized agent in dedicated git worktree." },
+            { cmd: "scion suspend <name>", cat: "lifecycle", desc: "Tears down container but preserves conversational state in Hub." },
+            { cmd: "scion resume <name>", cat: "lifecycle", desc: "Re-provisions container and resumes suspended agent session." },
+            { cmd: "scion attach <name>", cat: "lifecycle", desc: "Attaches host terminal to agent's internal tmux session." },
+            { cmd: "scion message <name> \"...\"", cat: "lifecycle", desc: "Asynchronously enqueues message into running agent stream." },
+            { cmd: "scion logs <name> -f", cat: "lifecycle", desc: "Streams structured logs emitted by agent process." },
+            { cmd: "scion server start", cat: "infra", desc: "Launches Workstation combo server (Hub + Broker + Web UI)." },
+            { cmd: "scion broker register", cat: "infra", desc: "Registers current host node as execution node with Hub." },
+            { cmd: "scion doctor", cat: "infra", desc: "Executes diagnostic checks on Docker, Podman, and Git." },
+            { cmd: "schema_version: \"1\"", cat: "yaml", desc: "Mandatory directive specifying Scion template schema version." },
+            { cmd: "default_harness_config", cat: "yaml", desc: "Resolves underlying adapter (e.g., gemini, claude)." },
+            { cmd: "task_flag: \"--directive\"", cat: "yaml", desc: "CLI flag for passing startup directive to custom Go binaries." },
+            { cmd: "resources.limits.max_turns", cat: "yaml", desc: "Places deterministic bound on maximum agent execution steps." }
+        ];
+
+        let currentCheatFilter = 'all';
+
+        function renderCheatsheet() {
+            const tbody = document.getElementById('cheatsheet-body');
+            const searchVal = document.getElementById('cheat-search').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            cheatData.forEach(item => {
+                const matchesCat = (currentCheatFilter === 'all' || item.cat === currentCheatFilter);
+                const matchesSearch = item.cmd.toLowerCase().includes(searchVal) || item.desc.toLowerCase().includes(searchVal);
+
+                if (matchesCat && matchesSearch) {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-sand-50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 font-bold text-goblue-600">${item.cmd}</td>
+                        <td class="p-3 text-[10px] uppercase text-sand-800"><span class="bg-sand-200 px-2 py-0.5 rounded">${item.cat}</span></td>
+                        <td class="p-3 text-sand-800">${item.desc}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            });
+        }
+
+        function setCheatFilter(cat) {
+            currentCheatFilter = cat;
+            renderCheatsheet();
+        }
+
+        function filterCheatsheet() {
+            renderCheatsheet();
+        }
+
+        // --- 6. Chart.js Initialization ---
+        let complianceChart, swarmChart;
+
+        function initCharts() {
+            // Chart 1: Compliance & Copilot Seats Bar Chart
+            const ctx1 = document.getElementById('complianceChart').getContext('2d');
+            complianceChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['acme/infra', 'acme/auth', 'acme/billing', 'acme/web', 'acme/data'],
+                    datasets: [
+                        {
+                            label: 'Copilot Seats',
+                            data: [42, 18, 12, 65, 30],
+                            backgroundColor: '#2a4e6c',
+                        },
+                        {
+                            label: 'Active Rulesets',
+                            data: [3, 4, 0, 5, 2],
+                            backgroundColor: '#3b5e4f',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e7e2d7' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { family: 'JetBrains Mono', size: 10 } } }
+                    }
+                }
+            });
+
+            // Chart 2: Swarm Turn Convergence Line Chart
+            const ctx2 = document.getElementById('swarmChart').getContext('2d');
+            swarmChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: ['Turn 1', 'Turn 2', 'Turn 3', 'Turn 4'],
+                    datasets: [
+                        {
+                            label: 'Alpha Code Completeness (%)',
+                            data: [45, 70, 88, 100],
+                            borderColor: '#2a4e6c',
+                            backgroundColor: '#2a4e6c',
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Beta Audit Findings',
+                            data: [8, 4, 1, 0],
+                            borderColor: '#8c6d46',
+                            backgroundColor: '#8c6d46',
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e7e2d7' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { family: 'JetBrains Mono', size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function updateAuditChart() {
+            // Randomize slight values to simulate live audit re-run
+            const newSeats = [42, 18, 12, 65, 30].map(v => v + Math.floor(Math.random() * 5) - 2);
+            complianceChart.data.datasets[0].data = newSeats;
+            complianceChart.update();
+        }
+
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCheatsheet();
+            initCharts();
+            inspectNode('hub');
+        });
+    </script>
+</body>
+</html>
+```
+
+### Summary of Built Technical Features
+
+1. **Information Architecture & Persona Tone:**
+   - Designed strictly around Thompson and Pike's philosophy of **orthogonal primitives**, minimal opaque abstractions, and process boundary isolation.
+   - Grounded in a warm, minimalist neutral aesthetic (sand, slate, sage green, Go slate blue) prioritizing high contrast, legibility, and fast technical navigation.
+
+2. **Interactive Topology & Lifecycle Explorer:**
+   - **System Topology Map:** Clickable HTML/CSS component allowing users to inspect the architectural responsibilities, data flow, and CEL policies of the Hub, Runtime Broker Daemon, Container Namespace, and `/bin/sciontool` IPC bridge.
+   - **Lifecycle Mechanics:** Interactive step-by-step state transition inspector explaining process creation, detached execution, resource-saving container suspension, and context-preserving resuming.
+
+3. **Enterprise Use Case Workbench:**
+   - **GitHub Org Auditor:** Pure Go 1.23 standard library agent using `net/http` and `log/slog` to poll GitHub billing APIs, evaluate active rulesets, write Markdown artifacts, and trigger `sciontool` IPC status codes.
+   - **Azure IaC IssueOps:** Gemini CLI agent bounded by system prompt rules, executing inside an isolated `git worktree` with injected Azure OIDC credentials to build Terraform PRs without provisioners.
+   - **CSP Swarm Architecture:** Dual-agent loop (Generator Alpha + Read-only Auditor Beta) communicating via Scion's asynchronous message queue and constrained by CEL policy checks.
+
+4. **Live Telemetry & Metrics Sandbox:**
+   - Pure **Chart.js Canvas** charts showing active Copilot seat allocation vs repository security rulesets, along with CSP Swarm convergence metrics over multiple refinement turns.
+   - Strictly responsive chart containers respecting maximum width and height bounds to prevent overflow.
+
+5. **Searchable Scion Operator Cheatsheet:**
+   - Real-time search filter across CLI commands, workstation configuration flags, and `scion-agent.yaml` schema directives.
