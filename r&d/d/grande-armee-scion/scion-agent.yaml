@@ -1,0 +1,17 @@
+schema_version: "1"
+name: grande-armee-orchestrator
+description: "Autonomous GitHub IssueOps agent patterned after Berthier's Imperial Headquarters."
+image: ghcr.io/internal/scion-berthier-agent:v1.0.0
+detached: true
+task_flag: "--directive"
+env:
+  GITHUB_ORG_NAME: "empire-infrastructure"
+secrets:
+  - name: GITHUB_TOKEN
+    type: environment
+resources:
+  requests:
+    cpu: "1"
+    memory: "512Mi"
+  limits:
+    max_duration: "1h"
