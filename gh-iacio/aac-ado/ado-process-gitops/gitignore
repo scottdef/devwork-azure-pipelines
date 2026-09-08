@@ -1,0 +1,25 @@
+# Build
+bin/
+adoproc
+
+# Reports (generated)
+reports/*.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+*.env.local
+
+# Go
+vendor/
+
+# Exported process snapshots
+processes-export/

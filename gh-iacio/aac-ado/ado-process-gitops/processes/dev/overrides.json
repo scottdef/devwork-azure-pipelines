@@ -1,0 +1,19 @@
+{
+  "processDescription": "CoolADOAgile DEV - experimental process for development and testing",
+  "workItemTypes": {},
+  "disabledWorkItemTypes": [],
+  "additionalFields": {
+    "CoolADO.UserStory": [
+      {"referenceName": "CoolADO.DevNotes", "name": "Developer Notes", "type": "html", "description": "Free-form developer notes (dev only)", "required": false}
+    ],
+    "CoolADO.Bug": [
+      {"referenceName": "CoolADO.DebugLog", "name": "Debug Log Reference", "type": "string", "description": "Link to debug log output (dev only)", "required": false}
+    ]
+  },
+  "additionalStates": {
+    "CoolADO.UserStory": [
+      {"name": "Experimental", "color": "fbbc04", "stateCategory": "InProgress", "order": 7}
+    ]
+  },
+  "additionalRules": {}
+}

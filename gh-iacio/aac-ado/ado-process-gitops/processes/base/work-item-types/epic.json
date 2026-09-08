@@ -1,0 +1,34 @@
+{
+  "referenceName": "CoolADO.Epic",
+  "name": "Epic",
+  "description": "Large initiatives spanning multiple features and sprints",
+  "color": "FF7B00",
+  "icon": "icon_crown",
+  "inherits": "Microsoft.VSTS.WorkItemTypes.Epic",
+  "fields": [
+    {
+      "referenceName": "CoolADO.BusinessValue",
+      "name": "Business Value Score",
+      "type": "integer",
+      "description": "Weighted business value from 1-100",
+      "required": false,
+      "defaultValue": "0"
+    },
+    {
+      "referenceName": "CoolADO.StrategicTheme",
+      "name": "Strategic Theme",
+      "type": "string",
+      "description": "Alignment to organizational strategy pillar",
+      "required": true,
+      "allowedValues": ["Growth", "Efficiency", "Compliance", "Innovation", "Technical Debt"]
+    }
+  ],
+  "states": [
+    {"name": "New", "color": "b2b2b2", "stateCategory": "Proposed", "order": 1},
+    {"name": "Ready for Planning", "color": "007acc", "stateCategory": "Proposed", "order": 2},
+    {"name": "In Progress", "color": "007acc", "stateCategory": "InProgress", "order": 3},
+    {"name": "Done", "color": "339933", "stateCategory": "Completed", "order": 4},
+    {"name": "Removed", "color": "ffffff", "stateCategory": "Removed", "order": 5}
+  ],
+  "rules": []
+}

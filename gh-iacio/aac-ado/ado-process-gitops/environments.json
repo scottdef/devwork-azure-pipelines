@@ -1,0 +1,23 @@
+{
+  "organization": "CoolADO",
+  "environments": [
+    {
+      "name": "dev",
+      "org": "CoolADO",
+      "project": "Dev",
+      "processName": "CoolADOAgile-Dev"
+    },
+    {
+      "name": "uat",
+      "org": "CoolADO",
+      "project": "UAT",
+      "processName": "CoolADOAgile-UAT"
+    },
+    {
+      "name": "prod",
+      "org": "CoolADO",
+      "project": "Prod",
+      "processName": "CoolADOAgile-Prod"
+    }
+  ]
+}

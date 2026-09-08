@@ -1,0 +1,19 @@
+{
+  "referenceName": "CoolADO.Feature",
+  "name": "Feature",
+  "description": "Deliverable functionality that provides user value",
+  "color": "773B93",
+  "icon": "icon_diamond",
+  "inherits": "Microsoft.VSTS.WorkItemTypes.Feature",
+  "fields": [
+    {"referenceName": "CoolADO.TargetRelease", "name": "Target Release", "type": "string", "description": "Target release version", "required": false},
+    {"referenceName": "CoolADO.RiskLevel", "name": "Risk Level", "type": "string", "description": "Implementation risk", "required": false, "allowedValues": ["Low", "Medium", "High", "Critical"]}
+  ],
+  "states": [
+    {"name": "New", "color": "b2b2b2", "stateCategory": "Proposed", "order": 1},
+    {"name": "In Progress", "color": "007acc", "stateCategory": "InProgress", "order": 2},
+    {"name": "Done", "color": "339933", "stateCategory": "Completed", "order": 3},
+    {"name": "Removed", "color": "ffffff", "stateCategory": "Removed", "order": 4}
+  ],
+  "rules": []
+}

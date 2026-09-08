@@ -1,0 +1,6 @@
+{
+  "name": "CoolADOAgile",
+  "description": "CoolADO custom Agile process with enhanced tracking and compliance fields",
+  "parentProcessTypeId": "adcc42ab-9882-485e-a3ed-7678f01f66bc",
+  "referenceName": "CoolADO.CoolADOAgile"
+}
