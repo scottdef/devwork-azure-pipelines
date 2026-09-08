@@ -1,0 +1,78 @@
+name: Promote to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'processes/**'
+      - 'environments.json'
+
+permissions:
+  contents: read
+
+env:
+  ADO_PAT: ${{ secrets.ADO_PAT }}
+
+jobs:
+  deploy-prod:
+    name: Sync Process to Production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      # GitHub Environment protection rules enforce:
+      #   - Required reviewers (at least 1 approval)
+      #   - Wait timer (optional cool-down before deploy)
+      #   - Deployment branches restricted to main
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.21
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build adoproc CLI
+        run: |
+          go build -ldflags "-X main.version=$(git describe --tags --always) -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o adoproc ./cmd/adoproc/
+
+      - name: Validate for Prod
+        run: ./adoproc validate --env prod
+
+      - name: Pre-deploy diff (must pass)
+        run: |
+          echo "## Production Pre-Deploy Diff" >> "$GITHUB_STEP_SUMMARY"
+          ./adoproc diff --env prod | tee diff.json || true
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat diff.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry-run sync
+        run: |
+          echo "## Planned Production Changes" >> "$GITHUB_STEP_SUMMARY"
+          ./adoproc sync --env prod --dry-run | tee dry-run.json
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat dry-run.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply changes to Production
+        run: |
+          ./adoproc sync --env prod | tee sync-result.json
+          echo "## Production Sync Results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat sync-result.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate full drift report
+        if: always()
+        run: ./adoproc report --output reports/prod-drift-report.html || true
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-drift-report
+          path: reports/
+          retention-days: 90

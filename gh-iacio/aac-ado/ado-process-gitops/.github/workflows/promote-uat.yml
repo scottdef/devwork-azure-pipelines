@@ -1,0 +1,63 @@
+name: Promote to UAT
+
+on:
+  push:
+    branches: [uat]
+    paths:
+      - 'processes/**'
+      - 'environments.json'
+
+permissions:
+  contents: read
+
+env:
+  ADO_PAT: ${{ secrets.ADO_PAT }}
+
+jobs:
+  deploy-uat:
+    name: Sync Process to UAT
+    runs-on: ubuntu-latest
+    environment: uat
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.21
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build adoproc CLI
+        run: go build -o adoproc ./cmd/adoproc/
+
+      - name: Validate for UAT
+        run: ./adoproc validate --env uat
+
+      - name: Pre-deploy diff
+        run: |
+          echo "## UAT Pre-Deploy Diff" >> "$GITHUB_STEP_SUMMARY"
+          ./adoproc diff --env uat | tee diff.json || true
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat diff.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply changes to UAT
+        run: |
+          ./adoproc sync --env uat | tee sync-result.json
+          echo "## UAT Sync Results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat sync-result.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate cross-environment report
+        if: always()
+        run: ./adoproc report --output reports/uat-drift-report.html || true
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-drift-report
+          path: reports/
+          retention-days: 30

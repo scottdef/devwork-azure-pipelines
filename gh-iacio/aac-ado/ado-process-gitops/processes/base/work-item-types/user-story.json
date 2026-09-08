@@ -1,0 +1,28 @@
+{
+  "referenceName": "CoolADO.UserStory",
+  "name": "User Story",
+  "description": "A user-facing requirement expressed as a story",
+  "color": "009CCC",
+  "icon": "icon_book",
+  "inherits": "Microsoft.VSTS.WorkItemTypes.UserStory",
+  "fields": [
+    {"referenceName": "CoolADO.AcceptanceCriteria", "name": "Acceptance Criteria", "type": "html", "description": "Conditions for acceptance", "required": true},
+    {"referenceName": "CoolADO.StoryPoints", "name": "Story Points", "type": "integer", "description": "Relative effort estimate", "required": false, "allowedValues": ["1","2","3","5","8","13","21"]},
+    {"referenceName": "CoolADO.Team", "name": "Owning Team", "type": "string", "description": "Responsible team", "required": false}
+  ],
+  "states": [
+    {"name": "New", "color": "b2b2b2", "stateCategory": "Proposed", "order": 1},
+    {"name": "Ready", "color": "007acc", "stateCategory": "Proposed", "order": 2},
+    {"name": "Active", "color": "007acc", "stateCategory": "InProgress", "order": 3},
+    {"name": "Resolved", "color": "ff9d00", "stateCategory": "Resolved", "order": 4},
+    {"name": "Closed", "color": "339933", "stateCategory": "Completed", "order": 5},
+    {"name": "Removed", "color": "ffffff", "stateCategory": "Removed", "order": 6}
+  ],
+  "rules": [
+    {
+      "name": "Require Acceptance Criteria before Active",
+      "conditions": [{"conditionType": "whenChanged", "field": "System.State", "value": "Active"}],
+      "actions": [{"actionType": "makeRequired", "targetField": "CoolADO.AcceptanceCriteria"}]
+    }
+  ]
+}

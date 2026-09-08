@@ -1,0 +1,24 @@
+{
+  "processDescription": "CoolADOAgile UAT - quality assurance validation environment",
+  "workItemTypes": {},
+  "disabledWorkItemTypes": [],
+  "additionalFields": {
+    "CoolADO.Bug": [
+      {"referenceName": "CoolADO.TestCycleRef", "name": "Test Cycle Reference", "type": "string", "description": "Reference to UAT test cycle ID", "required": false}
+    ],
+    "CoolADO.UserStory": [
+      {"referenceName": "CoolADO.UATSignoff", "name": "UAT Signoff", "type": "string", "description": "Name of UAT approver", "required": false}
+    ]
+  },
+  "additionalStates": {
+    "CoolADO.UserStory": [
+      {"name": "UAT Testing", "color": "ff9d00", "stateCategory": "InProgress", "order": 7},
+      {"name": "UAT Approved", "color": "339933", "stateCategory": "Resolved", "order": 8}
+    ]
+  },
+  "additionalRules": {
+    "CoolADO.UserStory": [
+      {"name": "Require UAT Signoff before Closed", "conditions": [{"conditionType": "whenChanged", "field": "System.State", "value": "Closed"}], "actions": [{"actionType": "makeRequired", "targetField": "CoolADO.UATSignoff"}]}
+    ]
+  }
+}
