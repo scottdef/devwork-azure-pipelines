@@ -1,0 +1,197 @@
+# deploy-chat-fallback-model.yml — Foundry Owner ONLY. Serverless (GlobalStandard,
+# pay-per-token) chat model on the NEW Foundry resource for Copilot BYOK, used when
+# Copilot AI Credits are exhausted. Only Microsoft.CognitiveServices operations.
+#
+# Preference order — first model present in the region's catalog is deployed:
+#   1. Qwen/qwen3-32b                    (requested)
+#   2. DeepSeek/DeepSeek-V3.1            (strong agentic fallback)
+#   3. Meta/Llama-4-Maverick-17B-128E-Instruct-FP8
+#   4. OpenAI/gpt-4.1-mini               (always present on AIServices accounts)
+# All four are Direct-from-Azure serverless; Foundry Owner can deploy any of them.
+name: Deploy — chat fallback model (Foundry Owner)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print what would run, deploy nothing"
+        type: boolean
+        default: true
+      post_key_in_issue:
+        description: "Put the API key in the issue body (anyone with repo read can see it; default off)"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: foundry-prod-chat-fallback
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-coolgit-copilot
+  ACCOUNT:        ais-coolgit-copilot-prod
+  DEPLOYMENT:     chat-fallback                  # stable name for COPILOT_MODEL
+  SKU:            GlobalStandard
+  CAPACITY:       "50"                           # K TPM
+  RAI_POLICY:     Microsoft.DefaultV2
+  CANDIDATES:     "Qwen|qwen3-32b;DeepSeek|DeepSeek-V3.1;Meta|Llama-4-Maverick-17B-128E-Instruct-FP8;OpenAI|gpt-4.1-mini"
+  SECRET_NAME:    FOUNDRY_BYOK_KEY
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: foundry-prod
+    steps:
+      - name: Azure login (UAMI, federated)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.UAMI_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Probe permissions
+        id: probe
+        run: |
+          set -euo pipefail
+          acct="$(az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" -o json)"
+          [[ "$(jq -r .properties.disableLocalAuth <<<"$acct")" != true ]] || { echo "::error::disableLocalAuth=true → no API key; Copilot BYOK needs one"; exit 1; }
+          loc="$(jq -r .location <<<"$acct")"
+          az cognitiveservices model list -l "$loc" --query 'length(@)' -o tsv >/dev/null || { echo "::error::missing locations/models/read"; exit 1; }
+          az cognitiveservices usage list -l "$loc" -o none || { echo "::error::missing locations/usages/read"; exit 1; }
+          az cognitiveservices account keys list -g "$RESOURCE_GROUP" -n "$ACCOUNT" -o none || { echo "::error::missing accounts/listKeys/action"; exit 1; }
+          { echo "location=$loc"; echo "endpoint=$(jq -r .properties.endpoint <<<"$acct" | sed 's#/$##')"; } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Pick first available candidate
+        id: pick
+        env:
+          LOC: ${{ steps.probe.outputs.location }}
+        run: |
+          set -euo pipefail
+          catalog="$(az cognitiveservices model list -l "$LOC" -o json)"
+          while IFS='|' read -r f n; do
+            v="$(jq -r --arg f "$f" --arg n "$n" '[.[] | select(.model.format==$f and .model.name==$n) | .model.version] | sort | last // empty' <<<"$catalog")"
+            if [[ -n "$v" ]]; then
+              [[ "$f/$n" == "Qwen/qwen3-32b" ]] || echo "::warning::qwen3-32b not in $LOC catalog → deploying $f/$n instead"
+              { echo "format=$f"; echo "name=$n"; echo "version=$v"; } | tee -a "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "not in catalog: $f/$n"
+          done < <(tr ';' '\n' <<<"$CANDIDATES")
+          echo "::error::no candidate available in $LOC"; exit 1
+
+      - name: Deploy
+        id: deploy
+        env:
+          LOC: ${{ steps.probe.outputs.location }}
+          FMT: ${{ steps.pick.outputs.format }}
+          NAME: ${{ steps.pick.outputs.name }}
+          VER: ${{ steps.pick.outputs.version }}
+        run: |
+          set -euo pipefail
+          read -r cur lim < <(az cognitiveservices usage list -l "$LOC" --query "[?contains(name.value,'$FMT.$SKU.$NAME')] | [0].[currentValue,limit]" -o tsv || echo "0 0")
+          echo "quota: current=${cur:-?} limit=${lim:-?} requested=$CAPACITY"
+          if [[ "${lim:-0}" != 0 ]] && (( cur + CAPACITY > lim )); then echo "::error::quota exceeded"; exit 1; fi
+          if az cognitiveservices account deployment show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT" -o none 2>/dev/null; then
+            cur_model="$(az cognitiveservices account deployment show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT" --query 'properties.model.name' -o tsv)"
+            [[ "$cur_model" == "$NAME" ]] || echo "::warning::$DEPLOYMENT currently backs $cur_model; PUT will switch it to $NAME"
+          fi
+          cmd=(az cognitiveservices account deployment create -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT"
+               --model-format "$FMT" --model-name "$NAME" --model-version "$VER" --sku-name "$SKU" --sku-capacity "$CAPACITY" --rai-policy-name "$RAI_POLICY" -o none)
+          printf '%q ' "${cmd[@]}"; echo
+          [[ "${{ inputs.dry_run }}" == true ]] && { echo "dry run — stopping"; exit 0; }
+          "${cmd[@]}"
+          for _ in $(seq 1 60); do
+            s="$(az cognitiveservices account deployment show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT" --query properties.provisioningState -o tsv)"
+            echo "provisioningState=$s"; [[ $s == Succeeded ]] && exit 0; [[ $s == Failed || $s == Canceled ]] && { echo "::error::$s"; exit 1; }; sleep 15
+          done; echo "::error::timeout"; exit 1
+
+      - name: Fetch key + validate with it
+        id: key
+        if: ${{ !inputs.dry_run }}
+        env:
+          EP: ${{ steps.probe.outputs.endpoint }}
+        run: |
+          set -euo pipefail
+          key="$(az cognitiveservices account keys list -g "$RESOURCE_GROUP" -n "$ACCOUNT" --query key1 -o tsv)"
+          echo "::add-mask::$key"; echo "key=$key" >> "$GITHUB_OUTPUT"
+          H=(-H "api-key: $key" -H "Authorization: Bearer $key" -H "Content-Type: application/json")
+          ping="{\"model\":\"$DEPLOYMENT\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":8}"
+          url=""
+          for u in "$EP/openai/deployments/$DEPLOYMENT/chat/completions?api-version=2024-10-21" "$EP/openai/v1/chat/completions" "$EP/models/chat/completions?api-version=2024-05-01-preview"; do
+            code=$(curl -sS -o r.json -w '%{http_code}' "$u" "${H[@]}" -d "$ping" || echo 000); [[ $code == 200 ]] && { url="$u"; break; }; done
+          [[ -n "$url" ]] || { echo "::error::no chat route answered with the key (last $code)"; cat r.json; exit 1; }
+          echo "chat OK via ${url%%\?*}"
+          chunks=$(curl -sS -N "$url" "${H[@]}" -d "$(jq '.+{stream:true}' <<<"$ping")" | grep -c '^data:' || true)
+          (( chunks > 1 )) || { echo "::error::no streaming"; exit 1; }
+          curl -sS "$url" "${H[@]}" -o t.json -d "$(jq '.+{max_tokens:128,tool_choice:"auto",messages:[{role:"user",content:"Weather in Boston? Use the tool. /no_think"}],
+            tools:[{type:"function",function:{name:"get_weather",parameters:{type:"object",properties:{city:{type:"string"}},required:["city"]}}}]}' <<<"$ping")"
+          tools=$(jq -r 'if .choices[0].message.tool_calls[0].function.name=="get_weather" then "true" else "false" end' t.json)
+          [[ $tools == true ]] || { echo "::error::no tool call — not Copilot-BYOK usable"; cat t.json; exit 1; }
+          base="${url%%\?*}"; base="${base%/chat/completions}"
+          { echo "chat_url=$url"; echo "byok_base=$base"; echo "streaming=true"; echo "tool_calling=$tools"; } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Store key as Actions secret (needs GH_ADMIN_TOKEN)
+        id: secret
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+          KEY: ${{ steps.key.outputs.key }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then echo "stored=false" >> "$GITHUB_OUTPUT"; echo "::notice::GH_ADMIN_TOKEN not set — key not stored as a secret"; exit 0; fi
+          gh secret set "$SECRET_NAME" --repo "${{ github.repository }}" --body "$KEY" && echo "stored=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create issue with model details (+ key if opted in)
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ steps.key.outputs.key }}
+          EP: ${{ steps.probe.outputs.endpoint }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.post_key_in_issue }}" == true ]]; then keyline="| **API key** | \`$KEY\` |"
+          elif [[ "${{ steps.secret.outputs.stored }}" == true ]]; then keyline="| API key | Actions secret \`$SECRET_NAME\` (not shown). Retrieve: \`az cognitiveservices account keys list -g $RESOURCE_GROUP -n $ACCOUNT --query key1 -o tsv\` |"
+          else keyline="| API key | not stored. Retrieve: \`az cognitiveservices account keys list -g $RESOURCE_GROUP -n $ACCOUNT --query key1 -o tsv\` |"; fi
+          body="$(cat <<MD
+          ## Chat fallback model deployed → \`$DEPLOYMENT\`
+
+          | | |
+          |---|---|
+          | Model | \`${{ steps.pick.outputs.format }}/${{ steps.pick.outputs.name }}@${{ steps.pick.outputs.version }}\` |
+          | SKU / capacity | $SKU / ${CAPACITY}K TPM |
+          | Account | \`$RESOURCE_GROUP/$ACCOUNT\` (${{ steps.probe.outputs.location }}) |
+          | Endpoint | \`$EP\` |
+          | Chat URL (verified) | \`${{ steps.key.outputs.chat_url }}\` |
+          | Streaming / tool calling | ${{ steps.key.outputs.streaming }} / ${{ steps.key.outputs.tool_calling }} |
+          $keyline
+          | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+
+          ### Copilot BYOK — enterprise (CoolGitEnterprise → AI controls → Copilot → Custom models → Add API key)
+          - Provider: **Microsoft Foundry**
+          - Base URL: \`${{ steps.key.outputs.byok_base }}\`
+          - Model / deployment: \`$DEPLOYMENT\`
+          - Max context: 131072
+          - **Enable**, then grant **CoolGitOrg** on the Access tab. Usage bills to Azure, not AI Credits.
+
+          ### Copilot CLI (per user)
+          \`\`\`bash
+          export COPILOT_PROVIDER_TYPE=azure
+          export COPILOT_PROVIDER_BASE_URL="${{ steps.key.outputs.byok_base }}"
+          export COPILOT_PROVIDER_API_KEY="<key>"
+          export COPILOT_MODEL="$DEPLOYMENT"
+          \`\`\`
+          MD
+          )"
+          gh issue create --repo "${{ github.repository }}" --title "BYOK: $DEPLOYMENT → ${{ steps.pick.outputs.name }}" --label foundry-byok --body "$body" || \
+          gh issue create --repo "${{ github.repository }}" --title "BYOK: $DEPLOYMENT → ${{ steps.pick.outputs.name }}" --body "$body"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## \`$DEPLOYMENT\` → ${{ steps.pick.outputs.format }}/${{ steps.pick.outputs.name }}@${{ steps.pick.outputs.version }} ($SKU × ${CAPACITY}K TPM)"
+            echo "- dry run: ${{ inputs.dry_run }} · key stored as secret: ${{ steps.secret.outputs.stored || 'n/a' }} · key in issue: ${{ inputs.post_key_in_issue }}"
+            echo "- BYOK base URL: \`${{ steps.key.outputs.byok_base || 'n/a' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

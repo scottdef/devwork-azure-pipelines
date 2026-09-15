@@ -1,0 +1,166 @@
+# deploy-qwen3-coder-next.yml — LEGACY HUB STACK (azurerm_ai_foundry + azurerm_ai_foundry_project).
+#
+# Under hubs, registry/Hugging Face models run as ML *managed online endpoints*
+# on the PROJECT workspace (Microsoft.MachineLearningServices/workspaces/onlineEndpoints),
+# not as Cognitive Services deployments. So: `az ml`, YAML specs, instance_type × count.
+#
+# Identity: UAMI + federated credential, subject
+#   repo:CoolGitOrg/copilot-foundry:environment:foundry-prod
+# UAMI needs "AzureML Data Scientist" (or Contributor) on the project workspace.
+#
+# GPU-hours bill while the endpoint exists, idle included. Dry-run first.
+name: Deploy — Qwen3-Coder-Next (hub / ML online endpoint)
+
+on:
+  workflow_dispatch:
+    inputs:
+      capacity:
+        description: "Compute size"
+        required: true
+        type: choice
+        default: "small  — 1× NC80adis_H100_v5 (2 H100)"
+        options:
+          - "small  — 1× NC80adis_H100_v5 (2 H100)"
+          - "medium — 2× NC80adis_H100_v5 (4 H100, load-balanced)"
+          - "large  — 1× ND96isr_H100_v5 (8 H100)"
+      dry_run:
+        description: "Render the YAML specs, deploy nothing"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: hub-foundry-prod-qwen3-coder-next
+  cancel-in-progress: false
+
+env:
+  # ── hard-coded target (legacy hub stack) ──────────────────────────────
+  RESOURCE_GROUP: rg-coolgit-copilot
+  HUB:            hub-coolgit-copilot            # azurerm_ai_foundry.name
+  PROJECT:        proj-coolgit-copilot           # azurerm_ai_foundry_project.name
+  ENDPOINT:       qwen3-coder-next               # ML online endpoint name (globally unique per region)
+  MODEL:          azureml://registries/azure-huggingface/models/qwen--qwen3-coder-next/labels/latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: foundry-prod
+    steps:
+      - name: Azure login (UAMI, federated)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.UAMI_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install az ml extension
+        run: az extension add -n ml -y && az version --query '"extensions"."ml"' -o tsv
+
+      - name: Map capacity choice → instance_type × count
+        id: cap
+        env:
+          CHOICE: ${{ inputs.capacity }}
+        run: |
+          set -euo pipefail
+          case "${CHOICE%% *}" in
+            small)  t=Standard_NC80adis_H100_v5; n=1 ;;
+            medium) t=Standard_NC80adis_H100_v5; n=2 ;;
+            large)  t=Standard_ND96isr_H100_v5;  n=1 ;;
+            *) echo "::error::unknown capacity '$CHOICE'"; exit 1 ;;
+          esac
+          { echo "instance_type=$t"; echo "instance_count=$n"; } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Pre-flight (hub, project, GPU quota)
+        run: |
+          set -euo pipefail
+          az ml workspace show -g "$RESOURCE_GROUP" -n "$HUB"     --query '{name:name,kind:kind,location:location}' -o table
+          az ml workspace show -g "$RESOURCE_GROUP" -n "$PROJECT" --query '{name:name,kind:kind,hub:hub_id}' -o table
+          loc="$(az ml workspace show -g "$RESOURCE_GROUP" -n "$PROJECT" --query location -o tsv)"
+          fam="$(sed -E 's/^Standard_(NC[0-9]+adis|ND[0-9]+isr)_H100_v5$/\1/' <<<"${{ steps.cap.outputs.instance_type }}")"
+          echo "quota family for $fam in $loc:"
+          az ml compute list-usage -l "$loc" --query "[?contains(name.value,'H100')].{name:name.value,current:currentValue,limit:limit}" -o table || true
+
+      - name: Render endpoint + deployment specs
+        run: |
+          set -euo pipefail
+          cat > endpoint.yml <<EOF
+          \$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
+          name: $ENDPOINT
+          auth_mode: aad_token
+          tags: { model: qwen3-coder-next, managed_by: github-actions }
+          EOF
+          cat > deployment.yml <<EOF
+          \$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineDeployment.schema.json
+          name: default
+          endpoint_name: $ENDPOINT
+          model: $MODEL
+          instance_type: ${{ steps.cap.outputs.instance_type }}
+          instance_count: ${{ steps.cap.outputs.instance_count }}
+          request_settings:
+            request_timeout_ms: 180000
+            max_concurrent_requests_per_instance: 8
+          liveness_probe:  { initial_delay: 600, period: 30, timeout: 10, failure_threshold: 30 }
+          readiness_probe: { initial_delay: 600, period: 30, timeout: 10, failure_threshold: 30 }
+          EOF
+          echo "── endpoint.yml"; cat endpoint.yml; echo "── deployment.yml"; cat deployment.yml
+
+      - name: Deploy
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if ! az ml online-endpoint show -g "$RESOURCE_GROUP" -w "$PROJECT" -n "$ENDPOINT" -o none 2>/dev/null; then
+            az ml online-endpoint create -g "$RESOURCE_GROUP" -w "$PROJECT" -f endpoint.yml -o none
+          fi
+          if az ml online-deployment show -g "$RESOURCE_GROUP" -w "$PROJECT" -e "$ENDPOINT" -n default -o none 2>/dev/null; then
+            az ml online-deployment update -g "$RESOURCE_GROUP" -w "$PROJECT" -f deployment.yml -o none
+          else
+            az ml online-deployment create -g "$RESOURCE_GROUP" -w "$PROJECT" -f deployment.yml --all-traffic -o none
+          fi
+          az ml online-endpoint show -g "$RESOURCE_GROUP" -w "$PROJECT" -n "$ENDPOINT" \
+            --query '{state:provisioning_state, traffic:traffic, scoring_uri:scoring_uri}' -o json | tee ep.json
+          echo "SCORING_URI=$(jq -r .scoring_uri ep.json)" >> "$GITHUB_ENV"
+
+      - name: Validate (Entra token for ML endpoint — chat, stream, tool call)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          tok="$(az account get-access-token --resource https://ml.azure.com --query accessToken -o tsv)"
+          H=(-H "Authorization: Bearer $tok" -H "Content-Type: application/json" -H "azureml-model-deployment: default")
+          base="${SCORING_URI%/score}"
+          ping='{"messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":8}'
+          url=""
+          # the HF vLLM image serves OpenAI routes; try them, then the raw /score
+          for u in "$base/v1/chat/completions" "$base/chat/completions" "$SCORING_URI"; do
+            code=$(curl -sS -o r.json -w '%{http_code}' "$u" "${H[@]}" -d "$ping" || echo 000)
+            [[ $code == 200 ]] && { url="$u"; break; }
+          done
+          [[ -n "$url" ]] || { echo "::error::no route returned 200 (last $code)"; cat r.json; exit 1; }
+          echo "chat OK via $url → $(jq -r '.choices[0].message.content // .output // .' r.json | head -c 80)"
+          echo "BASE_URL=$url" >> "$GITHUB_ENV"
+          chunks=$(curl -sS -N "$url" "${H[@]}" -d "$(jq '.+{stream:true}' <<<"$ping")" | grep -c '^data:' || true)
+          (( chunks > 1 )) && echo "stream OK ($chunks chunks)" || echo "::warning::no SSE streaming — Copilot needs it"
+          curl -sS "$url" "${H[@]}" -o t.json -d "$(jq '.+{max_tokens:128,tool_choice:"auto",
+            messages:[{role:"user",content:"Weather in Boston? Use the tool."}],
+            tools:[{type:"function",function:{name:"get_weather",parameters:{type:"object",properties:{city:{type:"string"}},required:["city"]}}}]}' <<<"$ping")"
+          jq -e '.choices[0].message.tool_calls[0].function.name=="get_weather"' t.json >/dev/null \
+            && echo "tool calling OK" \
+            || echo "::warning::no tool call returned — this image is not Copilot-BYOK compatible as served; check the vLLM tool parser (qwen3_coder)"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Qwen3-Coder-Next → hub \`$HUB\` / project \`$PROJECT\` / endpoint \`$ENDPOINT\`"
+            echo "- capacity: ${{ inputs.capacity }} → ${{ steps.cap.outputs.instance_type }} × ${{ steps.cap.outputs.instance_count }}"
+            echo "- dry run: ${{ inputs.dry_run }}"
+            echo "- scoring uri: \`${SCORING_URI:-n/a}\`   chat route: \`${BASE_URL:-n/a}\`"
+            echo
+            echo "ML online endpoints use \`aad_token\` (resource https://ml.azure.com) or the endpoint key"
+            echo "(\`az ml online-endpoint get-credentials -g $RESOURCE_GROUP -w $PROJECT -n $ENDPOINT\`). For Copilot BYOK use the"
+            echo "key with provider *OpenAI-compatible*, base URL \`${BASE_URL%/chat/completions}\`."
+            echo
+            echo "Decommission: \`az ml online-endpoint delete -g $RESOURCE_GROUP -w $PROJECT -n $ENDPOINT -y\` — GPUs bill until then."
+          } >> "$GITHUB_STEP_SUMMARY"

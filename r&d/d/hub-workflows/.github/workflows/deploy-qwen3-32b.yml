@@ -1,0 +1,188 @@
+# deploy-qwen3-32b.yml — LEGACY HUB STACK (azurerm_ai_foundry + azurerm_ai_foundry_project).
+#
+# Under hubs a model lands in one of two places, decided at run time:
+#   A. "Direct from Azure" catalog → deployment on the AI Services account the hub is
+#      CONNECTED to (discovered from the hub's connections, never guessed).
+#      `az cognitiveservices account deployment create`
+#   B. Otherwise (partner MaaS) → workspace serverless endpoint on the PROJECT.
+#      `az ml marketplace-subscription create` + `az ml serverless-endpoint create`
+#
+# Identity: UAMI + federated credential, subject repo:CoolGitOrg/copilot-foundry:environment:foundry-prod
+# UAMI needs Cognitive Services Contributor (account) + AzureML Data Scientist (project).
+name: Deploy — qwen3-32b (hub / serverless)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print commands, deploy nothing"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: hub-foundry-prod-qwen3-32b
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-coolgit-copilot
+  HUB:            hub-coolgit-copilot
+  PROJECT:        proj-coolgit-copilot
+  DEPLOYMENT:     qwen3-32b
+  MODEL_FORMAT:   Qwen
+  MODEL_NAME:     qwen3-32b
+  SKU:            GlobalStandard
+  CAPACITY:       "50"
+  RAI_POLICY:     Microsoft.DefaultV2
+  # path B only — registry asset for the serverless (MaaS) offer; verify with
+  #   az ml model list --registry-name azureml-qwen --query "[].name"
+  MAAS_MODEL:     azureml://registries/azureml-qwen/models/Qwen3-32B/labels/latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: foundry-prod
+    steps:
+      - name: Azure login (UAMI, federated)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.UAMI_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install az ml extension
+        run: az extension add -n ml -y
+
+      - name: Discover the hub's AI Services connection
+        id: hub
+        run: |
+          set -euo pipefail
+          hub_id="$(az ml workspace show -g "$RESOURCE_GROUP" -n "$HUB" --query id -o tsv)"
+          loc="$(az ml workspace show -g "$RESOURCE_GROUP" -n "$HUB" --query location -o tsv)"
+          # connections of category AIServices / AzureOpenAI carry the account's ARM id in metadata.ResourceId
+          acct_id="$(az rest --method get \
+            --url "https://management.azure.com${hub_id}/connections?api-version=2024-10-01" \
+            --query "value[?properties.category=='AIServices' || properties.category=='AzureOpenAI'] | [0].properties.metadata.ResourceId" -o tsv)"
+          [[ -n "$acct_id" ]] || { echo "::error::hub $HUB has no AIServices/AzureOpenAI connection — add azurerm_ai_services + connection"; exit 1; }
+          acct="${acct_id##*/}"; acct_rg="$(sed -E 's#.*/resourceGroups/([^/]+)/.*#\1#' <<<"$acct_id")"
+          { echo "account=$acct"; echo "account_rg=$acct_rg"; echo "location=$loc"; } | tee -a "$GITHUB_OUTPUT"
+          az cognitiveservices account show -g "$acct_rg" -n "$acct" --query '{name:name,kind:kind,endpoint:properties.endpoint,subdomain:properties.customSubDomainName}' -o table
+          [[ -n "$(az cognitiveservices account show -g "$acct_rg" -n "$acct" --query properties.customSubDomainName -o tsv)" ]] \
+            || echo "::warning::account has no custom subdomain → no endpoint URL / no Entra auth. Set custom_subdomain_name in Terraform."
+
+      - name: "Decide path (A: account catalog, B: MaaS serverless endpoint)"
+        id: path
+        env:
+          LOC: ${{ steps.hub.outputs.location }}
+        run: |
+          set -euo pipefail
+          ver="$(az cognitiveservices model list -l "$LOC" \
+                 --query "[?model.format=='$MODEL_FORMAT' && model.name=='$MODEL_NAME'] | sort_by(@, &model.version) | [-1].model.version" -o tsv)"
+          if [[ -n "$ver" ]]; then
+            echo "path=A"; echo "version=$ver"
+          else
+            echo "::notice::$MODEL_FORMAT/$MODEL_NAME not in the $LOC account catalog → MaaS serverless endpoint on project $PROJECT"
+            echo "path=B"; echo "version="
+          fi | tee -a "$GITHUB_OUTPUT"
+
+      # ── Path A ────────────────────────────────────────────────────────────
+      - name: "A: deploy on the connected AI Services account"
+        if: steps.path.outputs.path == 'A'
+        env:
+          ACCT:    ${{ steps.hub.outputs.account }}
+          ACCT_RG: ${{ steps.hub.outputs.account_rg }}
+          LOC:     ${{ steps.hub.outputs.location }}
+        run: |
+          set -euo pipefail
+          read -r cur lim < <(az cognitiveservices usage list -l "$LOC" \
+            --query "[?contains(name.value,'$MODEL_FORMAT.$SKU.$MODEL_NAME')] | [0].[currentValue,limit]" -o tsv || echo "0 0")
+          echo "quota: current=${cur:-?} limit=${lim:-?} requested=$CAPACITY"
+          if [[ "${lim:-0}" != 0 ]] && (( cur + CAPACITY > lim )); then echo "::error::quota exceeded"; exit 1; fi
+          cmd=(az cognitiveservices account deployment create -g "$ACCT_RG" -n "$ACCT" --deployment-name "$DEPLOYMENT"
+               --model-format "$MODEL_FORMAT" --model-name "$MODEL_NAME" --model-version "${{ steps.path.outputs.version }}"
+               --sku-name "$SKU" --sku-capacity "$CAPACITY" --rai-policy-name "$RAI_POLICY" -o none)
+          printf '%q ' "${cmd[@]}"; echo
+          [[ "${{ inputs.dry_run }}" == true ]] && { echo "dry run — stopping"; exit 0; }
+          "${cmd[@]}"
+          for _ in $(seq 1 60); do
+            s="$(az cognitiveservices account deployment show -g "$ACCT_RG" -n "$ACCT" --deployment-name "$DEPLOYMENT" --query properties.provisioningState -o tsv)"
+            echo "provisioningState=$s"; [[ $s == Succeeded ]] && break
+            [[ $s == Failed || $s == Canceled ]] && { echo "::error::$s"; exit 1; }; sleep 15
+          done
+          ep="$(az cognitiveservices account show -g "$ACCT_RG" -n "$ACCT" --query properties.endpoint -o tsv)"; ep="${ep%/}"
+          { echo "CHAT_URL=$ep/openai/deployments/$DEPLOYMENT/chat/completions?api-version=2024-10-21"
+            echo "TOKEN_RESOURCE=https://cognitiveservices.azure.com"
+            echo "BYOK_BASE=$ep/openai/deployments/$DEPLOYMENT/v1"; } >> "$GITHUB_ENV"
+
+      # ── Path B ────────────────────────────────────────────────────────────
+      - name: "B: MaaS serverless endpoint on the project workspace"
+        if: steps.path.outputs.path == 'B'
+        run: |
+          set -euo pipefail
+          sub_name="$(tr '[:upper:]' '[:lower:]' <<<"$DEPLOYMENT")-sub"
+          cat > subscription.yml <<EOF
+          name: $sub_name
+          model_id: ${MODEL_ASSET%/labels/latest}
+          EOF
+          cat > serverless.yml <<EOF
+          name: $DEPLOYMENT
+          model_id: $MAAS_MODEL
+          auth_mode: key
+          EOF
+          echo "── subscription.yml"; cat subscription.yml; echo "── serverless.yml"; cat serverless.yml
+          [[ "${{ inputs.dry_run }}" == true ]] && { echo "dry run — stopping"; exit 0; }
+          # marketplace subscription is only needed for partner (non-Microsoft) offers; harmless if it already exists
+          az ml marketplace-subscription create -g "$RESOURCE_GROUP" -w "$PROJECT" -f subscription.yml -o none 2>/dev/null || true
+          az ml serverless-endpoint create -g "$RESOURCE_GROUP" -w "$PROJECT" -f serverless.yml -o none
+          for _ in $(seq 1 60); do
+            s="$(az ml serverless-endpoint show -g "$RESOURCE_GROUP" -w "$PROJECT" -n "$DEPLOYMENT" --query provisioning_state -o tsv)"
+            echo "provisioning_state=$s"; [[ $s == Succeeded ]] && break
+            [[ $s == Failed ]] && { echo "::error::Failed"; exit 1; }; sleep 15
+          done
+          uri="$(az ml serverless-endpoint show -g "$RESOURCE_GROUP" -w "$PROJECT" -n "$DEPLOYMENT" --query scoring_uri -o tsv)"
+          key="$(az ml serverless-endpoint get-credentials -g "$RESOURCE_GROUP" -w "$PROJECT" -n "$DEPLOYMENT" --query primaryKey -o tsv)"
+          echo "::add-mask::$key"
+          { echo "CHAT_URL=${uri%/}/chat/completions"; echo "ENDPOINT_KEY=$key"; echo "BYOK_BASE=${uri%/}"; } >> "$GITHUB_ENV"
+        env:
+          MODEL_ASSET: ${{ env.MAAS_MODEL }}
+
+      - name: Validate (chat, stream, tool call — non-thinking turn)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${ENDPOINT_KEY:-}" ]]; then H=(-H "Authorization: Bearer $ENDPOINT_KEY" -H "Content-Type: application/json")
+          else tok="$(az account get-access-token --resource "$TOKEN_RESOURCE" --query accessToken -o tsv)"
+               H=(-H "Authorization: Bearer $tok" -H "Content-Type: application/json"); fi
+          ping="{\"model\":\"$DEPLOYMENT\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":8}"
+          code=$(curl -sS -o r.json -w '%{http_code}' "$CHAT_URL" "${H[@]}" -d "$ping")
+          [[ $code == 200 ]] || { echo "::error::chat failed ($code)"; cat r.json; exit 1; }
+          echo "chat OK → $(jq -r '.choices[0].message.content' r.json)"
+          chunks=$(curl -sS -N "$CHAT_URL" "${H[@]}" -d "$(jq '.+{stream:true}' <<<"$ping")" | grep -c '^data:')
+          (( chunks > 1 )) || { echo "::error::no streaming"; exit 1; }; echo "stream OK ($chunks chunks)"
+          curl -sS "$CHAT_URL" "${H[@]}" -o t.json -d "$(jq '.+{max_tokens:128,tool_choice:"auto",
+            messages:[{role:"user",content:"Weather in Boston? Use the tool. /no_think"}],
+            tools:[{type:"function",function:{name:"get_weather",parameters:{type:"object",properties:{city:{type:"string"}},required:["city"]}}}]}' <<<"$ping")"
+          jq -e '.choices[0].message.tool_calls[0].function.name=="get_weather"' t.json >/dev/null \
+            || { echo "::error::tool call missing"; cat t.json; exit 1; }
+          echo "tool calling OK"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## qwen3-32b → hub \`$HUB\` (path ${{ steps.path.outputs.path }})"
+            [[ "${{ steps.path.outputs.path }}" == A ]] \
+              && echo "- account deployment on \`${{ steps.hub.outputs.account_rg }}/${{ steps.hub.outputs.account }}/$DEPLOYMENT\` @ ${{ steps.path.outputs.version }} ($SKU ${CAPACITY}K TPM)" \
+              || echo "- MaaS serverless endpoint \`$DEPLOYMENT\` on project \`$PROJECT\` (key auth; rotate with \`az ml serverless-endpoint regenerate-keys\`)"
+            echo "- dry run: ${{ inputs.dry_run }}"
+            echo "- chat url: \`${CHAT_URL:-n/a}\`"
+            echo
+            echo '```bash'
+            echo "export COPILOT_PROVIDER_TYPE=$([[ "${{ steps.path.outputs.path }}" == A ]] && echo azure || echo openai)"
+            echo "export COPILOT_PROVIDER_BASE_URL=\"${BYOK_BASE:-n/a}\""
+            echo "export COPILOT_MODEL=$DEPLOYMENT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
