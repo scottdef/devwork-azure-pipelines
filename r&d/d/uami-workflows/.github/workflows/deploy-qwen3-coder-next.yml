@@ -1,0 +1,155 @@
+# deploy-qwen3-coder-next.yml — manual deploy of Qwen3-Coder-Next (Hugging Face,
+# managed compute, H100) into Azure AI Foundry. Bash steps only, no scripts.
+#
+# Identity: a user-assigned managed identity (UAMI) with a federated credential
+# whose subject is  repo:CoolGitOrg/copilot-foundry:environment:foundry-prod
+# (see scripts/bootstrap-uami.sh). azure/login exchanges the OIDC token for it.
+# No client secret exists anywhere.
+#
+# Managed compute bills per GPU-hour, idle included. Dry-run first.
+name: Deploy — Qwen3-Coder-Next (managed compute)
+
+on:
+  workflow_dispatch:
+    inputs:
+      capacity:
+        description: "Compute size"
+        required: true
+        type: choice
+        default: "small  — 1x H100_80GB (dev / fallback)"
+        options:
+          - "small  — 1x H100_80GB (dev / fallback)"
+          - "medium — 2x H100_80GB (team)"
+          - "large  — 4x H100_80GB (org-wide)"
+      dry_run:
+        description: "Print the PUT body, deploy nothing"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write     # OIDC token for the UAMI federated credential
+  contents: read
+
+concurrency:
+  group: foundry-prod-eastus2-qwen3-coder-next
+  cancel-in-progress: false
+
+env:
+  # ── hard-coded target ─────────────────────────────────────────────────
+  RESOURCE_GROUP:  rg-coolgit-copilot
+  ACCOUNT:         ais-coolgit-copilot-prod
+  DEPLOYMENT:      qwen3-coder-next
+  MODEL_REGISTRY:  azureml://registries/azure-huggingface/models/qwen--qwen3-coder-next
+  TEMPLATE:        azureml://registries/azure-huggingface/deploymenttemplates/qwen--qwen3-coder-next--h100/labels/latest
+  ACCELERATOR:     H100_80GB
+  API_VERSION:     "2025-06-01"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: foundry-prod          # federated subject binds to this name
+    steps:
+      - name: Azure login (UAMI, federated)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.UAMI_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Map capacity choice → instance count
+        id: cap
+        env:
+          CHOICE: ${{ inputs.capacity }}
+        run: |
+          set -euo pipefail
+          case "${CHOICE%% *}" in
+            small)  n=1 ;;
+            medium) n=2 ;;
+            large)  n=4 ;;
+            *) echo "::error::unknown capacity '$CHOICE'"; exit 1 ;;
+          esac
+          echo "instances=$n" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Pre-flight
+        run: |
+          set -euo pipefail
+          az account show --query '{sub:name, identity:user.name}' -o table
+          az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" \
+            --query '{name:name, kind:kind, location:location, endpoint:properties.endpoint}' -o table
+          # GPU quota headroom is not exposed via `usage list` for managed compute; the PUT fails fast if absent.
+
+      - name: Build request
+        id: body
+        run: |
+          set -euo pipefail
+          acct_id="$(az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --query id -o tsv)"
+          url="https://management.azure.com${acct_id}/deployments/${DEPLOYMENT}?api-version=${API_VERSION}"
+          jq -n --arg m "$MODEL_REGISTRY/labels/latest" --arg t "$TEMPLATE" --arg a "$ACCELERATOR" \
+                --argjson c "${{ steps.cap.outputs.instances }}" '{
+            sku: { name: "GlobalManagedCompute", capacity: $c },
+            properties: {
+              model: { format: "HuggingFace", name: $m },
+              deploymentTemplate: $t,
+              acceleratorType: $a
+            }
+          }' > body.json
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "PUT $url"; jq . body.json
+
+      - name: Deploy
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          az rest --method put --url "${{ steps.body.outputs.url }}" --body @body.json -o none
+          start=$(date +%s)
+          while :; do
+            state="$(az rest --method get --url "${{ steps.body.outputs.url }}" --query properties.provisioningState -o tsv 2>/dev/null || echo Unknown)"
+            echo "$(date -u +%T) provisioningState=$state"
+            case "$state" in
+              Succeeded) break ;;
+              Failed|Canceled) echo "::error::deployment $state"; az rest --method get --url "${{ steps.body.outputs.url }}" | jq .properties; exit 1 ;;
+            esac
+            (( $(date +%s) - start > 3600 )) && { echo "::error::timeout"; exit 1; }
+            sleep 30
+          done
+
+      - name: Validate (keyless — chat, stream, tool call)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ep="$(az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --query properties.endpoint -o tsv)"; ep="${ep%/}"
+          tok="$(az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv)"
+          H=(-H "Authorization: Bearer $tok" -H "Content-Type: application/json")
+          # managed compute exposes /openai/v1 (vLLM OpenAI-compatible); fall back to deployment route
+          for url in "$ep/openai/v1/chat/completions" "$ep/openai/deployments/$DEPLOYMENT/chat/completions?api-version=2024-10-21"; do
+            code=$(curl -sS -o r.json -w '%{http_code}' "$url" "${H[@]}" \
+              -d "{\"model\":\"$DEPLOYMENT\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":8}") && [[ $code == 200 ]] && break
+          done
+          [[ $code == 200 ]] || { echo "::error::chat failed ($code)"; cat r.json; exit 1; }
+          echo "chat OK via $url → $(jq -r '.choices[0].message.content' r.json)"
+          echo "BASE_URL=$url" >> "$GITHUB_ENV"
+          chunks=$(curl -sS -N "$url" "${H[@]}" -d "{\"model\":\"$DEPLOYMENT\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":8}" | grep -c '^data:')
+          (( chunks > 1 )) || { echo "::error::no streaming"; exit 1; }; echo "stream OK ($chunks chunks)"
+          curl -sS "$url" "${H[@]}" -o t.json -d "{\"model\":\"$DEPLOYMENT\",\"max_tokens\":128,\"tool_choice\":\"auto\",
+            \"messages\":[{\"role\":\"user\",\"content\":\"Weather in Boston? Use the tool.\"}],
+            \"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}}}]}"
+          jq -e '.choices[0].message.tool_calls[0].function.name=="get_weather"' t.json >/dev/null \
+            || { echo "::error::tool call missing (Copilot BYOK requires it)"; cat t.json; exit 1; }
+          echo "tool calling OK"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Qwen3-Coder-Next → \`$RESOURCE_GROUP/$ACCOUNT/$DEPLOYMENT\`"
+            echo "- capacity: ${{ inputs.capacity }} (${{ steps.cap.outputs.instances }} instance(s))"
+            echo "- dry run: ${{ inputs.dry_run }}"
+            echo "- endpoint: \`${BASE_URL:-n/a}\`"
+            echo
+            echo '```bash'
+            echo "export COPILOT_PROVIDER_TYPE=azure"
+            echo "export COPILOT_PROVIDER_BASE_URL=\"${BASE_URL%/chat/completions*}\""
+            echo "export COPILOT_MODEL=$DEPLOYMENT"
+            echo '```'
+            echo "Register in CoolGitEnterprise → AI controls → Custom models (provider: Microsoft Foundry). Idle GPU bills — decommission when unused."
+          } >> "$GITHUB_STEP_SUMMARY"

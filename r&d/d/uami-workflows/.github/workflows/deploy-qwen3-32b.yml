@@ -1,0 +1,122 @@
+# deploy-qwen3-32b.yml — manual deploy of qwen3-32b (Foundry Models sold by
+# Azure, serverless GlobalStandard, pay-per-token). Bash steps only.
+#
+# Identity: UAMI + federated credential, subject
+#   repo:CoolGitOrg/copilot-foundry:environment:foundry-prod
+# Everything hard-coded except dry_run.
+name: Deploy — qwen3-32b (serverless)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the az command, deploy nothing"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: foundry-prod-eastus2-qwen3-32b
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-coolgit-copilot
+  ACCOUNT:        ais-coolgit-copilot-prod
+  LOCATION:       eastus2
+  DEPLOYMENT:     qwen3-32b
+  MODEL_FORMAT:   Qwen
+  MODEL_NAME:     qwen3-32b
+  SKU:            GlobalStandard
+  CAPACITY:       "50"              # thousands of tokens-per-minute
+  RAI_POLICY:     Microsoft.DefaultV2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: foundry-prod
+    steps:
+      - name: Azure login (UAMI, federated)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.UAMI_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve latest version + check quota
+        id: pre
+        run: |
+          set -euo pipefail
+          az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" -o none
+          ver="$(az cognitiveservices model list -l "$LOCATION" \
+                 --query "[?model.format=='$MODEL_FORMAT' && model.name=='$MODEL_NAME'] | sort_by(@, &model.version) | [-1].model.version" -o tsv)"
+          [[ -n "$ver" ]] || { echo "::error::$MODEL_FORMAT/$MODEL_NAME not in $LOCATION catalog"; az cognitiveservices model list -l "$LOCATION" --query "[?contains(model.name,'qwen')].[model.format,model.name,model.version]" -o table; exit 1; }
+          echo "version=$ver" | tee -a "$GITHUB_OUTPUT"
+          read -r cur lim < <(az cognitiveservices usage list -l "$LOCATION" \
+            --query "[?contains(name.value,'$MODEL_FORMAT.$SKU.$MODEL_NAME')] | [0].[currentValue,limit]" -o tsv || echo "0 0")
+          echo "quota: current=$cur limit=$lim requested=$CAPACITY"
+          if [[ "${lim:-0}" != 0 ]] && (( cur + CAPACITY > lim )); then echo "::error::quota exceeded"; exit 1; fi
+          if az cognitiveservices account deployment show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT" -o none 2>/dev/null; then
+            echo "action=update" | tee -a "$GITHUB_OUTPUT"; else echo "action=create" | tee -a "$GITHUB_OUTPUT"; fi
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          cmd=(az cognitiveservices account deployment create -g "$RESOURCE_GROUP" -n "$ACCOUNT"
+               --deployment-name "$DEPLOYMENT"
+               --model-format "$MODEL_FORMAT" --model-name "$MODEL_NAME" --model-version "${{ steps.pre.outputs.version }}"
+               --sku-name "$SKU" --sku-capacity "$CAPACITY" --rai-policy-name "$RAI_POLICY" -o none)
+          printf '%q ' "${cmd[@]}"; echo
+          [[ "${{ inputs.dry_run }}" == true ]] && { echo "dry run — stopping"; exit 0; }
+          "${cmd[@]}"
+          for _ in $(seq 1 60); do
+            state="$(az cognitiveservices account deployment show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --deployment-name "$DEPLOYMENT" --query properties.provisioningState -o tsv)"
+            echo "provisioningState=$state"
+            [[ $state == Succeeded ]] && exit 0
+            [[ $state == Failed || $state == Canceled ]] && { echo "::error::$state"; exit 1; }
+            sleep 15
+          done
+          echo "::error::timeout"; exit 1
+
+      - name: Validate (keyless — chat, stream, tool call)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ep="$(az cognitiveservices account show -g "$RESOURCE_GROUP" -n "$ACCOUNT" --query properties.endpoint -o tsv)"; ep="${ep%/}"
+          tok="$(az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv)"
+          H=(-H "Authorization: Bearer $tok" -H "Content-Type: application/json")
+          urlA="$ep/openai/deployments/$DEPLOYMENT/chat/completions?api-version=2024-10-21"
+          urlB="$ep/models/chat/completions?api-version=2024-05-01-preview"
+          ping="{\"model\":\"$DEPLOYMENT\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":8}"
+          url=""; for u in "$urlA" "$urlB"; do
+            code=$(curl -sS -o r.json -w '%{http_code}' "$u" "${H[@]}" -d "$ping"); [[ $code == 200 ]] && { url="$u"; break; }; done
+          [[ -n "$url" ]] || { echo "::error::no URL shape returned 200 (last $code)"; cat r.json; exit 1; }
+          echo "chat OK via $url → $(jq -r '.choices[0].message.content' r.json)"; echo "BASE_URL=$url" >> "$GITHUB_ENV"
+          chunks=$(curl -sS -N "$url" "${H[@]}" -d "$(jq '.+{stream:true}' <<<"$ping")" | grep -c '^data:')
+          (( chunks > 1 )) || { echo "::error::no streaming"; exit 1; }; echo "stream OK ($chunks chunks)"
+          # non-thinking turn: Copilot agent loops choke on reasoning_content echoes from hybrid-thinking models
+          curl -sS "$url" "${H[@]}" -o t.json -d "$(jq '.+{max_tokens:128,tool_choice:"auto",
+            messages:[{role:"user",content:"Weather in Boston? Use the tool. /no_think"}],
+            tools:[{type:"function",function:{name:"get_weather",parameters:{type:"object",properties:{city:{type:"string"}},required:["city"]}}}]}' <<<"$ping")"
+          jq -e '.choices[0].message.tool_calls[0].function.name=="get_weather"' t.json >/dev/null \
+            || { echo "::error::tool call missing"; cat t.json; exit 1; }
+          echo "tool calling OK"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## qwen3-32b → \`$RESOURCE_GROUP/$ACCOUNT/$DEPLOYMENT\` (${{ steps.pre.outputs.action }})"
+            echo "- version: ${{ steps.pre.outputs.version }}  sku: $SKU  capacity: ${CAPACITY}K TPM  rai: $RAI_POLICY"
+            echo "- dry run: ${{ inputs.dry_run }}"
+            echo "- endpoint: \`${BASE_URL:-n/a}\`"
+            echo
+            echo '```bash'
+            echo "export COPILOT_PROVIDER_TYPE=azure"
+            echo "export COPILOT_PROVIDER_BASE_URL=\"${BASE_URL%/chat/completions*}/v1\""
+            echo "export COPILOT_MODEL=$DEPLOYMENT"
+            echo '```'
+            echo "Register in CoolGitEnterprise → AI controls → Custom models (provider: Microsoft Foundry)."
+          } >> "$GITHUB_STEP_SUMMARY"
