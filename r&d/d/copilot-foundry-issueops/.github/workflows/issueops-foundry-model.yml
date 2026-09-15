@@ -1,0 +1,243 @@
+# issueops-foundry-model.yml — the front door.
+#
+# State machine on labels:
+#   pending-validation → pending-approval → deploying → deployed | failed
+#                     ↘ validation-failed             ↘ cancelled
+#
+#   issues.opened/edited  : parse form → validate against registry → post plan → pending-approval
+#   issue_comment /approve: approver check → gh workflow run foundry-model-{deploy,decommission}.yml
+#   issue_comment /cancel : close
+#
+# Why this works with GITHUB_TOKEN: the "GITHUB_TOKEN can't trigger workflows" rule
+# has two exceptions — workflow_dispatch and repository_dispatch. That is exactly
+# what we use. `actions: write` is all it needs.  A PAT/App token is only needed
+# for the team-membership check (read:org) or cross-repo dispatch.
+name: IssueOps — Foundry model
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: issueops-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+env:
+  ORG: CoolGitOrg
+  APPROVER_TEAM: foundry-approvers
+
+jobs:
+  # ── 1. intake ──────────────────────────────────────────────────────────────
+  intake:
+    name: Validate request
+    if: >-
+      github.event_name == 'issues' &&
+      contains(github.event.issue.labels.*.name, 'foundry-model-request')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse issue form
+        id: parse
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$BODY" | scripts/parse-issue.sh > request.json
+          echo "request=$(jq -c . request.json)" >> "$GITHUB_OUTPUT"
+          jq . request.json
+
+      - name: Determine action
+        id: action
+        run: |
+          if [[ "${{ contains(github.event.issue.labels.*.name, 'action:decommission') }}" == "true" ]]; then
+            echo "action=decommission" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=deploy" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve against registry (offline)
+        id: resolve
+        if: steps.action.outputs.action == 'deploy'
+        env:
+          MODEL_KEY:      ${{ fromJson(steps.parse.outputs.request).model_key }}
+          TARGET_ACCOUNT: ${{ fromJson(steps.parse.outputs.request).target_account }}
+          DEPLOYMENT:     ${{ fromJson(steps.parse.outputs.request).deployment }}
+          SKU:            ${{ fromJson(steps.parse.outputs.request).sku }}
+          CAPACITY:       ${{ fromJson(steps.parse.outputs.request).capacity }}
+          RAI_POLICY:     ${{ fromJson(steps.parse.outputs.request).rai_policy }}
+          MODEL_VERSION:  ${{ fromJson(steps.parse.outputs.request).model_version }}
+        run: |
+          set -euo pipefail
+          # empty strings from the form mean "use default"
+          for v in DEPLOYMENT SKU CAPACITY RAI_POLICY MODEL_VERSION; do [[ -z "${!v}" || "${!v}" == "null" ]] && unset "$v"; done
+          scripts/resolve-model.sh --offline 2> resolve.err || { cat resolve.err; echo "error=$(grep -m1 '::error::' resolve.err | sed 's/::error:://')" >> "$GITHUB_OUTPUT"; exit 1; }
+
+      - name: Validate decommission target
+        if: steps.action.outputs.action == 'decommission'
+        env:
+          TARGET_ACCOUNT: ${{ fromJson(steps.parse.outputs.request).target_account }}
+          DEPLOYMENT:     ${{ fromJson(steps.parse.outputs.request).deployment }}
+        run: |
+          set -euo pipefail
+          yq -e ".accounts[\"$TARGET_ACCOUNT\"]" models/registry.yml >/dev/null || { echo "::error::unknown account $TARGET_ACCOUNT"; exit 1; }
+          [[ -f "deployments/$TARGET_ACCOUNT/$DEPLOYMENT.json" ]] || echo "::warning::no record at deployments/$TARGET_ACCOUNT/$DEPLOYMENT.json — deployment may not be managed by this repo"
+
+      - name: Post plan and move to pending-approval
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          n=${{ github.event.issue.number }}
+          action=${{ steps.action.outputs.action }}
+          req=request.json
+          if [[ "$action" == deploy ]]; then
+            body="$(cat <<MD
+          ## Plan: deploy
+
+          | | |
+          |---|---|
+          | Model | \`${{ steps.resolve.outputs.model_format }}/${{ steps.resolve.outputs.model_name }}@${{ steps.resolve.outputs.model_version }}\` |
+          | Kind | ${{ steps.resolve.outputs.kind }} |
+          | Deployment | \`${{ steps.resolve.outputs.deployment }}\` |
+          | Account | \`${{ steps.resolve.outputs.resource_group }}/${{ steps.resolve.outputs.account }}\` (${{ steps.resolve.outputs.location }}) |
+          | SKU / capacity | ${{ steps.resolve.outputs.sku }} / ${{ steps.resolve.outputs.capacity }} |
+          | RAI policy | ${{ steps.resolve.outputs.rai_policy }} |
+          | Copilot BYOK eligible | ${{ steps.resolve.outputs.copilot_byok }} |
+          | Dry run | $(jq -r .dry_run $req) |
+          | Validate after deploy | $(jq -r .run_validation $req) |
+
+          Environment \`${{ steps.resolve.outputs.environment }}\` protection rules apply as a second gate.
+
+          **@${{ env.ORG }}/${{ env.APPROVER_TEAM }}** — comment \`/approve\` to deploy, \`/cancel\` to close.
+          MD
+          )"
+          else
+            body="$(cat <<MD
+          ## Plan: decommission
+
+          Delete deployment \`$(jq -r .deployment $req)\` from account \`$(jq -r .target_account $req)\`.
+          If this model is registered in Copilot **AI controls → Custom models**, remove it there first or users get errors.
+
+          **@${{ env.ORG }}/${{ env.APPROVER_TEAM }}** — comment \`/approve\` to proceed, \`/cancel\` to close.
+          MD
+          )"
+          fi
+          gh issue comment "$n" --body "$body"
+          gh issue edit "$n" --remove-label pending-validation,validation-failed --add-label pending-approval
+
+      - name: Mark validation failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ github.event.issue.number }}
+          gh issue comment "$n" --body "❌ **Validation failed:** ${{ steps.resolve.outputs.error || 'see workflow log' }}
+
+          Edit the issue to re-run validation. [Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          gh issue edit "$n" --remove-label pending-validation,pending-approval --add-label validation-failed
+
+  # ── 2. approve ─────────────────────────────────────────────────────────────
+  approve:
+    name: Approve and dispatch
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.state == 'open' &&
+      startsWith(github.event.comment.body, '/approve') &&
+      contains(github.event.issue.labels.*.name, 'foundry-model-request') &&
+      contains(github.event.issue.labels.*.name, 'pending-approval')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check approver
+        id: who
+        env:
+          # GH_ADMIN_TOKEN (classic, read:org) enables the team check; without it the
+          # script falls back to OWNER/MEMBER author_association.
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: scripts/check-approver.sh
+
+      - name: Re-parse issue body (never trust the comment)
+        id: parse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh issue view ${{ github.event.issue.number }} --json body -q .body | scripts/parse-issue.sh > request.json
+          echo "request=$(jq -c . request.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch deploy
+        if: contains(github.event.issue.labels.*.name, 'action:deploy')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQ: ${{ steps.parse.outputs.request }}
+        run: |
+          set -euo pipefail
+          f() { jq -r "$1 // \"\"" <<<"$REQ"; }
+          gh workflow run foundry-model-deploy.yml --ref "${{ github.event.repository.default_branch }}" \
+            -f issue_number="${{ github.event.issue.number }}" \
+            -f model_key="$(f .model_key)" \
+            -f target_account="$(f .target_account)" \
+            -f deployment="$(f .deployment)" \
+            -f sku="$(f .sku)" \
+            -f capacity="$(f .capacity)" \
+            -f rai_policy="$(f .rai_policy)" \
+            -f model_version="$(f .model_version)" \
+            -f dry_run="$(f .dry_run)" \
+            -f run_validation="$(f .run_validation)"
+
+      - name: Dispatch decommission
+        if: contains(github.event.issue.labels.*.name, 'action:decommission')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQ: ${{ steps.parse.outputs.request }}
+        run: |
+          set -euo pipefail
+          gh workflow run foundry-model-decommission.yml --ref "${{ github.event.repository.default_branch }}" \
+            -f issue_number="${{ github.event.issue.number }}" \
+            -f target_account="$(jq -r .target_account <<<"$REQ")" \
+            -f deployment="$(jq -r .deployment <<<"$REQ")" \
+            -f dry_run="$(jq -r .dry_run <<<"$REQ")"
+
+      - name: Record approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ github.event.issue.number }}
+          gh issue comment "$n" --body "✅ Approved by @${{ github.event.comment.user.login }} (${{ steps.who.outputs.reason }}). Dispatched — results will be posted here."
+          gh issue edit "$n" --remove-label pending-approval --add-label deploying
+
+      - name: Reject
+        if: failure() && steps.who.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "⛔ @${{ github.event.comment.user.login }} is not an approver (${{ steps.who.outputs.reason }}). Ask @${{ env.ORG }}/${{ env.APPROVER_TEAM }}."
+
+  # ── 3. cancel ──────────────────────────────────────────────────────────────
+  cancel:
+    name: Cancel
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.state == 'open' &&
+      startsWith(github.event.comment.body, '/cancel') &&
+      contains(github.event.issue.labels.*.name, 'foundry-model-request')
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ github.event.issue.number }}
+          gh issue edit "$n" --remove-label pending-validation,pending-approval,deploying --add-label cancelled
+          gh issue close "$n" --comment "Cancelled by @${{ github.event.comment.user.login }}."

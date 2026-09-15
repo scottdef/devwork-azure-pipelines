@@ -1,0 +1,93 @@
+name: "Foundry model: deploy"
+description: Deploy (or update) a model in Azure AI Foundry for Copilot BYOK. Approval by @CoolGitOrg/foundry-approvers, then automated.
+title: "[foundry-deploy] "
+labels:
+  - "foundry-model-request"
+  - "action:deploy"
+  - "pending-validation"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill the form. A bot validates it against `models/registry.yml`, posts a plan, and waits for
+        an approver to comment `/approve`. Deploy runs with Azure OIDC; the result (endpoint,
+        version, validation) is posted back here. **Do not paste keys.**
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model
+      description: Options are generated from models/registry.yml. Need another? Open a PR to the registry.
+      options:
+        - "qwen3-32b — Qwen3 32B — serverless, Direct from Azure (default fallback)"
+        - "qwen3-coder-next — Qwen3-Coder-Next 80B-A3B — managed compute (H100), agentic coding"
+        - "deepseek-v3.1 — DeepSeek-V3.1 — serverless, strong coding/agent, hybrid thinking"
+        - "gpt-4.1 — OpenAI GPT-4.1 — serverless or PTU, 1M context"
+        - "codestral-2501 — Mistral Codestral 25.01 — serverless, code completion/FIM specialist"
+        - "llama-4-maverick — Meta Llama 4 Maverick 17B-128E FP8 — serverless, multimodal MoE"
+        - "phi-4 — Microsoft Phi-4 14B — serverless, cheap fast tier"
+        - "grok-3 — xAI Grok 3 — serverless"
+        - "gpt-4.1-ptu — OpenAI GPT-4.1 — ProvisionedManaged (PTU reserved throughput)"
+    validations:
+      required: true
+  - type: dropdown
+    id: target_account
+    attributes:
+      label: Target account
+      options:
+        - "prod-eastus2"
+        - "dev-swedencentral"
+    validations:
+      required: true
+  - type: input
+    id: deployment
+    attributes:
+      label: Deployment name
+      description: Lowercase, digits, hyphens. Defaults to the model key. This is the name users put in COPILOT_MODEL.
+      placeholder: qwen3-32b
+  - type: dropdown
+    id: sku
+    attributes:
+      label: SKU
+      description: Leave blank for the model's default. GlobalStandard = pay-per-token; ProvisionedManaged = PTU; GlobalManagedCompute = dedicated GPU.
+      options:
+        - "GlobalStandard"
+        - "DataZoneStandard"
+        - "GlobalManagedCompute"
+        - "Standard"
+        - "ProvisionedManaged"
+  - type: input
+    id: capacity
+    attributes:
+      label: Capacity
+      description: "Serverless: thousands of TPM. Provisioned: PTUs. Managed compute: instance count. Blank = model default."
+      placeholder: "50"
+  - type: dropdown
+    id: rai_policy
+    attributes:
+      label: Content filter (RAI) policy
+      options:
+        - "Microsoft.DefaultV2"
+        - "Microsoft.Default"
+        - "Microsoft.Nil"
+      default: 0
+  - type: input
+    id: model_version
+    attributes:
+      label: Model version
+      description: Blank = latest in the target region (resolved at deploy time).
+      placeholder: latest
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification
+      description: Why this model / tier. Required for ProvisionedManaged, managed compute, or Microsoft.Nil.
+    validations:
+      required: true
+  - type: checkboxes
+    id: options
+    attributes:
+      label: Options
+      options:
+        - label: Run endpoint validation after deploy
+        - label: Notify #platform-copilot on completion
+        - label: Dry run (plan only, no deploy)

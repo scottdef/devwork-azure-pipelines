@@ -1,0 +1,42 @@
+name: "Foundry model: decommission"
+description: Delete a Foundry deployment. Stops billing for managed compute / PTU immediately.
+title: "[foundry-decommission] "
+labels:
+  - "foundry-model-request"
+  - "action:decommission"
+  - "pending-validation"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Deleting a deployment that is registered in Copilot AI controls will break that model for
+        every user until an owner removes it there too. The bot reminds the approver.
+  - type: dropdown
+    id: target_account
+    attributes:
+      label: Target account
+      options:
+        - "prod-eastus2"
+        - "dev-swedencentral"
+    validations:
+      required: true
+  - type: input
+    id: deployment
+    attributes:
+      label: Deployment name
+      description: Exact deployment name (see deployments/<account>/*.json).
+    validations:
+      required: true
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification
+    validations:
+      required: true
+  - type: checkboxes
+    id: options
+    attributes:
+      label: Options
+      options:
+        - label: Notify #platform-copilot on completion
+        - label: Dry run (plan only, no deploy)

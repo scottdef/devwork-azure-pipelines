@@ -1,0 +1,5 @@
+# Registry and workflows are governance surfaces: approvers own them.
+/models/registry.yml        @CoolGitOrg/foundry-approvers
+/.github/workflows/         @CoolGitOrg/foundry-approvers
+/.github/ISSUE_TEMPLATE/    @CoolGitOrg/foundry-approvers
+/scripts/                   @CoolGitOrg/platform-team

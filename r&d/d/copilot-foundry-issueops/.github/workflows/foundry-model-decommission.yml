@@ -1,0 +1,99 @@
+# foundry-model-decommission.yml — delete a deployment, remove its record, report.
+name: Foundry model — decommission
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_account: { required: true,  type: string }
+      deployment:     { required: true,  type: string }
+      dry_run:        { required: false, type: boolean, default: false }
+      issue_number:   { required: false, type: string, default: "" }
+
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+
+concurrency:
+  group: foundry-${{ inputs.target_account }}-${{ inputs.deployment }}
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      environment:    ${{ steps.r.outputs.environment }}
+      resource_group: ${{ steps.r.outputs.resource_group }}
+      account:        ${{ steps.r.outputs.account }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        run: |
+          set -euo pipefail
+          a='.accounts["${{ inputs.target_account }}"]'
+          yq -e "$a" models/registry.yml >/dev/null
+          for k in environment resource_group account; do echo "$k=$(yq -r "$a.$k" models/registry.yml)" >> "$GITHUB_OUTPUT"; done
+
+  delete:
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: ${{ needs.resolve.outputs.environment }}
+    outputs:
+      action: ${{ steps.d.outputs.action }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: d
+        env:
+          RESOURCE_GROUP: ${{ needs.resolve.outputs.resource_group }}
+          ACCOUNT:        ${{ needs.resolve.outputs.account }}
+          DEPLOYMENT:     ${{ inputs.deployment }}
+          DRY_RUN:        ${{ inputs.dry_run }}
+        run: scripts/decommission.sh
+
+  record:
+    needs: [resolve, delete]
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.event.repository.default_branch }}" }
+      - name: Remove record
+        if: needs.delete.result == 'success' && !inputs.dry_run
+        run: |
+          set -euo pipefail
+          f="deployments/${{ inputs.target_account }}/${{ inputs.deployment }}.json"
+          [[ -f "$f" ]] || { echo "no record"; exit 0; }
+          git config user.name "github-actions[bot]"; git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -q "$f"; git commit -m "decommission(${{ inputs.target_account }}): ${{ inputs.deployment }}"; git push
+      - name: Report
+        if: inputs.issue_number != ''
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          n=${{ inputs.issue_number }}
+          run="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [[ "${{ needs.delete.result }}" == success ]]; then
+            gh issue comment "$n" --body "✅ Decommission: \`${{ inputs.deployment }}\` → ${{ needs.delete.outputs.action }}. $run
+
+          Reminder: remove it from **AI controls → Custom models** if it was registered."
+            if [[ "${{ inputs.dry_run }}" == true ]]; then
+              gh issue edit "$n" --remove-label deploying --add-label pending-approval
+            else
+              gh issue edit "$n" --remove-label deploying --add-label deployed; gh issue close "$n"
+            fi
+          else
+            gh issue comment "$n" --body "❌ Decommission failed. $run"
+            gh issue edit "$n" --remove-label deploying --add-label failed,pending-approval
+          fi
+      - name: Notify
+        if: always()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh api "repos/${{ github.repository }}/dispatches" -f event_type=foundry-model-event \
+            -F 'client_payload[action]=decommission' -F 'client_payload[deployment]=${{ inputs.deployment }}' \
+            -F 'client_payload[account]=${{ inputs.target_account }}' -F 'client_payload[result]=${{ needs.delete.result }}' \
+            -F 'client_payload[dry_run]=${{ inputs.dry_run }}' -F 'client_payload[issue]=${{ inputs.issue_number }}' \
+            -F 'client_payload[run]=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'

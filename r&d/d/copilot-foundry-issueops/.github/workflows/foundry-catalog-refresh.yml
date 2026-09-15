@@ -1,0 +1,58 @@
+# foundry-catalog-refresh.yml — weekly: snapshot the live catalog per region,
+# re-render the issue-form dropdowns from the registry, commit both, and open
+# an issue if a registry model has vanished from a region (drift).
+name: Foundry catalog — refresh
+
+on:
+  schedule: [{ cron: "0 5 * * 1" }]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [models/registry.yml]
+
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment: foundry-dev            # read-only catalog listing; any subscription works
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Snapshot catalog + detect drift
+        id: cat
+        run: |
+          set -uo pipefail
+          scripts/refresh-catalog.sh > drift.txt; rc=$?
+          echo "drift=$([[ $rc -eq 2 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          cat drift.txt; [[ $rc -eq 0 || $rc -eq 2 ]]
+
+      - name: Re-render issue forms from registry
+        run: scripts/render-issue-template.sh
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"; git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add models/catalog .github/ISSUE_TEMPLATE
+          git diff --cached --quiet && { echo "no change"; exit 0; }
+          git commit -m "chore(catalog): refresh $(date -u +%F)"; git push
+
+      - name: Open/update drift issue
+        if: steps.cat.outputs.drift == 'true'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -euo pipefail
+          title="Foundry catalog drift"
+          fence='```'
+          body="$(printf 'Models in registry.yml no longer offered in region:\n\n%s\n%s\n%s\n' "$fence" "$(cat drift.txt)" "$fence")"
+          n="$(gh issue list --label catalog-drift --state open --json number -q '.[0].number')"
+          if [[ -n "$n" ]]; then gh issue comment "$n" --body "$body"; else gh issue create --title "$title" --label catalog-drift --body "$body"; fi

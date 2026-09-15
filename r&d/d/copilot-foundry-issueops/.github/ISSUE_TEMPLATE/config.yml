@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Copilot BYOK runbook
+    url: https://github.com/CoolGitOrg/copilot-foundry/blob/main/docs/runbook.md
+    about: How to register a deployed model in Copilot (Enterprise AI controls) after this workflow finishes.

@@ -1,0 +1,51 @@
+# notify.yml — the webhook tail. Triggered by repository_dispatch from the
+# deploy/decommission workflows (GITHUB_TOKEN may raise repository_dispatch),
+# or by hand. Posts to Slack and, optionally, a generic webhook.
+name: Notify
+
+on:
+  repository_dispatch:
+    types: [foundry-model-event]
+  workflow_dispatch:
+    inputs:
+      message: { required: true, type: string }
+
+permissions: { contents: read }
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compose
+        id: m
+        env:
+          P: ${{ toJson(github.event.client_payload) }}
+          MANUAL: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$MANUAL" ]]; then text="$MANUAL"
+          else
+            text="$(jq -r '"Foundry \(.action) \(.deployment) on \(.account) [\(.model // "")] → \(.result)\(if .dry_run=="true" then " (dry run)" else "" end)  issue #\(.issue)  \(.run)"' <<<"$P")"
+          fi
+          { echo "text<<EOT"; echo "$text"; echo "EOT"; } >> "$GITHUB_OUTPUT"
+
+      - name: Slack
+        if: vars.SLACK_ENABLED == 'true'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          TEXT: ${{ steps.m.outputs.text }}
+        run: |
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "$(jq -n --arg t "$TEXT" '{text:$t}')" "$SLACK_WEBHOOK"
+
+      - name: Generic webhook
+        if: vars.WEBHOOK_URL != ''
+        env:
+          URL: ${{ vars.WEBHOOK_URL }}
+          SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          P: ${{ toJson(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          body="$(jq -c --arg src "${{ github.repository }}" '{source:$src, event:"foundry-model-event", payload:.}' <<<"$P")"
+          sig="sha256=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')"
+          curl -sS -X POST "$URL" -H 'Content-Type: application/json' -H "X-Hub-Signature-256: $sig" -d "$body"

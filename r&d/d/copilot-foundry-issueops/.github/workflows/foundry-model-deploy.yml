@@ -1,0 +1,241 @@
+# foundry-model-deploy.yml — the engine. Dispatched by IssueOps or by hand.
+#
+#   resolve  (no Azure)  registry → concrete params, picks the GitHub Environment
+#   deploy   (OIDC)      az deploy serverless | provisioned | managed; polls to Succeeded
+#   validate (OIDC)      chat + stream + tool-call against the live endpoint
+#   record               deployments/<account>/<name>.json committed; issue comment; repository_dispatch
+#
+# Environment `foundry-prod` / `foundry-dev` carries:
+#   vars.AZURE_CLIENT_ID  vars.AZURE_TENANT_ID  vars.AZURE_SUBSCRIPTION_ID   (OIDC, no secrets)
+#   required reviewers                                                    (second approval gate)
+name: Foundry model — deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_key:      { description: "Registry key (models/registry.yml)", required: true,  type: string }
+      target_account: { description: "Registry account key",               required: true,  type: string }
+      deployment:     { description: "Deployment name (blank = model key)", required: false, type: string, default: "" }
+      sku:            { description: "SKU (blank = model default)",         required: false, type: string, default: "" }
+      capacity:       { description: "Capacity (blank = model default)",    required: false, type: string, default: "" }
+      rai_policy:     { description: "RAI policy",                          required: false, type: string, default: "Microsoft.DefaultV2" }
+      model_version:  { description: "Model version or latest",             required: false, type: string, default: "latest" }
+      dry_run:        { description: "Plan only",                           required: false, type: boolean, default: false }
+      run_validation: { description: "Validate endpoint after deploy",      required: false, type: boolean, default: true }
+      issue_number:   { description: "IssueOps issue to report to (blank = none)", required: false, type: string, default: "" }
+
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+
+concurrency:
+  group: foundry-${{ inputs.target_account }}-${{ inputs.deployment || inputs.model_key }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve
+    runs-on: ubuntu-latest
+    outputs:
+      kind:           ${{ steps.r.outputs.kind }}
+      model_format:   ${{ steps.r.outputs.model_format }}
+      model_name:     ${{ steps.r.outputs.model_name }}
+      model_version:  ${{ steps.r.outputs.model_version }}
+      model_registry: ${{ steps.r.outputs.model_registry }}
+      accelerator:    ${{ steps.r.outputs.accelerator }}
+      sku:            ${{ steps.r.outputs.sku }}
+      capacity:       ${{ steps.r.outputs.capacity }}
+      rai_policy:     ${{ steps.r.outputs.rai_policy }}
+      deployment:     ${{ steps.r.outputs.deployment }}
+      resource_group: ${{ steps.r.outputs.resource_group }}
+      account:        ${{ steps.r.outputs.account }}
+      location:       ${{ steps.r.outputs.location }}
+      environment:    ${{ steps.r.outputs.environment }}
+      copilot_byok:   ${{ steps.r.outputs.copilot_byok }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        env:
+          MODEL_KEY:      ${{ inputs.model_key }}
+          TARGET_ACCOUNT: ${{ inputs.target_account }}
+          DEPLOYMENT:     ${{ inputs.deployment }}
+          SKU:            ${{ inputs.sku }}
+          CAPACITY:       ${{ inputs.capacity }}
+          RAI_POLICY:     ${{ inputs.rai_policy }}
+          MODEL_VERSION:  ${{ inputs.model_version }}
+        run: |
+          set -euo pipefail
+          for v in DEPLOYMENT SKU CAPACITY RAI_POLICY MODEL_VERSION; do [[ -z "${!v}" ]] && unset "$v"; done
+          scripts/resolve-model.sh --offline
+
+  deploy:
+    name: Deploy (${{ needs.resolve.outputs.kind }})
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: ${{ needs.resolve.outputs.environment }}
+    outputs:
+      endpoint:           ${{ steps.d.outputs.endpoint }}
+      resolved_version:   ${{ steps.d.outputs.resolved_version }}
+      provisioning_state: ${{ steps.d.outputs.provisioning_state }}
+      action:             ${{ steps.d.outputs.action }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id:       ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve "latest" version from the regional catalog
+        id: v
+        if: needs.resolve.outputs.kind != 'managed'
+        env:
+          MODEL_KEY:      ${{ inputs.model_key }}
+          TARGET_ACCOUNT: ${{ inputs.target_account }}
+          MODEL_VERSION:  ${{ needs.resolve.outputs.model_version }}
+        run: scripts/resolve-model.sh | grep '^model_version=' | tee -a "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        id: d
+        env:
+          RESOURCE_GROUP: ${{ needs.resolve.outputs.resource_group }}
+          ACCOUNT:        ${{ needs.resolve.outputs.account }}
+          LOCATION:       ${{ needs.resolve.outputs.location }}
+          DEPLOYMENT:     ${{ needs.resolve.outputs.deployment }}
+          MODEL_FORMAT:   ${{ needs.resolve.outputs.model_format }}
+          MODEL_NAME:     ${{ needs.resolve.outputs.model_name }}
+          MODEL_VERSION:  ${{ steps.v.outputs.model_version || needs.resolve.outputs.model_version }}
+          MODEL_REGISTRY: ${{ needs.resolve.outputs.model_registry }}
+          ACCELERATOR:    ${{ needs.resolve.outputs.accelerator }}
+          SKU:            ${{ needs.resolve.outputs.sku }}
+          CAPACITY:       ${{ needs.resolve.outputs.capacity }}
+          RAI_POLICY:     ${{ needs.resolve.outputs.rai_policy }}
+          DRY_RUN:        ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          case "${{ needs.resolve.outputs.kind }}" in
+            serverless|provisioned) scripts/deploy-serverless.sh ;;
+            managed)                scripts/deploy-managed.sh ;;
+            *) echo "::error::unknown kind"; exit 1 ;;
+          esac
+
+  validate:
+    name: Validate endpoint
+    needs: [resolve, deploy]
+    if: inputs.run_validation && !inputs.dry_run
+    uses: ./.github/workflows/foundry-model-validate.yml
+    with:
+      environment:  ${{ needs.resolve.outputs.environment }}
+      endpoint:     ${{ needs.deploy.outputs.endpoint }}
+      deployment:   ${{ needs.resolve.outputs.deployment }}
+      expect_tools: ${{ needs.resolve.outputs.copilot_byok == 'true' }}
+    secrets: inherit
+
+  record:
+    name: Record and report
+    needs: [resolve, deploy, validate]
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Write deployment record
+        if: needs.deploy.result == 'success' && !inputs.dry_run
+        run: |
+          set -euo pipefail
+          dir="deployments/${{ inputs.target_account }}"; mkdir -p "$dir"
+          f="$dir/${{ needs.resolve.outputs.deployment }}.json"
+          jq -n \
+            --arg key    "${{ inputs.model_key }}" \
+            --arg fmt    "${{ needs.resolve.outputs.model_format }}" \
+            --arg name   "${{ needs.resolve.outputs.model_name }}" \
+            --arg ver    "${{ needs.deploy.outputs.resolved_version }}" \
+            --arg kind   "${{ needs.resolve.outputs.kind }}" \
+            --arg sku    "${{ needs.resolve.outputs.sku }}" \
+            --argjson cap ${{ needs.resolve.outputs.capacity }} \
+            --arg rai    "${{ needs.resolve.outputs.rai_policy }}" \
+            --arg ep     "${{ needs.deploy.outputs.endpoint }}" \
+            --arg acct   "${{ needs.resolve.outputs.account }}" \
+            --arg rg     "${{ needs.resolve.outputs.resource_group }}" \
+            --arg loc    "${{ needs.resolve.outputs.location }}" \
+            --arg byok   "${{ needs.resolve.outputs.copilot_byok }}" \
+            --arg val    "${{ needs.validate.result }}" \
+            --arg shape  "${{ needs.validate.outputs.url_shape }}" \
+            --arg issue  "${{ inputs.issue_number }}" \
+            --arg run    "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg by     "${{ github.actor }}" \
+            --arg at     "$(date -u +%FT%TZ)" \
+            '{model_key:$key, model:{format:$fmt,name:$name,version:$ver}, kind:$kind, sku:$sku, capacity:$cap,
+              rai_policy:$rai, endpoint:$ep, account:$acct, resource_group:$rg, location:$loc,
+              copilot_byok:($byok=="true"), validation:{result:$val,url_shape:$shape},
+              issue:$issue, run:$run, deployed_by:$by, deployed_at:$at}' > "$f"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$f"
+          git commit -m "deploy(${{ inputs.target_account }}): ${{ needs.resolve.outputs.deployment }} ${{ needs.resolve.outputs.model_format }}/${{ needs.resolve.outputs.model_name }}@${{ needs.deploy.outputs.resolved_version }}" || echo "no change"
+          git push
+        # If the default branch is ruleset-protected, add the Actions app (or a GitHub App used
+        # via create-github-app-token) to the bypass list — GITHUB_TOKEN cannot bypass on its own.
+
+      - name: Report to issue
+        if: inputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OK: ${{ needs.deploy.result == 'success' && (needs.validate.result == 'success' || needs.validate.result == 'skipped') }}
+        run: |
+          set -euo pipefail
+          n=${{ inputs.issue_number }}
+          run="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [[ "$OK" == true ]]; then
+            state="${{ inputs.dry_run && 'dry-run' || 'deployed' }}"
+            gh issue comment "$n" --body "$(cat <<MD
+          ## ✅ ${state}: \`${{ needs.resolve.outputs.deployment }}\`
+
+          | | |
+          |---|---|
+          | Endpoint | \`${{ needs.deploy.outputs.endpoint }}\` |
+          | Model | \`${{ needs.resolve.outputs.model_format }}/${{ needs.resolve.outputs.model_name }}@${{ needs.deploy.outputs.resolved_version }}\` |
+          | SKU / capacity | ${{ needs.resolve.outputs.sku }} / ${{ needs.resolve.outputs.capacity }} |
+          | Validation | ${{ needs.validate.result }} (url shape ${{ needs.validate.outputs.url_shape || 'n/a' }}, tools=${{ needs.validate.outputs.tool_calling || 'n/a' }}) |
+          | Run | $run |
+
+          ### Next: register in Copilot (UI-only, no API)
+          Enterprise owner: **CoolGitEnterprise → AI controls → Copilot → Custom models → Add API key**
+          provider *Microsoft Foundry*, base URL \`${{ needs.deploy.outputs.endpoint }}\`, deployment \`${{ needs.resolve.outputs.deployment }}\`,
+          key from Key Vault (\`make key ACCOUNT=${{ inputs.target_account }}\`). Then enable the model for **CoolGitOrg**.
+
+          Users (CLI): \`COPILOT_PROVIDER_TYPE=azure COPILOT_PROVIDER_BASE_URL=${{ needs.deploy.outputs.endpoint }}openai/deployments/${{ needs.resolve.outputs.deployment }}/v1 COPILOT_MODEL=${{ needs.resolve.outputs.deployment }}\`
+          MD
+          )"
+            if [[ "${{ inputs.dry_run }}" == true ]]; then
+              gh issue edit "$n" --remove-label deploying --add-label pending-approval
+              gh issue comment "$n" --body "Dry run complete. Edit the issue to untick *Dry run*, then \`/approve\` again to deploy."
+            else
+              gh issue edit "$n" --remove-label deploying --add-label deployed
+              gh issue close "$n"
+            fi
+          else
+            gh issue comment "$n" --body "❌ Deploy failed (deploy=${{ needs.deploy.result }}, validate=${{ needs.validate.result }}). $run
+          Comment \`/approve\` to retry after fixing, or \`/cancel\`."
+            gh issue edit "$n" --remove-label deploying --add-label failed,pending-approval
+          fi
+
+      - name: Notify (repository_dispatch → notify.yml)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/dispatches" \
+            -f event_type=foundry-model-event \
+            -F 'client_payload[action]=deploy' \
+            -F 'client_payload[deployment]=${{ needs.resolve.outputs.deployment }}' \
+            -F 'client_payload[account]=${{ inputs.target_account }}' \
+            -F 'client_payload[model]=${{ needs.resolve.outputs.model_format }}/${{ needs.resolve.outputs.model_name }}' \
+            -F 'client_payload[result]=${{ needs.deploy.result }}/${{ needs.validate.result }}' \
+            -F 'client_payload[dry_run]=${{ inputs.dry_run }}' \
+            -F 'client_payload[issue]=${{ inputs.issue_number }}' \
+            -F 'client_payload[run]=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'

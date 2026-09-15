@@ -1,0 +1,194 @@
+# models/registry.yml — single source of truth.
+#
+# Everything reads this: the issue form (rendered from it), the IssueOps
+# validator, the deploy workflow, the catalog-drift job, the Makefile.
+# Change a model here; nothing else needs editing.
+#
+# kind:
+#   serverless   — "Foundry Models sold by Azure". Pay-per-token, no idle cost,
+#                  Microsoft SLA. Deployed with `az cognitiveservices account deployment create`.
+#   provisioned  — same catalog, but PTU-reserved throughput (ProvisionedManaged).
+#                  Billed per PTU-hour whether used or not.
+#   managed      — Partner/community (Hugging Face) weights on dedicated GPU
+#                  in your region. Billed per GPU-hour, idle included. Deployed
+#                  with `az rest` against the Foundry deployments API.
+#
+# version: "latest" is resolved at deploy time from
+#   `az cognitiveservices model list -l <location>` — the authoritative per-region list.
+#
+# format: the `--model-format` value. Verify with the same command; publishers
+#   occasionally rename formats.
+
+schema_version: 1
+
+accounts:
+  prod-eastus2:
+    resource_group: rg-coolgit-copilot
+    account: ais-coolgit-copilot-prod
+    location: eastus2
+    environment: foundry-prod          # GitHub Environment (approval gate + OIDC vars)
+  dev-swedencentral:
+    resource_group: rg-coolgit-copilot-dev
+    account: ais-coolgit-copilot-dev
+    location: swedencentral
+    environment: foundry-dev
+
+rai_policies:
+  - Microsoft.DefaultV2
+  - Microsoft.Default
+  - Microsoft.Nil                      # no filter; only allowed with approval + justification
+
+models:
+  # ── Qwen (the primary use case) ──────────────────────────────────────────
+  qwen3-32b:
+    display: "Qwen3 32B — serverless, Direct from Azure (default fallback)"
+    kind: serverless
+    format: Qwen
+    name: qwen3-32b
+    version: latest
+    skus: [GlobalStandard, DataZoneStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50               # thousands of TPM
+    context_window: 131072
+    tool_calling: true
+    streaming: true
+    thinking_mode: hybrid              # use non-thinking for Copilot agent turns
+    copilot_byok: true
+    tier: on-demand
+
+  qwen3-coder-next:
+    display: "Qwen3-Coder-Next 80B-A3B — managed compute (H100), agentic coding"
+    kind: managed
+    format: HuggingFace
+    name: qwen--qwen3-coder-next
+    registry: azureml://registries/azure-huggingface/models/qwen--qwen3-coder-next
+    version: latest
+    accelerator: H100_80GB
+    instance_count: 1
+    skus: [GlobalManagedCompute]
+    default_sku: GlobalManagedCompute
+    default_capacity: 1                # instance count
+    context_window: 262144
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: hosted
+    notes: "Per-GPU-hour billing including idle. Schedule scale-to-zero off-hours."
+
+  # ── Alternatives (on-demand, Direct from Azure) ──────────────────────────
+  deepseek-v3.1:
+    display: "DeepSeek-V3.1 — serverless, strong coding/agent, hybrid thinking"
+    kind: serverless
+    format: DeepSeek
+    name: DeepSeek-V3.1
+    version: latest
+    skus: [GlobalStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50
+    context_window: 131072
+    tool_calling: true
+    streaming: true
+    thinking_mode: hybrid
+    copilot_byok: true
+    tier: on-demand
+    notes: "reasoning_content echo on thinking turns -> use COPILOT_PROVIDER_TYPE=anthropic or non-thinking."
+
+  gpt-4.1:
+    display: "OpenAI GPT-4.1 — serverless or PTU, 1M context"
+    kind: serverless
+    format: OpenAI
+    name: gpt-4.1
+    version: latest
+    skus: [GlobalStandard, DataZoneStandard, Standard, ProvisionedManaged]
+    default_sku: GlobalStandard
+    default_capacity: 100
+    context_window: 1047576
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: on-demand
+
+  codestral-2501:
+    display: "Mistral Codestral 25.01 — serverless, code completion/FIM specialist"
+    kind: serverless
+    format: Mistral AI
+    name: Codestral-2501
+    version: latest
+    skus: [GlobalStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50
+    context_window: 262144
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: on-demand
+
+  llama-4-maverick:
+    display: "Meta Llama 4 Maverick 17B-128E FP8 — serverless, multimodal MoE"
+    kind: serverless
+    format: Meta
+    name: Llama-4-Maverick-17B-128E-Instruct-FP8
+    version: latest
+    skus: [GlobalStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50
+    context_window: 1048576
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: on-demand
+
+  phi-4:
+    display: "Microsoft Phi-4 14B — serverless, cheap fast tier"
+    kind: serverless
+    format: Microsoft
+    name: Phi-4
+    version: latest
+    skus: [GlobalStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50
+    context_window: 16384
+    tool_calling: false
+    streaming: true
+    thinking_mode: none
+    copilot_byok: false                # no tool calling -> Copilot agent/CLI will reject it
+    tier: on-demand
+    notes: "Chat-only. Not eligible for Copilot BYOK (needs tool calling)."
+
+  grok-3:
+    display: "xAI Grok 3 — serverless"
+    kind: serverless
+    format: xAI
+    name: grok-3
+    version: latest
+    skus: [GlobalStandard]
+    default_sku: GlobalStandard
+    default_capacity: 50
+    context_window: 131072
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: on-demand
+
+  # ── Provisioned (reserved throughput) variant ────────────────────────────
+  gpt-4.1-ptu:
+    display: "OpenAI GPT-4.1 — ProvisionedManaged (PTU reserved throughput)"
+    kind: provisioned
+    format: OpenAI
+    name: gpt-4.1
+    version: latest
+    skus: [ProvisionedManaged]
+    default_sku: ProvisionedManaged
+    default_capacity: 50               # PTUs
+    context_window: 1047576
+    tool_calling: true
+    streaming: true
+    thinking_mode: none
+    copilot_byok: true
+    tier: hosted
+    notes: "Billed per PTU-hour. Only for sustained load; not a fallback tier."
