@@ -1,0 +1,32 @@
+{
+  "resource_group": "rg-coolgit-copilot",
+  "account": "ais-coolgit-copilot-prod",
+  "location": "eastus2",
+  "repo": "CoolGitOrg/foundry-ops",
+  "ref": "main",
+  "github_api": "https://api.github.com",
+  "workflows": {
+    "deploy": "foundry-deploy.yml",
+    "report": "foundry-report.yml",
+    "test": "foundry-model-test.yml"
+  },
+  "token_resource": "https://cognitiveservices.azure.com",
+  "report_dir": "reports",
+  "refresh_seconds": 120,
+  "metrics": [
+    "ModelRequests",
+    "InputTokens",
+    "OutputTokens"
+  ],
+  "copilot": {
+    "bin": "copilot",
+    "provider_type": "openai",
+    "wire_api": "completions",
+    "args": [
+      "-s",
+      "--no-ask-user"
+    ],
+    "offline": true,
+    "timeout_seconds": 120
+  }
+}

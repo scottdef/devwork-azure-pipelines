@@ -1,0 +1,130 @@
+# Probe one deployment from GitHub's network: over HTTPS, and through
+# the Copilot CLI in BYOK mode. Keyless: the runner's Entra token is
+# the only credential, and it is never printed.
+name: foundry-model-test
+run-name: "foundry-model-test ${{ inputs.deployment }} ${{ inputs.mode }} [${{ inputs.request_id }}]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment:
+        description: Deployment name
+        type: string
+        required: true
+      mode:
+        description: Which path to test
+        type: choice
+        options: [both, api, copilot]
+        default: both
+      request_id:
+        description: Correlation id set by foundry-tui
+        type: string
+      reason:
+        description: Why this test was requested
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+
+concurrency:
+  group: foundry-records
+  cancel-in-progress: false
+
+env:
+  FOUNDRY_ACCOUNT: ${{ vars.FOUNDRY_ACCOUNT }}
+  FOUNDRY_RESOURCE_GROUP: ${{ vars.FOUNDRY_RESOURCE_GROUP }}
+  FOUNDRY_LOCATION: ${{ vars.FOUNDRY_LOCATION }}
+  FOUNDRY_REPO: ${{ github.repository }}
+  FOUNDRY_STATE_DIR: records/state
+  IN_DEPLOYMENT: ${{ inputs.deployment }}
+  IN_MODE: ${{ inputs.mode }}
+  IN_REQUEST_ID: ${{ inputs.request_id }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          re_name='^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$'
+          [[ "$IN_DEPLOYMENT" =~ $re_name ]] || { echo "::error::deployment is not valid"; exit 1; }
+          [[ "$IN_MODE" =~ ^(both|api|copilot)$ ]] || { echo "::error::mode is not valid"; exit 1; }
+
+      - name: App token (optional)
+        id: app
+        if: ${{ vars.AUTOADMIN_APP_ID != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.AUTOADMIN_APP_ID }}
+          private-key: ${{ secrets.AUTOADMIN_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          go build -trimpath -ldflags "-X main.version=${GITHUB_SHA::12}" -o bin/foundry-tui ./cmd/foundry-tui
+
+      - uses: actions/setup-node@v7
+        if: ${{ inputs.mode != 'api' }}
+        with:
+          node-version: 24
+
+      - name: Install the Copilot CLI
+        if: ${{ inputs.mode != 'api' }}
+        run: |
+          set -euo pipefail
+          npm install -g @github/copilot
+          copilot --version
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Probe
+        id: probe
+        run: |
+          set -uo pipefail
+          ./bin/foundry-tui test -deployment "$IN_DEPLOYMENT" -mode "$IN_MODE" -json > probe.jsonl
+          rc=$?
+          {
+            echo "### Probe of \`$IN_DEPLOYMENT\`"
+            echo
+            echo "| Path | Result | Latency | Detail |"
+            echo "|---|---|---|---|"
+            jq -r '"| \(.kind) | \(if .ok then "pass" else "FAIL" end) | \(.latency_ms) ms | \(.detail | gsub("\\|"; "/")) |"' probe.jsonl
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+
+      - name: Commit the probe history
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add records/state
+          git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          git commit -s -m "foundry: probe $IN_DEPLOYMENT [${IN_REQUEST_ID:-manual}]"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "push rejected (attempt $attempt); rebasing"
+            git pull --rebase
+          done
+          echo "::error::could not push the probe history"; exit 1
+
+      - name: Result
+        env:
+          RC: ${{ steps.probe.outputs.rc }}
+        run: |
+          set -euo pipefail
+          [[ "$RC" == "0" ]] || { echo "::error::one or more probes failed"; exit 1; }

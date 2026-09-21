@@ -1,0 +1,248 @@
+{{- /*
+  The long-term record. Rules for editing this file:
+    - no scripts, no remote fonts, no images: it must open offline, years from now;
+    - html/template escapes every value; do not defeat it;
+    - the look is Plan 9's acme: pale yellow text frames, pale blue tag
+      lines, a small square handle at the left of each tag.
+*/ -}}
+{{- $s := .S -}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry record: {{ $s.Scope.Account }} at {{ date $s.Generated }}</title>
+<style>
+:root {
+  --paper: #ffffea; --tag: #eaffff; --rule: #8888cc; --ink: #000000;
+  --dim: #55554a; --bar: #99994c; --high: #aa0000; --warn: #8a5a00; --ok: #2d6a2d;
+  --sans: "Go", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Verdana, sans-serif;
+  --mono: "Go Mono", "Lucida Console", "DejaVu Sans Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: #777777; }
+body { margin: 0 auto; max-width: 78rem; padding: 0.5rem; font: 15px/1.5 var(--sans); color: var(--ink); }
+section, header { background: var(--paper); border: 1px solid var(--ink); margin: 0 0 0.5rem; }
+h1, h2 { margin: 0; font: inherit; font-weight: normal; background: var(--tag);
+  border-bottom: 1px solid var(--rule); padding: 0.25rem 0.6rem 0.25rem 0; display: flex; gap: 0.6rem; align-items: baseline; }
+h1::before, h2::before { content: ""; flex: none; align-self: stretch; width: 0.9rem; background: var(--rule);
+  border-right: 1px solid var(--ink); margin: -0.25rem 0; }
+h1 { font-size: 1.25rem; }
+h2 small { color: var(--dim); margin-left: auto; font-size: 0.85rem; }
+.body { padding: 0.6rem 0.9rem 0.8rem; overflow-x: auto; }
+p { margin: 0.3rem 0; max-width: 72ch; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th { text-align: left; font-weight: normal; color: var(--dim); border-bottom: 1px solid var(--bar); padding: 0.2rem 0.8rem 0.2rem 0; white-space: nowrap; }
+td { vertical-align: top; padding: 0.2rem 0.8rem 0.2rem 0; border-bottom: 1px dotted var(--bar); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+code, .m { font-family: var(--mono); font-size: 0.85em; overflow-wrap: anywhere; }
+.high { color: var(--high); } .warn { color: var(--warn); } .ok { color: var(--ok); } .dim { color: var(--dim); }
+.sev { font-family: var(--mono); white-space: nowrap; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 1.2rem; margin: 0; }
+dt { color: var(--dim); } dd { margin: 0; overflow-wrap: anywhere; }
+.meter { display: inline-block; width: 8rem; height: 0.7rem; border: 1px solid var(--ink); background: #fff; vertical-align: baseline; }
+.meter i { display: block; height: 100%; background: var(--bar); }
+.empty { color: var(--dim); font-style: italic; }
+a { color: inherit; }
+@media print { html { background: #fff; } body { max-width: none; padding: 0; font-size: 11px; } section, header { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>{{ $s.Scope.Account }} <span class="dim">recorded {{ date $s.Generated }}</span></h1>
+  <div class="body">
+    <dl>
+      <dt>Resource group</dt><dd>{{ $s.Scope.ResourceGroup }}, {{ $s.Scope.Location }}{{ with $s.Scope.Subscription }}, subscription <code>{{ . }}</code>{{ end }}</dd>
+      <dt>Repository</dt><dd>{{ $s.Scope.Repo }}</dd>
+      <dt>Recorded by</dt><dd>{{ $s.Actor }} using foundry-tui {{ $s.Version }}</dd>
+      <dt>Bounded by</dt><dd>{{ $s.Role }} ({{ $s.RoleSource }}). Nothing on this page needed a wider role.</dd>
+      <dt>Findings</dt><dd><span class="high">{{ $s.Count "high" }} high</span>, <span class="warn">{{ $s.Count "warn" }} to watch</span>, {{ $s.Count "info" }} notes</dd>
+      <dt>Source data</dt><dd><code>{{ .JSONFile }}</code><br>sha256 <code>{{ .JSONSum }}</code></dd>
+      <dt>Audit chain head</dt><dd>{{ if $s.AuditHead }}<code>{{ $s.AuditHead }}</code>{{ else }}<span class="dim">no local audit records</span>{{ end }}</dd>
+    </dl>
+  </div>
+</header>
+
+<section>
+  <h2>Findings</h2>
+  <div class="body">
+  {{ if $s.Findings }}
+    <table>
+      <tr><th>Severity</th><th>Subject</th><th>What was seen</th></tr>
+      {{ range $s.Findings }}<tr><td class="sev {{ .Severity }}">{{ .Severity }}</td><td>{{ .Subject }}</td><td>{{ .Text }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">The rules found nothing to report.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Deployments <small>{{ len $s.Deployments }} on the account</small></h2>
+  <div class="body">
+  {{ if $s.Deployments }}
+    <table>
+      <tr><th>Name</th><th>Model</th><th>Version</th><th>SKU</th><th class="n">Capacity</th><th class="n">Req/min</th><th class="n">Tok/min</th><th>State</th><th>Upgrade</th><th>Created</th><th>Last changed</th></tr>
+      {{ range $s.Deployments }}<tr>
+        <td>{{ .Name }}</td>
+        <td>{{ .Properties.Model.Format }} / {{ .Properties.Model.Name }}</td>
+        <td class="m">{{ .Properties.Model.Version }}</td>
+        <td>{{ .SKU.Name }}</td>
+        <td class="n">{{ .SKU.Capacity }}</td>
+        <td class="n">{{ num (.RateLimit "request") }}</td>
+        <td class="n">{{ num (.RateLimit "token") }}</td>
+        <td class="{{ if eq .Properties.ProvisioningState "Succeeded" }}ok{{ else }}high{{ end }}">{{ .Properties.ProvisioningState }}</td>
+        <td>{{ .Properties.VersionUpgradeOption }}</td>
+        <td>{{ .SystemData.CreatedBy }}<br><span class="dim">{{ date .SystemData.CreatedAt }}</span></td>
+        <td>{{ .SystemData.LastModifiedBy }}<br><span class="dim">{{ date .SystemData.LastModifiedAt }}</span></td>
+      </tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No deployments were returned.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Model lifecycle <small>catalog entries for deployed models</small></h2>
+  <div class="body">
+  {{ if $s.Models }}
+    <table>
+      <tr><th>Model</th><th>Version</th><th>Lifecycle</th><th>Inference retires</th><th>Deployment types offered</th></tr>
+      {{ range $s.Models }}<tr><td>{{ .Format }} / {{ .Name }}</td><td class="m">{{ .Version }}</td><td>{{ .LifecycleStatus }}</td><td>{{ with .Deprecation.Inference }}{{ . }}{{ else }}<span class="dim">not announced</span>{{ end }}</td><td>{{ join .SKUNames ", " }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No catalog rows matched the deployed models.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Quota in {{ $s.Scope.Location }} <small>lines in use</small></h2>
+  <div class="body">
+  {{ if $s.Usage }}
+    <table>
+      <tr><th>Quota</th><th class="n">Used</th><th class="n">Limit</th><th>Share</th></tr>
+      {{ range $s.Usage }}<tr><td class="m">{{ .Name.Value }}</td><td class="n">{{ num .CurrentValue }}</td><td class="n">{{ num .Limit }}</td>
+        <td><span class="meter"><i style="width: {{ printf "%.0f" .Percent }}%"></i></span> {{ pct .Percent }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No quota is in use, or the section was skipped.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Health and alerts</h2>
+  <div class="body">
+    <dl>
+      <dt>Resource Health</dt><dd>{{ with $s.Health.Properties.AvailabilityState }}{{ . }}{{ else }}<span class="dim">unknown</span>{{ end }}{{ with $s.Health.Properties.Summary }}: {{ . }}{{ end }}</dd>
+      <dt>Account state</dt><dd>{{ $s.Account.Properties.ProvisioningState }}; kind {{ $s.Account.Kind }}; SKU {{ $s.Account.SKU.Name }}</dd>
+      <dt>Network</dt><dd>public access {{ $s.Account.Properties.PublicNetworkAccess }}</dd>
+      <dt>Key authentication</dt><dd>{{ if $s.Account.Properties.DisableLocalAuth }}disabled{{ else }}enabled{{ end }}</dd>
+      <dt>Endpoint</dt><dd><code>{{ $s.Account.Properties.Endpoint }}</code></dd>
+    </dl>
+    {{ if $s.Alerts }}
+    <table>
+      <tr><th>Alert rule</th><th>Severity</th><th>Condition</th><th>State</th><th>Since</th></tr>
+      {{ range $s.Alerts }}{{ with .Properties.Essentials }}<tr><td>{{ .AlertRule }}</td><td>{{ .Severity }}</td><td>{{ .MonitorCondition }}</td><td>{{ .AlertState }}</td><td>{{ .StartDateTime }}</td></tr>{{ end }}
+      {{ end }}
+    </table>
+    {{ else }}<p class="empty">No alerts fired against the account in the last 30 days.</p>{{ end }}
+    {{ if $s.Metrics }}
+    <table>
+      <tr><th>Deployment</th><th>Metric</th><th class="n">24 hour total</th></tr>
+      {{ range $s.Metrics }}<tr><td>{{ .Deployment }}</td><td>{{ .Name }}</td><td class="n">{{ num .Total }}</td></tr>
+      {{ end }}
+    </table>
+    {{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Model probes <small>newest first</small></h2>
+  <div class="body">
+  {{ if $s.Probes }}
+    <table>
+      <tr><th>When</th><th>Deployment</th><th>Path</th><th>Result</th><th class="n">Latency</th><th class="n">Tokens in/out</th><th>Detail</th></tr>
+      {{ range $s.Probes }}<tr><td>{{ date .Time }}</td><td>{{ .Deployment }}</td><td>{{ .Kind }}</td>
+        <td class="{{ if .OK }}ok{{ else }}high{{ end }}">{{ if .OK }}pass{{ else }}fail{{ end }}</td>
+        <td class="n">{{ .LatencyMS }} ms</td><td class="n">{{ .TokensIn }}/{{ .TokensOut }}</td><td>{{ .Detail }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No probes have been run from this state directory. Run <code>foundry-tui test</code>.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Who has access <small>role assignments at or above the account</small></h2>
+  <div class="body">
+  {{ if $s.Access }}
+    <table>
+      <tr><th>Role</th><th>Principal</th><th>Type</th><th>Assigned at</th><th>Since</th></tr>
+      {{ range $s.Access }}<tr><td>{{ .Role }}</td><td>{{ with .PrincipalName }}{{ . }}{{ else }}<code>{{ .PrincipalID }}</code>{{ end }}</td><td>{{ .PrincipalType }}</td>
+        <td>{{ if .Inherited $s.Account.ID }}<span class="dim">inherited:</span> <code>{{ .Scope }}</code>{{ else }}this account{{ end }}</td><td>{{ .CreatedOn }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No role assignments were returned.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Agentic workflows <small>gh-aw lock files in {{ $s.Scope.Repo }}</small></h2>
+  <div class="body">
+  {{ with $s.AgenticWorkflows }}
+    <table>
+      <tr><th>Workflow</th><th>State</th><th class="n">Runs</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Running</th><th class="n">Success</th><th class="n">Mean time</th><th>Last run</th></tr>
+      {{ range . }}<tr><td>{{ .Workflow }}<br><code>{{ .Path }}</code></td><td>{{ .State }}</td><td class="n">{{ .Runs }}</td><td class="n">{{ .Succeeded }}</td><td class="n">{{ .Failed }}</td><td class="n">{{ .Active }}</td>
+        <td class="n">{{ if .Runs }}{{ pct .SuccessRate }}{{ end }}</td><td class="n">{{ if .Runs }}{{ .AvgDuration }}{{ end }}</td>
+        <td>{{ if .Last.ID }}<a href="{{ .Last.URL }}">#{{ .Last.Number }}</a> {{ .Last.State }}, {{ date .Last.CreatedAt }}{{ else }}<span class="dim">none in window</span>{{ end }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No <code>.lock.yml</code> workflows are registered in this repository.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Workflow runs <small>latest 25 of {{ len $s.Runs }} read</small></h2>
+  <div class="body">
+  {{ if $s.Runs }}
+    <table>
+      <tr><th>Run</th><th>Title</th><th>Event</th><th>By</th><th>Result</th><th class="n">Took</th><th>Started</th></tr>
+      {{ range last $s.Runs 25 }}<tr><td><a href="{{ .URL }}">{{ .Name }} #{{ .Number }}</a></td><td>{{ .DisplayTitle }}</td><td>{{ .Event }}</td><td>{{ .Actor.Login }}</td>
+        <td class="{{ if eq .State "success" }}ok{{ else if eq .State "failure" }}high{{ end }}">{{ .State }}</td><td class="n">{{ .Duration }}</td><td>{{ date .CreatedAt }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">No runs were read.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>Local audit trail <small>{{ if $s.AuditErr }}chain broken{{ else }}chain verified{{ end }}; latest {{ len $s.Audit }}</small></h2>
+  <div class="body">
+  {{ with $s.AuditErr }}<p class="high">{{ . }}</p>{{ end }}
+  {{ if $s.Audit }}
+    <table>
+      <tr><th class="n">Seq</th><th>When</th><th>Who</th><th>What</th><th>Subject</th><th>Request</th><th>Hash</th></tr>
+      {{ range $s.Audit }}<tr><td class="n">{{ .Seq }}</td><td>{{ date .Time }}</td><td>{{ .Actor }}</td><td class="m">{{ .Kind }}</td><td>{{ .Subject }}</td><td class="m">{{ index .Detail "request_id" }}</td><td class="m">{{ short .Hash }}</td></tr>
+      {{ end }}
+    </table>
+  {{ else }}<p class="empty">This state directory holds no audit records.</p>{{ end }}
+  </div>
+</section>
+
+<section>
+  <h2>What this record could and could not see</h2>
+  <div class="body">
+    <table>
+      <tr><th>Capability</th><th>Azure action</th><th>Plane</th><th>{{ $s.Role }}</th></tr>
+      {{ range $s.Permissions }}<tr><td>{{ .What }}</td><td class="m">{{ .Action }}</td><td>{{ if .Data }}data{{ else }}control{{ end }}</td>
+        <td class="{{ if .Allowed }}ok{{ else }}warn{{ end }}">{{ if .Allowed }}allowed{{ else }}not allowed{{ end }}</td></tr>
+      {{ end }}
+    </table>
+    {{ if $s.Skipped }}
+    <p>Sections left out of this record, and why:</p>
+    <dl>{{ range $s.SkippedKeys }}<dt>{{ . }}</dt><dd>{{ index $s.Skipped . }}</dd>{{ end }}</dl>
+    {{ end }}
+  </div>
+</section>
+
+</body>
+</html>

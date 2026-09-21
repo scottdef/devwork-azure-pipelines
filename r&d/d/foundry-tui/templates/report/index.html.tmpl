@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry records</title>
+<style>
+html { background: #777777; }
+body { margin: 0 auto; max-width: 48rem; padding: 0.5rem; font: 15px/1.6 "Go", "Lucida Grande", "Lucida Sans Unicode", Verdana, sans-serif; }
+main { background: #ffffea; border: 1px solid #000; }
+h1 { margin: 0; font: inherit; font-size: 1.25rem; background: #eaffff; border-bottom: 1px solid #8888cc; padding: 0.25rem 0.6rem; }
+ol { margin: 0; padding: 0.6rem 0.9rem 0.8rem 3rem; }
+a { color: inherit; font-family: "Go Mono", "Lucida Console", Menlo, monospace; font-size: 0.9em; }
+p { padding: 0.6rem 0.9rem; margin: 0; color: #55554a; }
+</style>
+</head>
+<body>
+<main>
+<h1>Foundry records, newest first</h1>
+{{ if . }}<ol>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ol>
+{{ else }}<p>No records yet. Run <code>foundry-tui report</code>.</p>{{ end }}
+</main>
+</body>
+</html>

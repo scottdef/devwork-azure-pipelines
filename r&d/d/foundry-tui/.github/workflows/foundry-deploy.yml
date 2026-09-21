@@ -1,0 +1,240 @@
+# Create, scale or delete one Foundry model deployment.
+#
+# Started by:  foundry-tui (gh workflow run foundry-deploy.yml --json < payload)
+# Identity:    a user-assigned managed identity holding Foundry Owner on the
+#              account, and nothing else. OIDC; no stored Azure secret.
+# Safety:      dry_run defaults to true. A live run enters the foundry-prod
+#              environment, which is where you put required reviewers.
+# Afterwards:  commits a change record, starts the report workflow,
+#              and posts a signed webhook if one is configured.
+name: foundry-deploy
+run-name: "foundry-deploy ${{ inputs.action }} ${{ inputs.deployment }} [${{ inputs.request_id }}]${{ inputs.dry_run && ' dry-run' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [create, update, delete]
+        required: true
+      deployment:
+        description: Deployment name
+        type: string
+        required: true
+      model_format:
+        description: Model format (OpenAI, Anthropic, Mistral AI, ...)
+        type: string
+      model_name:
+        description: Model name
+        type: string
+      model_version:
+        description: Model version
+        type: string
+      sku_name:
+        description: Deployment type (GlobalStandard, DataZoneStandard, Standard, ...)
+        type: string
+      sku_capacity:
+        description: Capacity units
+        type: string
+      dry_run:
+        description: Plan only; change nothing
+        type: boolean
+        default: true
+      request_id:
+        description: Correlation id set by foundry-tui
+        type: string
+        required: true
+      reason:
+        description: Why this change is being made
+        type: string
+        required: true
+
+permissions:
+  id-token: write # OIDC to Azure
+  contents: write # commit the change record
+  actions: write  # start the report workflow
+
+concurrency:
+  group: foundry-deploy-${{ inputs.deployment }}
+  cancel-in-progress: false
+
+env:
+  # Inputs reach bash through the environment only. No ${{ }} inside run:.
+  IN_ACTION: ${{ inputs.action }}
+  IN_DEPLOYMENT: ${{ inputs.deployment }}
+  IN_MODEL_FORMAT: ${{ inputs.model_format }}
+  IN_MODEL_NAME: ${{ inputs.model_name }}
+  IN_MODEL_VERSION: ${{ inputs.model_version }}
+  IN_SKU_NAME: ${{ inputs.sku_name }}
+  IN_SKU_CAPACITY: ${{ inputs.sku_capacity }}
+  IN_DRY_RUN: ${{ inputs.dry_run }}
+  IN_REQUEST_ID: ${{ inputs.request_id }}
+  IN_REASON: ${{ inputs.reason }}
+  FOUNDRY_ACCOUNT: ${{ vars.FOUNDRY_ACCOUNT }}
+  FOUNDRY_RESOURCE_GROUP: ${{ vars.FOUNDRY_RESOURCE_GROUP }}
+  ACTOR: ${{ github.triggering_actor }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.dry_run && 'foundry-plan' || 'foundry-prod' }}
+    steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          re_name='^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$'
+          re_token='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+          re_format='^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$'
+          re_capacity='^[1-9][0-9]{0,5}$'
+          re_request='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+          [[ -n "$FOUNDRY_ACCOUNT" && -n "$FOUNDRY_RESOURCE_GROUP" ]] || fail "set repository variables FOUNDRY_ACCOUNT and FOUNDRY_RESOURCE_GROUP"
+          [[ "$IN_ACTION" =~ ^(create|update|delete)$ ]] || fail "action is not valid"
+          [[ "$IN_DEPLOYMENT" =~ $re_name ]] || fail "deployment is not valid"
+          [[ "$IN_REQUEST_ID" =~ $re_request ]] || fail "request_id is not valid"
+          (( ${#IN_REASON} >= 8 && ${#IN_REASON} <= 200 )) || fail "reason must be 8 to 200 characters"
+          if [[ "$IN_ACTION" != "delete" ]]; then
+            [[ "$IN_MODEL_FORMAT" =~ $re_format ]] || fail "model_format is not valid"
+            [[ "$IN_MODEL_NAME" =~ $re_token ]] || fail "model_name is not valid"
+            [[ "$IN_MODEL_VERSION" =~ $re_token ]] || fail "model_version is not valid"
+            [[ "$IN_SKU_NAME" =~ $re_token ]] || fail "sku_name is not valid"
+            [[ "$IN_SKU_CAPACITY" =~ $re_capacity ]] || fail "sku_capacity is not valid"
+          fi
+
+      - name: App token (optional)
+        id: app
+        if: ${{ vars.AUTOADMIN_APP_ID != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.AUTOADMIN_APP_ID }}
+          private-key: ${{ secrets.AUTOADMIN_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read current state
+        run: |
+          set -euo pipefail
+          if az cognitiveservices account deployment show \
+               -g "$FOUNDRY_RESOURCE_GROUP" -n "$FOUNDRY_ACCOUNT" \
+               --deployment-name "$IN_DEPLOYMENT" -o json > before.json 2>/dev/null; then
+            echo "EXISTS=true" >> "$GITHUB_ENV"
+          else
+            echo '{}' > before.json
+            echo "EXISTS=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Guard
+        run: |
+          set -euo pipefail
+          case "$IN_ACTION:$EXISTS" in
+            create:true)  echo "::error::$IN_DEPLOYMENT already exists; use update"; exit 1 ;;
+            update:false) echo "::error::$IN_DEPLOYMENT does not exist; use create"; exit 1 ;;
+            delete:false) echo "::error::$IN_DEPLOYMENT does not exist"; exit 1 ;;
+          esac
+
+      - name: Plan and apply
+        run: |
+          set -euo pipefail
+          if [[ "$IN_ACTION" == "delete" ]]; then
+            cmd=(az cognitiveservices account deployment delete
+                 -g "$FOUNDRY_RESOURCE_GROUP" -n "$FOUNDRY_ACCOUNT"
+                 --deployment-name "$IN_DEPLOYMENT")
+          else
+            # create is a PUT: it creates, and it updates in place.
+            cmd=(az cognitiveservices account deployment create
+                 -g "$FOUNDRY_RESOURCE_GROUP" -n "$FOUNDRY_ACCOUNT"
+                 --deployment-name "$IN_DEPLOYMENT"
+                 --model-format "$IN_MODEL_FORMAT" --model-name "$IN_MODEL_NAME"
+                 --model-version "$IN_MODEL_VERSION"
+                 --sku-name "$IN_SKU_NAME" --sku-capacity "$IN_SKU_CAPACITY")
+          fi
+          plan=$(printf '%q ' "${cmd[@]}")
+          {
+            echo "### foundry-deploy \`$IN_REQUEST_ID\`"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Action | $IN_ACTION \`$IN_DEPLOYMENT\` |"
+            echo "| Requested by | $ACTOR |"
+            echo "| Dry run | $IN_DRY_RUN |"
+            echo
+            echo '```'
+            echo "$plan"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$IN_DRY_RUN" == "true" ]]; then
+            echo "Dry run: nothing was changed." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          "${cmd[@]}" -o none
+          echo "Applied." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write and commit the change record
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          az cognitiveservices account deployment show \
+            -g "$FOUNDRY_RESOURCE_GROUP" -n "$FOUNDRY_ACCOUNT" \
+            --deployment-name "$IN_DEPLOYMENT" -o json > after.json 2>/dev/null || echo '{}' > after.json
+          dir="records/deployments/$(date -u +%Y)"
+          mkdir -p "$dir"
+          jq -n \
+            --arg request_id "$IN_REQUEST_ID" --arg action "$IN_ACTION" --arg deployment "$IN_DEPLOYMENT" \
+            --arg reason "$IN_REASON" --arg actor "$ACTOR" --arg run_url "$RUN_URL" \
+            --arg account "$FOUNDRY_ACCOUNT" --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile before before.json --slurpfile after after.json \
+            '{request_id: $request_id, time: $time, actor: $actor, account: $account, action: $action,
+              deployment: $deployment, reason: $reason, run_url: $run_url,
+              before: $before[0], after: $after[0]}' > "$dir/$IN_REQUEST_ID.json"
+          sha256sum "$dir/$IN_REQUEST_ID.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$dir/$IN_REQUEST_ID.json"
+          git commit -s -m "foundry: $IN_ACTION $IN_DEPLOYMENT [$IN_REQUEST_ID]" -m "Requested by $ACTOR. $RUN_URL"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "push rejected (attempt $attempt); rebasing"
+            git pull --rebase
+          done
+          echo "::error::could not push the change record"; exit 1
+
+      - name: Start the report workflow
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jq -n --arg id "$IN_REQUEST_ID" --arg why "after $IN_ACTION of $IN_DEPLOYMENT" \
+            '{request_id: $id, reason: $why}' |
+            gh workflow run foundry-report.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" --json
+
+      - name: Webhook (optional)
+        if: ${{ always() }}
+        env:
+          WEBHOOK_URL: ${{ secrets.FOUNDRY_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.FOUNDRY_WEBHOOK_SECRET }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          [[ -n "$WEBHOOK_URL" ]] || { echo "no webhook configured"; exit 0; }
+          body=$(jq -cn --arg event foundry.deploy --arg status "$JOB_STATUS" --arg request_id "$IN_REQUEST_ID" \
+            --arg action "$IN_ACTION" --arg deployment "$IN_DEPLOYMENT" --arg dry_run "$IN_DRY_RUN" \
+            --arg actor "$ACTOR" --arg run_url "$RUN_URL" \
+            '{event: $event, status: $status, request_id: $request_id, action: $action,
+              deployment: $deployment, dry_run: ($dry_run == "true"), actor: $actor, run_url: $run_url}')
+          sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $NF}')
+          curl -fsS --max-time 20 --retry 2 \
+            -H "Content-Type: application/json" \
+            -H "X-Foundry-Signature-256: sha256=$sig" \
+            -d "$body" "$WEBHOOK_URL" > /dev/null

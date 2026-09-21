@@ -1,0 +1,18 @@
+{{- /*
+  Inputs for .github/workflows/foundry-deploy.yml.
+  Every value passes through "json", so nothing a user types can
+  escape its string. Ten inputs: the old workflow_dispatch limit
+  (25 on github.com since 2025-12; older GHES still enforces 10).
+*/ -}}
+{
+  "action":        {{ json .action }},
+  "deployment":    {{ json .deployment }},
+  "model_format":  {{ json .model_format }},
+  "model_name":    {{ json .model_name }},
+  "model_version": {{ json .model_version }},
+  "sku_name":      {{ json .sku_name }},
+  "sku_capacity":  {{ json .sku_capacity }},
+  "dry_run":       {{ json (default "true" .dry_run) }},
+  "request_id":    {{ json .request_id }},
+  "reason":        {{ json .reason }}
+}

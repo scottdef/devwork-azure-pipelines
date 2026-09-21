@@ -1,0 +1,8 @@
+/bin/
+/dist/
+/foundry-tui
+/foundry-tui.json
+*.test
+*.out
+# Local state is not a record; the workflows commit records/ themselves.
+/.state/

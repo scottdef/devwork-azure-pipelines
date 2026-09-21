@@ -1,0 +1,7 @@
+{{- /* Inputs for .github/workflows/foundry-model-test.yml. */ -}}
+{
+  "deployment": {{ json .deployment }},
+  "mode":       {{ json (default "both" (lower .mode)) }},
+  "request_id": {{ json .request_id }},
+  "reason":     {{ json .reason }}
+}

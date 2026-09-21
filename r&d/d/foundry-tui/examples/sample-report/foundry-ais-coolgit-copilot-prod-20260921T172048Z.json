@@ -1,0 +1,493 @@
+{
+  "generated": "2026-09-21T17:20:48Z",
+  "version": "test",
+  "actor": "crafty",
+  "scope": {
+    "subscription": "",
+    "resource_group": "rg-coolgit-copilot",
+    "account": "ais-coolgit-copilot-prod",
+    "location": "eastus2",
+    "repo": "CoolGitOrg/foundry-ops"
+  },
+  "role": "Foundry Owner",
+  "role_source": "snapshot 2026-07-16",
+  "permissions": [
+    {
+      "Key": "account",
+      "What": "Foundry account settings",
+      "Action": "Microsoft.CognitiveServices/accounts/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "deployments",
+      "What": "Model deployments and authorship",
+      "Action": "Microsoft.CognitiveServices/accounts/deployments/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "models",
+      "What": "Deployable model catalog and retirement dates",
+      "Action": "Microsoft.CognitiveServices/accounts/models/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "usage",
+      "What": "Regional quota",
+      "Action": "Microsoft.CognitiveServices/locations/usages/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "access",
+      "What": "Role assignments on the account",
+      "Action": "Microsoft.Authorization/roleAssignments/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "health",
+      "What": "Resource Health",
+      "Action": "Microsoft.ResourceHealth/availabilityStatuses/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "alerts",
+      "What": "Fired Azure Monitor alerts",
+      "Action": "Microsoft.AlertsManagement/alerts/read",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "metrics",
+      "What": "Azure Monitor metrics (requests, tokens)",
+      "Action": "Microsoft.Insights/metrics/read",
+      "Data": false,
+      "Note": "Not in Foundry Owner. Add Monitoring Reader on the account, or rely on alerts and probes.",
+      "Allowed": false
+    },
+    {
+      "Key": "activity",
+      "What": "Azure activity log",
+      "Action": "Microsoft.Insights/eventtypes/values/read",
+      "Data": false,
+      "Note": "Not in Foundry Owner and not collected. Deployment systemData and the workflow run history cover authorship.",
+      "Allowed": false
+    },
+    {
+      "Key": "inference",
+      "What": "Model probes (chat completions)",
+      "Action": "Microsoft.CognitiveServices/accounts/OpenAI/deployments/chat/completions/action",
+      "Data": true,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "deploy.write",
+      "What": "Create or scale a deployment (workflow identity)",
+      "Action": "Microsoft.CognitiveServices/accounts/deployments/write",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    },
+    {
+      "Key": "deploy.delete",
+      "What": "Delete a deployment (workflow identity)",
+      "Action": "Microsoft.CognitiveServices/accounts/deployments/delete",
+      "Data": false,
+      "Note": "",
+      "Allowed": true
+    }
+  ],
+  "account": {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-coolgit-copilot/providers/Microsoft.CognitiveServices/accounts/ais-coolgit-copilot-prod",
+    "name": "ais-coolgit-copilot-prod",
+    "kind": "AIServices",
+    "location": "eastus2",
+    "sku": {
+      "name": "S0"
+    },
+    "properties": {
+      "endpoint": "https://ais-coolgit-copilot-prod.cognitiveservices.azure.com/",
+      "endpoints": null,
+      "customSubDomainName": "ais-coolgit-copilot-prod",
+      "provisioningState": "Succeeded",
+      "publicNetworkAccess": "Enabled",
+      "disableLocalAuth": false
+    }
+  },
+  "deployments": [
+    {
+      "id": "",
+      "name": "claude-sonnet",
+      "sku": {
+        "name": "GlobalStandard",
+        "capacity": 20
+      },
+      "properties": {
+        "model": {
+          "format": "Anthropic",
+          "name": "claude-sonnet-4-6",
+          "version": "1"
+        },
+        "provisioningState": "Succeeded",
+        "versionUpgradeOption": "",
+        "raiPolicyName": "",
+        "capabilities": {
+          "chatCompletion": "true"
+        },
+        "rateLimits": null
+      },
+      "systemData": {
+        "createdBy": "uami-foundry-deploy",
+        "createdAt": "2026-08-11T09:00:00Z",
+        "lastModifiedBy": "",
+        "lastModifiedAt": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "",
+      "name": "embed-small",
+      "sku": {
+        "name": "Standard",
+        "capacity": 120
+      },
+      "properties": {
+        "model": {
+          "format": "OpenAI",
+          "name": "text-embedding-3-small",
+          "version": "1"
+        },
+        "provisioningState": "Failed",
+        "versionUpgradeOption": "",
+        "raiPolicyName": "",
+        "capabilities": {
+          "embeddings": "true"
+        },
+        "rateLimits": null
+      },
+      "systemData": {
+        "createdBy": "",
+        "createdAt": "0001-01-01T00:00:00Z",
+        "lastModifiedBy": "",
+        "lastModifiedAt": "0001-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "",
+      "name": "gpt-4o",
+      "sku": {
+        "name": "GlobalStandard",
+        "capacity": 50
+      },
+      "properties": {
+        "model": {
+          "format": "OpenAI",
+          "name": "gpt-4o",
+          "version": "2024-11-20"
+        },
+        "provisioningState": "Succeeded",
+        "versionUpgradeOption": "NoAutoUpgrade",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "capabilities": {
+          "chatCompletion": "true"
+        },
+        "rateLimits": [
+          {
+            "key": "request",
+            "count": 500,
+            "renewalPeriod": 60
+          },
+          {
+            "key": "token",
+            "count": 50000,
+            "renewalPeriod": 60
+          }
+        ]
+      },
+      "systemData": {
+        "createdBy": "crafty@coolgit.example",
+        "createdAt": "2026-06-01T10:00:00Z",
+        "lastModifiedBy": "uami-foundry-deploy",
+        "lastModifiedAt": "2026-09-01T12:30:00Z"
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "claude-sonnet-4-6",
+      "format": "Anthropic",
+      "version": "1",
+      "lifecycleStatus": "GenerallyAvailable",
+      "isDefaultVersion": false,
+      "skus": [
+        {
+          "name": "GlobalStandard",
+          "capacity": {
+            "default": 20,
+            "maximum": 200
+          }
+        }
+      ],
+      "deprecation": {
+        "inference": ""
+      }
+    },
+    {
+      "name": "gpt-4o",
+      "format": "OpenAI",
+      "version": "2024-11-20",
+      "lifecycleStatus": "GenerallyAvailable",
+      "isDefaultVersion": false,
+      "skus": [
+        {
+          "name": "GlobalStandard",
+          "capacity": {
+            "default": 50,
+            "maximum": 1000
+          }
+        },
+        {
+          "name": "Standard",
+          "capacity": {
+            "default": 10,
+            "maximum": 450
+          }
+        }
+      ],
+      "deprecation": {
+        "inference": "2026-10-21T17:20:48Z"
+      }
+    }
+  ],
+  "usage": [
+    {
+      "name": {
+        "value": "OpenAI.Standard.text-embedding-3-small"
+      },
+      "currentValue": 120,
+      "limit": 140,
+      "unit": "Count"
+    },
+    {
+      "name": {
+        "value": "OpenAI.GlobalStandard.gpt-4o"
+      },
+      "currentValue": 50,
+      "limit": 1000,
+      "unit": "Count"
+    }
+  ],
+  "access": [
+    {
+      "principalName": "uami-foundry-deploy",
+      "principalId": "p1",
+      "principalType": "ServicePrincipal",
+      "roleDefinitionName": "Foundry Owner",
+      "scope": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-coolgit-copilot/providers/Microsoft.CognitiveServices/accounts/ais-coolgit-copilot-prod",
+      "createdOn": "2026-06-01T09:00:00Z"
+    },
+    {
+      "principalName": "",
+      "principalId": "p2",
+      "principalType": "Group",
+      "roleDefinitionName": "Owner",
+      "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+      "createdOn": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "health": {
+    "properties": {
+      "availabilityState": "Available",
+      "summary": "There aren't any known Azure platform problems affecting this resource.",
+      "reasonType": "",
+      "reportedTime": ""
+    }
+  },
+  "alerts": [
+    {
+      "name": "a1",
+      "properties": {
+        "essentials": {
+          "severity": "Sev2",
+          "alertState": "New",
+          "monitorCondition": "Fired",
+          "alertRule": "foundry-429-rate",
+          "startDateTime": "2026-09-20T08:00:00Z"
+        }
+      }
+    }
+  ],
+  "metrics": null,
+  "workflows": [
+    {
+      "Workflow": "foundry-deploy",
+      "Path": ".github/workflows/foundry-deploy.yml",
+      "Agentic": false,
+      "State": "active",
+      "Runs": 1,
+      "Succeeded": 0,
+      "Failed": 1,
+      "Active": 0,
+      "SuccessRate": 0,
+      "AvgDuration": 0,
+      "Last": {
+        "id": 42,
+        "name": "foundry-deploy",
+        "display_title": "\u003cscript\u003ealert(1)\u003c/script\u003e",
+        "path": ".github/workflows/foundry-deploy.yml",
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_branch": "",
+        "html_url": "https://github.example/runs/42",
+        "run_number": 7,
+        "run_attempt": 0,
+        "created_at": "2026-09-21T17:20:48Z",
+        "run_started_at": "2026-09-21T17:20:48Z",
+        "updated_at": "2026-09-21T17:20:48Z",
+        "triggering_actor": {
+          "login": "crafty"
+        }
+      }
+    },
+    {
+      "Workflow": "Record \u003ctriage\u003e",
+      "Path": ".github/workflows/foundry-record-triage.lock.yml",
+      "Agentic": true,
+      "State": "active",
+      "Runs": 0,
+      "Succeeded": 0,
+      "Failed": 0,
+      "Active": 0,
+      "SuccessRate": 0,
+      "AvgDuration": 0,
+      "Last": {
+        "id": 0,
+        "name": "",
+        "display_title": "",
+        "path": "",
+        "event": "",
+        "status": "",
+        "conclusion": "",
+        "head_branch": "",
+        "html_url": "",
+        "run_number": 0,
+        "run_attempt": 0,
+        "created_at": "0001-01-01T00:00:00Z",
+        "run_started_at": "0001-01-01T00:00:00Z",
+        "updated_at": "0001-01-01T00:00:00Z",
+        "triggering_actor": {
+          "login": ""
+        }
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": 42,
+      "name": "foundry-deploy",
+      "display_title": "\u003cscript\u003ealert(1)\u003c/script\u003e",
+      "path": ".github/workflows/foundry-deploy.yml",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "",
+      "html_url": "https://github.example/runs/42",
+      "run_number": 7,
+      "run_attempt": 0,
+      "created_at": "2026-09-21T17:20:48Z",
+      "run_started_at": "2026-09-21T17:20:48Z",
+      "updated_at": "2026-09-21T17:20:48Z",
+      "triggering_actor": {
+        "login": "crafty"
+      }
+    }
+  ],
+  "probes": [
+    {
+      "time": "2026-09-21T17:20:48.939058412Z",
+      "deployment": "gpt-4o",
+      "kind": "api",
+      "ok": false,
+      "latency_ms": 0,
+      "detail": "429 Too Many Requests"
+    }
+  ],
+  "audit": [
+    {
+      "seq": 1,
+      "time": "2026-09-21T17:20:48Z",
+      "actor": "crafty",
+      "kind": "dispatch.request",
+      "subject": "gpt-4o",
+      "detail": {
+        "request_id": "ftui-1"
+      },
+      "prev": "",
+      "hash": "14673b1dafd2d72a6cf9936dddd1fc3eb994826a957f17c54358080929350b41"
+    }
+  ],
+  "audit_head": "14673b1dafd2d72a6cf9936dddd1fc3eb994826a957f17c54358080929350b41",
+  "findings": [
+    {
+      "severity": "high",
+      "subject": "embed-small",
+      "text": "provisioning state is Failed"
+    },
+    {
+      "severity": "warn",
+      "subject": "gpt-4o",
+      "text": "gpt-4o 2024-11-20 retires in 29 days (2026-10-21)"
+    },
+    {
+      "severity": "warn",
+      "subject": "OpenAI.Standard.text-embedding-3-small",
+      "text": "quota is 86% used (120 of 140)"
+    },
+    {
+      "severity": "warn",
+      "subject": "foundry-429-rate",
+      "text": "Sev2 alert is firing since 2026-09-20T08:00:00Z"
+    },
+    {
+      "severity": "warn",
+      "subject": "foundry-deploy",
+      "text": "last run failed: https://github.example/runs/42"
+    },
+    {
+      "severity": "warn",
+      "subject": "gpt-4o",
+      "text": "latest api probe failed: 429 Too Many Requests"
+    },
+    {
+      "severity": "info",
+      "subject": "gpt-4o",
+      "text": "auto-upgrade is off; the version will not move before retirement"
+    },
+    {
+      "severity": "info",
+      "subject": "ais-coolgit-copilot-prod",
+      "text": "key authentication is enabled; this tool and its workflows need only Entra ID"
+    },
+    {
+      "severity": "info",
+      "subject": "ais-coolgit-copilot-prod",
+      "text": "public network access is enabled"
+    }
+  ],
+  "skipped": {
+    "activity": "not collected: Microsoft.Insights/eventtypes/values/read is outside Foundry Owner. Not in Foundry Owner and not collected. Deployment systemData and the workflow run history cover authorship.",
+    "metrics": "not collected: Microsoft.Insights/metrics/read is outside Foundry Owner. Not in Foundry Owner. Add Monitoring Reader on the account, or rely on alerts and probes."
+  }
+}

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry record: ais-coolgit-copilot-prod at 2026-09-21 17:20Z</title>
+<style>
+:root {
+  --paper: #ffffea; --tag: #eaffff; --rule: #8888cc; --ink: #000000;
+  --dim: #55554a; --bar: #99994c; --high: #aa0000; --warn: #8a5a00; --ok: #2d6a2d;
+  --sans: "Go", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Verdana, sans-serif;
+  --mono: "Go Mono", "Lucida Console", "DejaVu Sans Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: #777777; }
+body { margin: 0 auto; max-width: 78rem; padding: 0.5rem; font: 15px/1.5 var(--sans); color: var(--ink); }
+section, header { background: var(--paper); border: 1px solid var(--ink); margin: 0 0 0.5rem; }
+h1, h2 { margin: 0; font: inherit; font-weight: normal; background: var(--tag);
+  border-bottom: 1px solid var(--rule); padding: 0.25rem 0.6rem 0.25rem 0; display: flex; gap: 0.6rem; align-items: baseline; }
+h1::before, h2::before { content: ""; flex: none; align-self: stretch; width: 0.9rem; background: var(--rule);
+  border-right: 1px solid var(--ink); margin: -0.25rem 0; }
+h1 { font-size: 1.25rem; }
+h2 small { color: var(--dim); margin-left: auto; font-size: 0.85rem; }
+.body { padding: 0.6rem 0.9rem 0.8rem; overflow-x: auto; }
+p { margin: 0.3rem 0; max-width: 72ch; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th { text-align: left; font-weight: normal; color: var(--dim); border-bottom: 1px solid var(--bar); padding: 0.2rem 0.8rem 0.2rem 0; white-space: nowrap; }
+td { vertical-align: top; padding: 0.2rem 0.8rem 0.2rem 0; border-bottom: 1px dotted var(--bar); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+code, .m { font-family: var(--mono); font-size: 0.85em; overflow-wrap: anywhere; }
+.high { color: var(--high); } .warn { color: var(--warn); } .ok { color: var(--ok); } .dim { color: var(--dim); }
+.sev { font-family: var(--mono); white-space: nowrap; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 1.2rem; margin: 0; }
+dt { color: var(--dim); } dd { margin: 0; overflow-wrap: anywhere; }
+.meter { display: inline-block; width: 8rem; height: 0.7rem; border: 1px solid var(--ink); background: #fff; vertical-align: baseline; }
+.meter i { display: block; height: 100%; background: var(--bar); }
+.empty { color: var(--dim); font-style: italic; }
+a { color: inherit; }
+@media print { html { background: #fff; } body { max-width: none; padding: 0; font-size: 11px; } section, header { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ais-coolgit-copilot-prod <span class="dim">recorded 2026-09-21 17:20Z</span></h1>
+  <div class="body">
+    <dl>
+      <dt>Resource group</dt><dd>rg-coolgit-copilot, eastus2</dd>
+      <dt>Repository</dt><dd>CoolGitOrg/foundry-ops</dd>
+      <dt>Recorded by</dt><dd>crafty using foundry-tui test</dd>
+      <dt>Bounded by</dt><dd>Foundry Owner (snapshot 2026-07-16). Nothing on this page needed a wider role.</dd>
+      <dt>Findings</dt><dd><span class="high">1 high</span>, <span class="warn">5 to watch</span>, 3 notes</dd>
+      <dt>Source data</dt><dd><code>foundry-ais-coolgit-copilot-prod-20260921T172048Z.json</code><br>sha256 <code>ae32940528024f44b9ba8248520dc3eaf709e8da9b04945e0d71ed9c6e6f25fa</code></dd>
+      <dt>Audit chain head</dt><dd><code>14673b1dafd2d72a6cf9936dddd1fc3eb994826a957f17c54358080929350b41</code></dd>
+    </dl>
+  </div>
+</header>
+
+<section>
+  <h2>Findings</h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Severity</th><th>Subject</th><th>What was seen</th></tr>
+      <tr><td class="sev high">high</td><td>embed-small</td><td>provisioning state is Failed</td></tr>
+      <tr><td class="sev warn">warn</td><td>gpt-4o</td><td>gpt-4o 2024-11-20 retires in 29 days (2026-10-21)</td></tr>
+      <tr><td class="sev warn">warn</td><td>OpenAI.Standard.text-embedding-3-small</td><td>quota is 86% used (120 of 140)</td></tr>
+      <tr><td class="sev warn">warn</td><td>foundry-429-rate</td><td>Sev2 alert is firing since 2026-09-20T08:00:00Z</td></tr>
+      <tr><td class="sev warn">warn</td><td>foundry-deploy</td><td>last run failed: https://github.example/runs/42</td></tr>
+      <tr><td class="sev warn">warn</td><td>gpt-4o</td><td>latest api probe failed: 429 Too Many Requests</td></tr>
+      <tr><td class="sev info">info</td><td>gpt-4o</td><td>auto-upgrade is off; the version will not move before retirement</td></tr>
+      <tr><td class="sev info">info</td><td>ais-coolgit-copilot-prod</td><td>key authentication is enabled; this tool and its workflows need only Entra ID</td></tr>
+      <tr><td class="sev info">info</td><td>ais-coolgit-copilot-prod</td><td>public network access is enabled</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Deployments <small>3 on the account</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Name</th><th>Model</th><th>Version</th><th>SKU</th><th class="n">Capacity</th><th class="n">Req/min</th><th class="n">Tok/min</th><th>State</th><th>Upgrade</th><th>Created</th><th>Last changed</th></tr>
+      <tr>
+        <td>claude-sonnet</td>
+        <td>Anthropic / claude-sonnet-4-6</td>
+        <td class="m">1</td>
+        <td>GlobalStandard</td>
+        <td class="n">20</td>
+        <td class="n">0</td>
+        <td class="n">0</td>
+        <td class="ok">Succeeded</td>
+        <td></td>
+        <td>uami-foundry-deploy<br><span class="dim">2026-08-11 09:00Z</span></td>
+        <td><br><span class="dim"></span></td>
+      </tr>
+      <tr>
+        <td>embed-small</td>
+        <td>OpenAI / text-embedding-3-small</td>
+        <td class="m">1</td>
+        <td>Standard</td>
+        <td class="n">120</td>
+        <td class="n">0</td>
+        <td class="n">0</td>
+        <td class="high">Failed</td>
+        <td></td>
+        <td><br><span class="dim"></span></td>
+        <td><br><span class="dim"></span></td>
+      </tr>
+      <tr>
+        <td>gpt-4o</td>
+        <td>OpenAI / gpt-4o</td>
+        <td class="m">2024-11-20</td>
+        <td>GlobalStandard</td>
+        <td class="n">50</td>
+        <td class="n">500</td>
+        <td class="n">50000</td>
+        <td class="ok">Succeeded</td>
+        <td>NoAutoUpgrade</td>
+        <td>crafty@coolgit.example<br><span class="dim">2026-06-01 10:00Z</span></td>
+        <td>uami-foundry-deploy<br><span class="dim">2026-09-01 12:30Z</span></td>
+      </tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Model lifecycle <small>catalog entries for deployed models</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Model</th><th>Version</th><th>Lifecycle</th><th>Inference retires</th><th>Deployment types offered</th></tr>
+      <tr><td>Anthropic / claude-sonnet-4-6</td><td class="m">1</td><td>GenerallyAvailable</td><td><span class="dim">not announced</span></td><td>GlobalStandard</td></tr>
+      <tr><td>OpenAI / gpt-4o</td><td class="m">2024-11-20</td><td>GenerallyAvailable</td><td>2026-10-21T17:20:48Z</td><td>GlobalStandard, Standard</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Quota in eastus2 <small>lines in use</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Quota</th><th class="n">Used</th><th class="n">Limit</th><th>Share</th></tr>
+      <tr><td class="m">OpenAI.Standard.text-embedding-3-small</td><td class="n">120</td><td class="n">140</td>
+        <td><span class="meter"><i style="width: 86%"></i></span> 86%</td></tr>
+      <tr><td class="m">OpenAI.GlobalStandard.gpt-4o</td><td class="n">50</td><td class="n">1000</td>
+        <td><span class="meter"><i style="width: 5%"></i></span> 5%</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Health and alerts</h2>
+  <div class="body">
+    <dl>
+      <dt>Resource Health</dt><dd>Available: There aren&#39;t any known Azure platform problems affecting this resource.</dd>
+      <dt>Account state</dt><dd>Succeeded; kind AIServices; SKU S0</dd>
+      <dt>Network</dt><dd>public access Enabled</dd>
+      <dt>Key authentication</dt><dd>enabled</dd>
+      <dt>Endpoint</dt><dd><code>https://ais-coolgit-copilot-prod.cognitiveservices.azure.com/</code></dd>
+    </dl>
+    
+    <table>
+      <tr><th>Alert rule</th><th>Severity</th><th>Condition</th><th>State</th><th>Since</th></tr>
+      <tr><td>foundry-429-rate</td><td>Sev2</td><td>Fired</td><td>New</td><td>2026-09-20T08:00:00Z</td></tr>
+      
+    </table>
+    
+    
+  </div>
+</section>
+
+<section>
+  <h2>Model probes <small>newest first</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>When</th><th>Deployment</th><th>Path</th><th>Result</th><th class="n">Latency</th><th class="n">Tokens in/out</th><th>Detail</th></tr>
+      <tr><td>2026-09-21 17:20Z</td><td>gpt-4o</td><td>api</td>
+        <td class="high">fail</td>
+        <td class="n">0 ms</td><td class="n">0/0</td><td>429 Too Many Requests</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Who has access <small>role assignments at or above the account</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Role</th><th>Principal</th><th>Type</th><th>Assigned at</th><th>Since</th></tr>
+      <tr><td>Foundry Owner</td><td>uami-foundry-deploy</td><td>ServicePrincipal</td>
+        <td>this account</td><td>2026-06-01T09:00:00Z</td></tr>
+      <tr><td>Owner</td><td><code>p2</code></td><td>Group</td>
+        <td><span class="dim">inherited:</span> <code>/subscriptions/00000000-0000-0000-0000-000000000000</code></td><td>2025-01-01T00:00:00Z</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Agentic workflows <small>gh-aw lock files in CoolGitOrg/foundry-ops</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Workflow</th><th>State</th><th class="n">Runs</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Running</th><th class="n">Success</th><th class="n">Mean time</th><th>Last run</th></tr>
+      <tr><td>Record &lt;triage&gt;<br><code>.github/workflows/foundry-record-triage.lock.yml</code></td><td>active</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td>
+        <td class="n"></td><td class="n"></td>
+        <td><span class="dim">none in window</span></td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Workflow runs <small>latest 25 of 1 read</small></h2>
+  <div class="body">
+  
+    <table>
+      <tr><th>Run</th><th>Title</th><th>Event</th><th>By</th><th>Result</th><th class="n">Took</th><th>Started</th></tr>
+      <tr><td><a href="https://github.example/runs/42">foundry-deploy #7</a></td><td>&lt;script&gt;alert(1)&lt;/script&gt;</td><td>workflow_dispatch</td><td>crafty</td>
+        <td class="high">failure</td><td class="n">0s</td><td>2026-09-21 17:20Z</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>Local audit trail <small>chain verified; latest 1</small></h2>
+  <div class="body">
+  
+  
+    <table>
+      <tr><th class="n">Seq</th><th>When</th><th>Who</th><th>What</th><th>Subject</th><th>Request</th><th>Hash</th></tr>
+      <tr><td class="n">1</td><td>2026-09-21 17:20Z</td><td>crafty</td><td class="m">dispatch.request</td><td>gpt-4o</td><td class="m">ftui-1</td><td class="m">14673b1dafd2</td></tr>
+      
+    </table>
+  
+  </div>
+</section>
+
+<section>
+  <h2>What this record could and could not see</h2>
+  <div class="body">
+    <table>
+      <tr><th>Capability</th><th>Azure action</th><th>Plane</th><th>Foundry Owner</th></tr>
+      <tr><td>Foundry account settings</td><td class="m">Microsoft.CognitiveServices/accounts/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Model deployments and authorship</td><td class="m">Microsoft.CognitiveServices/accounts/deployments/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Deployable model catalog and retirement dates</td><td class="m">Microsoft.CognitiveServices/accounts/models/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Regional quota</td><td class="m">Microsoft.CognitiveServices/locations/usages/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Role assignments on the account</td><td class="m">Microsoft.Authorization/roleAssignments/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Resource Health</td><td class="m">Microsoft.ResourceHealth/availabilityStatuses/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Fired Azure Monitor alerts</td><td class="m">Microsoft.AlertsManagement/alerts/read</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Azure Monitor metrics (requests, tokens)</td><td class="m">Microsoft.Insights/metrics/read</td><td>control</td>
+        <td class="warn">not allowed</td></tr>
+      <tr><td>Azure activity log</td><td class="m">Microsoft.Insights/eventtypes/values/read</td><td>control</td>
+        <td class="warn">not allowed</td></tr>
+      <tr><td>Model probes (chat completions)</td><td class="m">Microsoft.CognitiveServices/accounts/OpenAI/deployments/chat/completions/action</td><td>data</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Create or scale a deployment (workflow identity)</td><td class="m">Microsoft.CognitiveServices/accounts/deployments/write</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      <tr><td>Delete a deployment (workflow identity)</td><td class="m">Microsoft.CognitiveServices/accounts/deployments/delete</td><td>control</td>
+        <td class="ok">allowed</td></tr>
+      
+    </table>
+    
+    <p>Sections left out of this record, and why:</p>
+    <dl><dt>activity</dt><dd>not collected: Microsoft.Insights/eventtypes/values/read is outside Foundry Owner. Not in Foundry Owner and not collected. Deployment systemData and the workflow run history cover authorship.</dd><dt>metrics</dt><dd>not collected: Microsoft.Insights/metrics/read is outside Foundry Owner. Not in Foundry Owner. Add Monitoring Reader on the account, or rely on alerts and probes.</dd></dl>
+    
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+# Write a dated Foundry record (HTML + JSON + sha256) and commit it.
+#
+# Runs daily, after every live deploy, and on request from foundry-tui.
+# Everything it reads is within the Foundry Owner role; the report says
+# what it could not see and why.
+name: foundry-report
+run-name: "foundry-report [${{ inputs.request_id || github.event_name }}]"
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Correlation id set by the caller
+        type: string
+      reason:
+        description: Why this report was requested
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+  actions: read # workflow run history for the report
+
+concurrency:
+  group: foundry-records # one writer at a time for records/state
+  cancel-in-progress: false
+
+env:
+  FOUNDRY_ACCOUNT: ${{ vars.FOUNDRY_ACCOUNT }}
+  FOUNDRY_RESOURCE_GROUP: ${{ vars.FOUNDRY_RESOURCE_GROUP }}
+  FOUNDRY_LOCATION: ${{ vars.FOUNDRY_LOCATION }}
+  FOUNDRY_REPO: ${{ github.repository }}
+  FOUNDRY_STATE_DIR: records/state # CI's audit chain lives in git
+  IN_REQUEST_ID: ${{ inputs.request_id }}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: App token (optional)
+        id: app
+        if: ${{ vars.AUTOADMIN_APP_ID != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.AUTOADMIN_APP_ID }}
+          private-key: ${{ secrets.AUTOADMIN_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          go build -trimpath -ldflags "-X main.version=${GITHUB_SHA::12}" -o bin/foundry-tui ./cmd/foundry-tui
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Write the record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ./bin/foundry-tui report -out reports > files.txt 2> findings.txt
+          ./bin/foundry-tui audit -verify
+          {
+            echo "### Foundry record"
+            echo
+            echo '```'
+            cat files.txt
+            echo
+            cat findings.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports records/state
+          git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          git commit -s -m "foundry: record $(date -u +%Y-%m-%dT%H:%MZ) [${IN_REQUEST_ID:-$GITHUB_EVENT_NAME}]"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "push rejected (attempt $attempt); rebasing"
+            git pull --rebase
+          done
+          echo "::error::could not push the record"; exit 1
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: foundry-record-${{ github.run_id }}
+          path: reports/foundry-*
+          retention-days: 90
