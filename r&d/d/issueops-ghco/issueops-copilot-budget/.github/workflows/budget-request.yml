@@ -1,0 +1,52 @@
+name: budget-request
+
+# A new request: validate the requester and the amount, then summon the approvers.
+on:
+  issues:
+    types: [opened]        # not "reopened": a decided request stays decided; open a new one
+
+permissions:
+  contents: read           # checkout only. All other access is through the app's tokens.
+
+concurrency:
+  group: budget-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: contains(github.event.issue.labels.*.name, 'copilot-budget-request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Org token (issues, team membership)
+        id: org
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          owner: CoolGitOrg
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Enterprise token (billing)
+        id: ent
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          enterprise: CoolGitEnterprise
+
+      # User-controlled text reaches the shell only as environment variables, never as ${{ }} in run:.
+      - name: Validate
+        env:
+          ORG_TOKEN: ${{ steps.org.outputs.token }}
+          ENT_TOKEN: ${{ steps.ent.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          BODY: ${{ github.event.issue.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/request.sh

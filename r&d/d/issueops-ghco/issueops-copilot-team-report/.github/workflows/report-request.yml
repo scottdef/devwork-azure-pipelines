@@ -1,0 +1,44 @@
+name: report-request
+
+# The front door. Plain Actions, no agent: check the requester, then start the agentic workflow.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read           # checkout only; everything else goes through the app token
+
+concurrency:
+  group: report-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  admit:
+    if: contains(github.event.issue.labels.*.name, 'copilot-team-report')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: App token (issues, members, actions)
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          owner: CoolGitOrg
+          repositories: ${{ github.event.repository.name }}
+
+      # Issue text reaches the shell as environment variables only, never as ${{ }} inside run:.
+      - name: Admit or refuse
+        env:
+          ORG_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.event.repository.default_branch }}
+          ISSUE: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          BODY: ${{ github.event.issue.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/request.sh

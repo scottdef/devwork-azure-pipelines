@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fake gh. GET /a/b/c?x=1 is served from $FIX/a_b_c.json (page>1 -> []); a missing file is a 404.
+# Writes are appended to $GH_LOG as "METHOD PATH BODY".
+set -euo pipefail
+[ "$1" = api ] || exit 0
+shift
+method=GET path="" jqf="" input=""
+while [ $# -gt 0 ]; do
+	case $1 in
+	-H) shift ;;
+	-X | --method) method=$2; shift ;;
+	--input) input=$2; shift ;;
+	--jq) jqf=$2; shift ;;
+	--paginate) ;;
+	*) path=$1 ;;
+	esac
+	shift
+done
+out() { if [ -n "$jqf" ]; then jq -r "$jqf"; else cat; fi; }
+if [ "$method" != GET ]; then
+	body=""; [ "$input" = - ] && body=$(cat)
+	printf '%s %s %s\n' "$method" "$path" "$body" >>"$GH_LOG"
+	echo '{}' | out; exit 0
+fi
+case $path in *[?\&]page=[2-9]*) echo '[]' | out; exit 0 ;; esac
+f=${path%%\?*}; f=${f#/}; f="$FIX/${f//\//_}.json"
+[ -f "$f" ] || { echo "gh: Not Found (HTTP 404) $path" >&2; exit 1; }
+out <"$f"

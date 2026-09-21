@@ -1,0 +1,7 @@
+external-sources=true
+source-path=SCRIPTDIR
+source-path=SCRIPTDIR/../config
+# die/refuse never return, so "A && B || die" is exactly if-then-else here.
+disable=SC2015
+# printf format strings with backticks are meant literally.
+disable=SC2016

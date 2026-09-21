@@ -1,0 +1,56 @@
+name: budget-decide
+
+# "/approve" or "/deny <reason>" on a pending request.
+# issue_comment workflows always run from the default branch, so this is the code on main.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: budget-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false   # a second /approve queues, then finds the label gone and stops
+
+jobs:
+  decide:
+    if: >-
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'budget:pending') &&
+      (startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/deny'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: copilot-budget   # deployment history; restrict to main; add reviewers for a second lock
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Org token (issues, team membership)
+        id: org
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          owner: CoolGitOrg
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Enterprise token (billing)
+        id: ent
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          enterprise: CoolGitEnterprise
+
+      - name: Decide
+        env:
+          ORG_TOKEN: ${{ steps.org.outputs.token }}
+          ENT_TOKEN: ${{ steps.ent.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          COMMENT: ${{ github.event.comment.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/decide.sh

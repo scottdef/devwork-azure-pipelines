@@ -1,0 +1,62 @@
+{
+  "spec": {
+    "environment": "uat",
+    "resource": "fdy-myass-uat-eus2",
+    "host_kind": "openai",
+    "model": "claude-opus-4-5",
+    "deployment": "claude-opus-4-5",
+    "surface": "auto",
+    "wire_api": "auto",
+    "auth": "api-key",
+    "api_key_secret": "FOUNDRY_UAT_API_KEY",
+    "entra_authority_host": "login.microsoftonline.com",
+    "legacy_api_version": "2024-10-21",
+    "inference_api_version": "2024-05-01-preview",
+    "enterprise_url_style": "v1",
+    "runs_on": "self-hosted, linux, x64"
+  },
+  "host": "fdy-myass-uat-eus2.services.ai.azure.com",
+  "model_id": "claude-opus-4-5",
+  "surface": "anthropic",
+  "urls": {
+    "origin": "https://fdy-myass-uat-eus2.services.ai.azure.com",
+    "anthropic_base": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic",
+    "anthropic_messages": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic/v1/messages"
+  },
+  "gh_aw": {
+    "engine_model": "claude-opus-4-5",
+    "provider_base_url": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic",
+    "provider_type": "anthropic",
+    "api_key_expr": "${{ secrets.FOUNDRY_UAT_API_KEY }}",
+    "network_allowed": [
+      "defaults",
+      "fdy-myass-uat-eus2.services.ai.azure.com"
+    ],
+    "workflow_slug": "smoke-foundry-uat-fdy-myass-uat-eus2-claude-opus-4-5"
+  },
+  "copilot_client": {
+    "cli_base_url": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic",
+    "cli_model": "claude-opus-4-5",
+    "sdk_base_url": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic",
+    "sdk_type": "anthropic",
+    "sdk_model": "claude-opus-4-5"
+  },
+  "copilot_enterprise": {
+    "provider": "Microsoft Foundry",
+    "key_name": "foundry-uat-fdy-myass-uat-eus2-anthropic",
+    "deployment_url": "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic/v1/messages",
+    "model_id": "claude-opus-4-5",
+    "deployment_url_alternates": [
+      "https://fdy-myass-uat-eus2.services.ai.azure.com/anthropic",
+      "https://fdy-myass-uat-eus2.services.ai.azure.com"
+    ],
+    "host_accepted": true,
+    "supported": true
+  },
+  "warnings": [
+    {
+      "scope": "gh-aw",
+      "message": "anthropic surface: the Foundry URL is confirmed, but gh-aw only documents Azure BYOK for the OpenAI-compatible endpoint. COPILOT_PROVIDER_TYPE=anthropic against Foundry is untested by this tool; run the generated smoke workflow before relying on it"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+name: Copilot budget increase
+description: Ask for a higher monthly Copilot AI-credit budget. Needs approval.
+title: "Copilot budget increase"
+labels: ["copilot-budget-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The request is for **you**, the person opening this issue. You must belong to an allowed team.
+        A member of `@CoolGitOrg/issueops-bureaucraticops` approves or denies it; nothing changes until then.
+        The resulting budget cannot exceed 300. Budgets are per month; usage resets each billing cycle.
+  - type: dropdown
+    id: increase
+    attributes:
+      label: Requested increase
+      description: Added to your current monthly budget. 1 = US$1 = 100 AI credits.
+      options:
+        - "+50"
+        - "+100"
+        - "+150"
+        - "+200"
+        - "+250"
+        - "+300"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Justification
+      description: What you are doing and why the current budget is not enough. The approvers read this.
+    validations:
+      required: true

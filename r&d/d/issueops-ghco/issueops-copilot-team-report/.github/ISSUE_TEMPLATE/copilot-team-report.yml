@@ -1,0 +1,33 @@
+name: Copilot team report
+description: Usage, acceptance, agent activity and cost for one team's members, as an offline HTML report.
+title: "Copilot team report"
+labels: ["copilot-team-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You must be a **maintainer of the team** you name. The report lists each member's Copilot usage and cost;
+        it arrives on this issue as a download and expires after 14 days. Teams under 5 members are refused.
+  - type: input
+    id: team
+    attributes:
+      label: Team
+      description: The team slug, as in github.com/orgs/CoolGitOrg/teams/<slug>.
+      placeholder: payments-platform
+    validations:
+      required: true
+  - type: dropdown
+    id: period
+    attributes:
+      label: Period
+      options:
+        - "28 days"
+        - "14 days"
+        - "7 days"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Anything the reader should know
+      description: Optional. Kept on the issue for the record; the agent never sees it.

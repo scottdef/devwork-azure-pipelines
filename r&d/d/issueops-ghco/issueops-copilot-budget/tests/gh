@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Fake gh. Reads come from $FIX; writes are logged to $GH_LOG as "METHOD PATH BODY".
+set -euo pipefail
+[ "$1" = api ] || exit 0
+shift
+method=GET path="" jqf="" input=""
+while [ $# -gt 0 ]; do
+	case $1 in
+	-H) shift ;;
+	-X | --method) method=$2; shift ;;
+	--input) input=$2; shift ;;
+	--jq) jqf=$2; shift ;;
+	--paginate) ;;
+	*) path=$1 ;;
+	esac
+	shift
+done
+out() { if [ -n "$jqf" ]; then jq -r "$jqf"; else cat; fi; }
+fix() { if [ -f "$FIX/$1" ]; then cat "$FIX/$1"; else printf '%s' "$2"; fi; }
+
+if [ "$method" != GET ]; then
+	body=""; [ "$input" = - ] && body=$(cat)
+	printf '%s %s %s\n' "$method" "$path" "$body" >>"$GH_LOG"
+	case $path in
+	*/billing/budgets*) amt=$(jq -r '.budget_amount' <<<"$body"); echo "$amt" >"$FIX/.written"
+		printf '{"message":"ok","budget":{"id":"bud-new","budget_amount":%s}}' "$amt" | out ;;
+	*) echo '{}' | out ;;
+	esac
+	exit 0
+fi
+empty='{"budgets":[],"has_next_page":false}'
+case $path in
+*/teams/*/memberships/*) t=${path#*/teams/}; t=${t%%/*}; u=${path##*/}
+	[ -f "$FIX/member.$t.$u" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+	echo '{"state":"active"}' | out ;;
+*/user-states*) fix states.json '{"user_states":[]}' | out ;;
+*scope=user*) fix budgets.user.json "$empty" | out ;;
+*scope=multi_user_cost_center*) fix budgets.cc.json "$empty" | out ;;
+*scope=multi_user_customer*) fix budgets.universal.json "$empty" | out ;;
+*/billing/budgets/*) printf '{"budget_amount":%s}' "$(cat "$FIX/.written")" | out ;;
+*/issues/*/comments*) fix comments.json '[]' | out ;;
+*/issues\?*) fix open.json '[]' | out ;;
+*/issues/*) fix issue.json '{}' | out ;;
+*) echo "fake gh: unhandled GET $path" >&2; exit 1 ;;
+esac
