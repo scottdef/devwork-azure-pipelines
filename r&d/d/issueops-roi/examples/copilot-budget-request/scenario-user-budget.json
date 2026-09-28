@@ -1,0 +1,40 @@
+{
+  "name": "Temporary user budget for a contractor (invalid → fixed, stale approval, beneficiary confirms)",
+  "description": "A user-scope budget with an expiry date. The first version is invalid (user budgets cannot have alert recipients). After the fix the requestor submits, a Copilot admin approves, then the requestor edits the amount: the approval is voided by the content digest and the request must be resubmitted and re-approved. The named user confirms as the budget beneficiary.",
+  "type": "copilot-budget-request",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 102, "title": "[IssueOps] Copilot AI budget: contractor sam-contract", "requestor": "dana-dev" },
+  "values": {
+    "budget_scope": ["user"],
+    "budget_target": "@sam-contract",
+    "budget_product": ["AI credits"],
+    "budget_amount": "300",
+    "budget_enforcement": ["Stop usage when the budget is reached"],
+    "budget_alert_recipients": "dana-dev",
+    "budget_expires_on": "2026-12-31",
+    "budget_cost_center": "CC-4410-PAYMENTS",
+    "budget_justification": "Contractor migrating the settlement batch jobs to Java 21 through December; needs agent mode beyond the default per-user allowance.",
+    "budget_acknowledgements": { "selected": [
+      "I understand spend up to this amount is billed to CoolEngEnt and charged back to the cost center above",
+      "My manager is aware of this request" ] }
+  },
+  "directory": {
+    "teams": { "copilot-admins": ["alex-admin", "cara-copilot"], "finops-approvers": ["fran-finops"] },
+    "members": ["sam-contract", "dana-dev"]
+  },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "invalid", "contains": ["Alert recipients are not supported"] } },
+    { "do": "comment", "user": "dana-dev", "body": ".submit", "after": "2m", "expect": { "action": "rejected", "rejected": true } },
+    { "do": "edit", "values": { "budget_alert_recipients": "" }, "after": "5m", "note": "The requestor removes the alert recipients; the summary comment is updated in place.",
+      "expect": { "action": "summary", "phase": "validated", "escalated": true } },
+    { "do": "comment", "user": "dana-dev", "body": ".submit", "after": "1m", "expect": { "action": "submitted" } },
+    { "do": "comment", "user": "cara-copilot", "body": ".approve", "after": "20m", "expect": { "action": "approval-recorded" } },
+    { "do": "edit", "values": { "budget_amount": "450" }, "after": "15m", "note": "Editing the body after submission changes the digest: recorded approvals no longer apply.",
+      "expect": { "phase": "validated" } },
+    { "do": "comment", "user": "sam-contract", "body": ".approve", "after": "3m", "expect": { "action": "rejected", "contains": ["changed after it was submitted"] } },
+    { "do": "comment", "user": "dana-dev", "body": ".submit", "after": "2m", "expect": { "action": "submitted" } },
+    { "do": "comment", "user": "sam-contract", "body": ".approve Confirmed, thanks.", "after": "30m", "expect": { "action": "approval-recorded" } },
+    { "do": "comment", "user": "cara-copilot", "body": ".approve", "after": "10m", "expect": { "action": "approved", "execute": true, "environment": "copilot-budgets" } },
+    { "do": "execute", "after": "1m", "expect": { "action": "completed", "close": "completed" } }
+  ]
+}

@@ -1,0 +1,13 @@
+## 🚀 Approved: execution starting
+
+{{- if .Approval }}
+
+{{ template "approval-progress" . }}
+{{- else }}
+
+No approval was required by policy; {{ mention .Actor }} submitted the request.
+{{- end }}
+
+Execution starts in the GitHub environment {{ code .Plan.Environment }}{{ if .RunURL }} ([workflow run]({{ .RunURL }})){{ end }}. If that environment has required reviewers, they approve the deployment in the Actions UI before anything changes.
+
+{{ template "footer" . }}

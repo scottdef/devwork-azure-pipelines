@@ -1,0 +1,34 @@
+# HELP issueops_copilot_active_users Distinct active Copilot users in the window.
+# TYPE issueops_copilot_active_users gauge
+issueops_copilot_active_users{org="CoolEngOrg",scope="teams",window="28d"} 10
+# HELP issueops_copilot_engaged_users Distinct engaged Copilot users in the window.
+# TYPE issueops_copilot_engaged_users gauge
+issueops_copilot_engaged_users{org="CoolEngOrg",scope="teams",window="28d"} 8
+# HELP issueops_copilot_ai_cost_usd AI-credit cost in USD for the window.
+# TYPE issueops_copilot_ai_cost_usd gauge
+issueops_copilot_ai_cost_usd{org="CoolEngOrg",scope="teams",window="28d"} 892.63
+# HELP issueops_copilot_total_cost_usd AI-credit plus prorated seat cost in USD for the window.
+# TYPE issueops_copilot_total_cost_usd gauge
+issueops_copilot_total_cost_usd{org="CoolEngOrg",scope="teams",window="28d"} 1293.03
+# HELP issueops_copilot_merged_prs Merged pull requests in scope for the window.
+# TYPE issueops_copilot_merged_prs gauge
+issueops_copilot_merged_prs{org="CoolEngOrg",scope="teams",window="28d"} 44
+# HELP issueops_copilot_cost_per_merged_pr_usd Total cost per merged pull request.
+# TYPE issueops_copilot_cost_per_merged_pr_usd gauge
+issueops_copilot_cost_per_merged_pr_usd{org="CoolEngOrg",scope="teams",window="28d"} 29.39
+# HELP issueops_copilot_team_total_cost_usd Team total cost in USD for the window.
+# TYPE issueops_copilot_team_total_cost_usd gauge
+issueops_copilot_team_total_cost_usd{org="CoolEngOrg",scope="teams",window="28d",team="platform-eng"} 809.49
+issueops_copilot_team_total_cost_usd{org="CoolEngOrg",scope="teams",window="28d",team="payments"} 483.54
+# HELP issueops_copilot_team_engaged_users Team engaged users for the window.
+# TYPE issueops_copilot_team_engaged_users gauge
+issueops_copilot_team_engaged_users{org="CoolEngOrg",scope="teams",window="28d",team="platform-eng"} 4
+issueops_copilot_team_engaged_users{org="CoolEngOrg",scope="teams",window="28d",team="payments"} 4
+# HELP issueops_copilot_team_merged_prs Team merged pull requests for the window.
+# TYPE issueops_copilot_team_merged_prs gauge
+issueops_copilot_team_merged_prs{org="CoolEngOrg",scope="teams",window="28d",team="platform-eng"} 22
+issueops_copilot_team_merged_prs{org="CoolEngOrg",scope="teams",window="28d",team="payments"} 22
+# HELP issueops_copilot_team_cost_per_merged_pr_usd Team cost per merged pull request.
+# TYPE issueops_copilot_team_cost_per_merged_pr_usd gauge
+issueops_copilot_team_cost_per_merged_pr_usd{org="CoolEngOrg",scope="teams",window="28d",team="platform-eng"} 36.8
+issueops_copilot_team_cost_per_merged_pr_usd{org="CoolEngOrg",scope="teams",window="28d",team="payments"} 21.98

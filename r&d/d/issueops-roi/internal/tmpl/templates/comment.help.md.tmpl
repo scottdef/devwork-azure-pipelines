@@ -1,0 +1,17 @@
+## 🧭 IssueOps commands
+
+| Command | Who | What it does |
+| ------- | --- | ------------ |
+| `.submit` | requestor | Confirms the validated request and starts approval (or execution when no approval is required). |
+{{- if .QA }}
+| `.answers` + `A1: …` lines | requestor | Answers clarifying questions. |
+{{- end }}
+| `.approve [note]` | eligible approvers | Approves the current submission. |
+| `.deny <reason>` | eligible approvers | Denies and closes the request. |
+| `.retry` | eligible approvers | Re-runs a failed execution of the same approved content. |
+| `.cancel [reason]` | requestor or repository maintainers | Cancels the request. |
+| `.status` | anyone | Shows validation, questions and approval progress. |
+
+Commands must be the first word of the comment. Editing the issue body re-runs validation and voids approvals.
+
+{{ template "footer" . }}

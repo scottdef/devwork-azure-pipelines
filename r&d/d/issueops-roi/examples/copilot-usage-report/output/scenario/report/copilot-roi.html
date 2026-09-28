@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copilot usage and ROI</title>
+<style>
+.viz-root{color-scheme:light;--page:#f9f9f7;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10)}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])) .viz-root{color-scheme:dark;--page:#0d0d0d;--surface-1:#1a1a19;--text-primary:#ffffff;--text-secondary:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10)}}
+:root[data-theme="dark"] .viz-root{color-scheme:dark;--page:#0d0d0d;--surface-1:#1a1a19;--text-primary:#ffffff;--text-secondary:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page,#f9f9f7)}
+.viz-root{background:var(--page);color:var(--text-primary);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh;padding:24px 16px 48px}
+main{max-width:1120px;margin:0 auto}
+h1{font-size:28px;margin:0 0 4px}
+h2{font-size:18px;margin:32px 0 8px}
+.sub{color:var(--text-secondary);margin:0 0 4px}
+.purpose{color:var(--text-secondary);margin:0 0 20px;font-style:italic}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.kpi .l{color:var(--text-secondary);font-size:13px}
+.kpi .v{font-size:28px;font-weight:600;margin:2px 0}
+.kpi .s{color:var(--muted);font-size:12px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px;margin:16px 0}
+.card h3{margin:0;font-size:16px}
+.card p{margin:2px 0 8px;color:var(--text-secondary);font-size:13px}
+.container{width:100%}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--text-secondary);font-size:13px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--text-secondary);font-weight:600}
+ul{padding-left:20px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;font-size:13px}
+dt{color:var(--text-secondary)}
+dd{margin:0}
+</style>
+<script src="https://go-echarts.github.io/go-echarts-assets/assets/echarts.min.js"></script>
+</head>
+<body>
+<div class="viz-root">
+<main>
+<h1>Copilot usage and ROI</h1>
+<p class="sub">CoolEngOrg · platform-eng, payments · 2026-08-23 to 2026-09-19 (28 days with data)</p>
+<p class="purpose">Purpose: Quarterly business review: compare AI-credit spend against merged pull requests and review throughput for platform-eng and payments, and identify seats that are not being used before the October true-up.</p>
+<section class="kpis" aria-label="Headline metrics">
+<div class="kpi"><div class="l">Total cost</div><div class="v">$1,293.03</div><div class="s">$892.63 AI &#43; $400.40 seats</div></div>
+<div class="kpi"><div class="l">Cost per merged PR</div><div class="v">$29.39</div><div class="s">AI only: $20.29</div></div>
+<div class="kpi"><div class="l">Merged pull requests</div><div class="v">44</div><div class="s">Copilot-authored: n/a</div></div>
+<div class="kpi"><div class="l">Active users</div><div class="v">10</div><div class="s">8 engaged (80%)</div></div>
+<div class="kpi"><div class="l">Code acceptance rate</div><div class="v">40%</div><div class="s">18605 AI-assisted lines added</div></div>
+<div class="kpi"><div class="l">Median time to merge</div><div class="v">35.0 h</div><div class="s">p90: 56.4 h</div></div>
+</section>
+<h2>Findings</h2>
+<ul><li>8 of 10 active Copilot users (80%) were engaged: they accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day.</li><li>50% of active users used an agentic surface (agent mode, CLI, Copilot app or cloud agent) at least once.</li><li>Total cost per merged pull request: $29.39 (AI credits alone: $20.29).</li><li>Lowest cost per merged PR: payments ($21.98); highest: platform-eng ($36.80).</li><li>AI-credit spend in the second half of the period changed &#43;26% versus the first half.</li></ul>
+
+<section class="card" aria-labelledby="h-adoption">
+<h3 id="h-adoption">Daily active and engaged users</h3>
+<p>Users per day. Engaged users accepted code or used an agentic surface that day.</p>
+<div class="container">
+    <div class="item" id="adoption" style="width:100%;height:340px;"></div>
+</div>
+
+    
+
+<details><summary>Table view</summary><div class="tw"><table>
+<thead><tr><th scope="col">Day</th><th scope="col">Active users</th><th scope="col">Engaged users</th></tr></thead>
+<tbody><tr><td>2026-08-23</td><td>1</td><td>0</td></tr><tr><td>2026-08-24</td><td>7</td><td>5</td></tr><tr><td>2026-08-25</td><td>5</td><td>5</td></tr><tr><td>2026-08-26</td><td>6</td><td>5</td></tr><tr><td>2026-08-27</td><td>6</td><td>6</td></tr><tr><td>2026-08-28</td><td>4</td><td>4</td></tr><tr><td>2026-08-29</td><td>3</td><td>2</td></tr><tr><td>2026-08-30</td><td>2</td><td>2</td></tr><tr><td>2026-08-31</td><td>5</td><td>4</td></tr><tr><td>2026-09-01</td><td>3</td><td>2</td></tr><tr><td>2026-09-02</td><td>5</td><td>4</td></tr><tr><td>2026-09-03</td><td>4</td><td>4</td></tr><tr><td>2026-09-04</td><td>6</td><td>5</td></tr><tr><td>2026-09-05</td><td>1</td><td>1</td></tr><tr><td>2026-09-06</td><td>1</td><td>1</td></tr><tr><td>2026-09-07</td><td>6</td><td>6</td></tr><tr><td>2026-09-08</td><td>7</td><td>7</td></tr><tr><td>2026-09-09</td><td>7</td><td>7</td></tr><tr><td>2026-09-10</td><td>5</td><td>5</td></tr><tr><td>2026-09-11</td><td>5</td><td>5</td></tr><tr><td>2026-09-12</td><td>0</td><td>0</td></tr><tr><td>2026-09-13</td><td>2</td><td>2</td></tr><tr><td>2026-09-14</td><td>8</td><td>7</td></tr><tr><td>2026-09-15</td><td>8</td><td>7</td></tr><tr><td>2026-09-16</td><td>9</td><td>8</td></tr><tr><td>2026-09-17</td><td>8</td><td>7</td></tr><tr><td>2026-09-18</td><td>6</td><td>6</td></tr><tr><td>2026-09-19</td><td>0</td><td>0</td></tr></tbody>
+</table></div></details>
+</section>
+<script type="text/javascript">
+    "use strict";
+    let goecharts_adoption = echarts.init(document.getElementById('adoption'), "white", { renderer: "svg" });
+    let option_adoption = {"animation":false,"color":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"],"grid":[{"left":"8","top":"40","right":"24","bottom":"8","containLabel":true}],"legend":{"show":true,"left":"0","top":"0"},"series":[{"name":"Active users","type":"line","showSymbol":false,"data":[{"value":1},{"value":7},{"value":5},{"value":6},{"value":6},{"value":4},{"value":3},{"value":2},{"value":5},{"value":3},{"value":5},{"value":4},{"value":6},{"value":1},{"value":1},{"value":6},{"value":7},{"value":7},{"value":5},{"value":5},{"value":0},{"value":2},{"value":8},{"value":8},{"value":9},{"value":8},{"value":6},{"value":0}],"animation":false},{"name":"Engaged users","type":"line","showSymbol":false,"data":[{"value":0},{"value":5},{"value":5},{"value":5},{"value":6},{"value":4},{"value":2},{"value":2},{"value":4},{"value":2},{"value":4},{"value":4},{"value":5},{"value":1},{"value":1},{"value":6},{"value":7},{"value":7},{"value":5},{"value":5},{"value":0},{"value":2},{"value":7},{"value":7},{"value":8},{"value":7},{"value":6},{"value":0}],"animation":false}],"title":{},"toolbox":{},"tooltip":{"show":true,"trigger":"axis"},"xAxis":[{"data":["2026-08-23","2026-08-24","2026-08-25","2026-08-26","2026-08-27","2026-08-28","2026-08-29","2026-08-30","2026-08-31","2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-05","2026-09-06","2026-09-07","2026-09-08","2026-09-09","2026-09-10","2026-09-11","2026-09-12","2026-09-13","2026-09-14","2026-09-15","2026-09-16","2026-09-17","2026-09-18","2026-09-19"]}],"yAxis":[{"minInterval":1}]}
+
+    goecharts_adoption.setOption(option_adoption);
+</script>
+
+
+<section class="card" aria-labelledby="h-daily_cost">
+<h3 id="h-daily_cost">Daily AI-credit cost (USD)</h3>
+<p>Metered AI credits consumed by users in scope, priced at the configured credit price.</p>
+<div class="container">
+    <div class="item" id="daily_cost" style="width:100%;height:340px;"></div>
+</div>
+
+    
+
+<details><summary>Table view</summary><div class="tw"><table>
+<thead><tr><th scope="col">Day</th><th scope="col">AI credits</th><th scope="col">AI cost</th></tr></thead>
+<tbody><tr><td>2026-08-23</td><td>35.59</td><td>$0.36</td></tr><tr><td>2026-08-24</td><td>563.06</td><td>$5.63</td></tr><tr><td>2026-08-25</td><td>3254.42</td><td>$32.54</td></tr><tr><td>2026-08-26</td><td>6198.40</td><td>$61.98</td></tr><tr><td>2026-08-27</td><td>10951.07</td><td>$109.51</td></tr><tr><td>2026-08-28</td><td>1865.17</td><td>$18.65</td></tr><tr><td>2026-08-29</td><td>1992.44</td><td>$19.92</td></tr><tr><td>2026-08-30</td><td>1609.83</td><td>$16.10</td></tr><tr><td>2026-08-31</td><td>1328.54</td><td>$13.29</td></tr><tr><td>2026-09-01</td><td>1640.30</td><td>$16.40</td></tr><tr><td>2026-09-02</td><td>4030.79</td><td>$40.31</td></tr><tr><td>2026-09-03</td><td>471.36</td><td>$4.71</td></tr><tr><td>2026-09-04</td><td>5459.67</td><td>$54.60</td></tr><tr><td>2026-09-05</td><td>32.47</td><td>$0.32</td></tr><tr><td>2026-09-06</td><td>1440.86</td><td>$14.41</td></tr><tr><td>2026-09-07</td><td>6652.81</td><td>$66.53</td></tr><tr><td>2026-09-08</td><td>11246.02</td><td>$112.46</td></tr><tr><td>2026-09-09</td><td>5121.71</td><td>$51.22</td></tr><tr><td>2026-09-10</td><td>1678.67</td><td>$16.79</td></tr><tr><td>2026-09-11</td><td>1175.33</td><td>$11.75</td></tr><tr><td>2026-09-12</td><td>0.00</td><td>$0.00</td></tr><tr><td>2026-09-13</td><td>1794.11</td><td>$17.94</td></tr><tr><td>2026-09-14</td><td>3419.14</td><td>$34.19</td></tr><tr><td>2026-09-15</td><td>7762.80</td><td>$77.63</td></tr><tr><td>2026-09-16</td><td>2822.93</td><td>$28.23</td></tr><tr><td>2026-09-17</td><td>4471.95</td><td>$44.72</td></tr><tr><td>2026-09-18</td><td>2243.85</td><td>$22.44</td></tr><tr><td>2026-09-19</td><td>0.00</td><td>$0.00</td></tr></tbody>
+</table></div></details>
+</section>
+<script type="text/javascript">
+    "use strict";
+    let goecharts_daily_cost = echarts.init(document.getElementById('daily_cost'), "white", { renderer: "svg" });
+    let option_daily_cost = {"animation":false,"color":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"],"grid":[{"left":"8","top":"40","right":"24","bottom":"8","containLabel":true}],"legend":{},"series":[{"name":"AI cost (USD)","type":"bar","data":[{"value":0.36},{"value":5.63},{"value":32.54},{"value":61.98},{"value":109.51},{"value":18.65},{"value":19.92},{"value":16.1},{"value":13.29},{"value":16.4},{"value":40.31},{"value":4.71},{"value":54.6},{"value":0.32},{"value":14.41},{"value":66.53},{"value":112.46},{"value":51.22},{"value":16.79},{"value":11.75},{"value":0},{"value":17.94},{"value":34.19},{"value":77.63},{"value":28.23},{"value":44.72},{"value":22.44},{"value":0}]}],"title":{},"toolbox":{},"tooltip":{"show":true,"trigger":"axis"},"xAxis":[{"data":["2026-08-23","2026-08-24","2026-08-25","2026-08-26","2026-08-27","2026-08-28","2026-08-29","2026-08-30","2026-08-31","2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-05","2026-09-06","2026-09-07","2026-09-08","2026-09-09","2026-09-10","2026-09-11","2026-09-12","2026-09-13","2026-09-14","2026-09-15","2026-09-16","2026-09-17","2026-09-18","2026-09-19"]}],"yAxis":[{}]}
+
+    goecharts_daily_cost.setOption(option_daily_cost);
+</script>
+
+
+<section class="card" aria-labelledby="h-team_cpp">
+<h3 id="h-team_cpp">Cost per merged pull request by team (USD)</h3>
+<p>Lower is better. Teams with no merged pull requests are omitted.</p>
+<div class="container">
+    <div class="item" id="team_cpp" style="width:100%;height:340px;"></div>
+</div>
+
+    
+
+<details><summary>Table view</summary><div class="tw"><table>
+<thead><tr><th scope="col">Team</th><th scope="col">Total cost</th><th scope="col">Merged PRs</th><th scope="col">Cost per merged PR</th></tr></thead>
+<tbody><tr><td>payments</td><td>$483.54</td><td>22</td><td>$21.98</td></tr><tr><td>platform-eng</td><td>$809.49</td><td>22</td><td>$36.80</td></tr></tbody>
+</table></div></details>
+</section>
+<script type="text/javascript">
+    "use strict";
+    let goecharts_team_cpp = echarts.init(document.getElementById('team_cpp'), "white", { renderer: "svg" });
+    let option_team_cpp = {"animation":false,"color":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"],"grid":[{"left":"28","top":"40","right":"32","bottom":"8","containLabel":true}],"legend":{},"series":[{"name":"Cost per merged PR","type":"bar","data":[{"value":21.98},{"value":36.8}]}],"title":{},"toolbox":{},"tooltip":{"show":true,"trigger":"item"},"xAxis":[{}],"yAxis":[{"data":["payments","platform-eng"]}]}
+
+    goecharts_team_cpp.setOption(option_team_cpp);
+</script>
+
+
+<section class="card" aria-labelledby="h-team_scatter">
+<h3 id="h-team_scatter">Team spend versus merged pull requests</h3>
+<p>Each point is a team: total cost (USD) across, merged pull requests up. Up and to the left means more output per dollar.</p>
+<div class="container">
+    <div class="item" id="team_scatter" style="width:100%;height:340px;"></div>
+</div>
+
+    
+
+<details><summary>Table view</summary><div class="tw"><table>
+<thead><tr><th scope="col">Team</th><th scope="col">Total cost</th><th scope="col">Merged PRs</th><th scope="col">Cost per merged PR</th></tr></thead>
+<tbody><tr><td>payments</td><td>$483.54</td><td>22</td><td>$21.98</td></tr><tr><td>platform-eng</td><td>$809.49</td><td>22</td><td>$36.80</td></tr></tbody>
+</table></div></details>
+</section>
+<script type="text/javascript">
+    "use strict";
+    let goecharts_team_scatter = echarts.init(document.getElementById('team_scatter'), "white", { renderer: "svg" });
+    let option_team_scatter = {"animation":false,"color":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"],"grid":[{"left":"40","top":"40","right":"96","bottom":"36","containLabel":true}],"legend":{},"series":[{"name":"Teams","type":"scatter","data":[{"name":"payments","value":[483.54,22],"symbolSize":12},{"name":"platform-eng","value":[809.49,22],"symbolSize":12}],"label":{"show":true,"position":"right","formatter":"{b}"}}],"title":{},"toolbox":{},"tooltip":{"show":true,"trigger":"item"},"xAxis":[{"type":"value","name":"Total cost (USD)","nameLocation":"middle","nameGap":30}],"yAxis":[{"name":"Merged PRs","nameLocation":"middle","nameGap":40,"type":"value","minInterval":1}]}
+
+    goecharts_team_scatter.setOption(option_team_scatter);
+</script>
+
+
+<section class="card" aria-labelledby="h-weekly_prs">
+<h3 id="h-weekly_prs">Merged pull requests per week</h3>
+<p>Weeks start on Monday; partial weeks at the edges of the period are included.</p>
+<div class="container">
+    <div class="item" id="weekly_prs" style="width:100%;height:340px;"></div>
+</div>
+
+    
+
+<details><summary>Table view</summary><div class="tw"><table>
+<thead><tr><th scope="col">Week starting</th><th scope="col">Merged PRs</th><th scope="col">AI cost</th></tr></thead>
+<tbody><tr><td>2026-08-17</td><td>0</td><td>$0.36</td></tr><tr><td>2026-08-24</td><td>12</td><td>$264.33</td></tr><tr><td>2026-08-31</td><td>8</td><td>$144.04</td></tr><tr><td>2026-09-07</td><td>13</td><td>$276.69</td></tr><tr><td>2026-09-14</td><td>11</td><td>$207.21</td></tr></tbody>
+</table></div></details>
+</section>
+<script type="text/javascript">
+    "use strict";
+    let goecharts_weekly_prs = echarts.init(document.getElementById('weekly_prs'), "white", { renderer: "svg" });
+    let option_weekly_prs = {"animation":false,"color":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"],"grid":[{"left":"8","top":"40","right":"24","bottom":"8","containLabel":true}],"legend":{},"series":[{"name":"Merged PRs","type":"line","data":[{"value":0},{"value":12},{"value":8},{"value":13},{"value":11}],"animation":false}],"title":{},"toolbox":{},"tooltip":{"show":true,"trigger":"axis"},"xAxis":[{"data":["2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14"]}],"yAxis":[{"minInterval":1}]}
+
+    goecharts_weekly_prs.setOption(option_weekly_prs);
+</script>
+
+
+
+<h2>Teams</h2>
+<div class="card tw"><table>
+<thead><tr><th scope="col">Team</th><th scope="col">Seats</th><th scope="col">Active</th><th scope="col">Engaged</th><th scope="col">AI cost</th><th scope="col">Seat cost</th><th scope="col">Total cost</th><th scope="col">Acceptance</th><th scope="col">Merged PRs</th><th scope="col">Median cycle</th><th scope="col">Reviews</th><th scope="col">Cost / PR</th></tr></thead>
+<tbody><tr><td>platform-eng</td><td>6</td><td>5</td><td>4</td><td>$591.09</td><td>$218.40</td><td>$809.49</td><td>41%</td><td>22</td><td>33.0 h</td><td>15</td><td>$36.80</td></tr><tr><td>payments</td><td>5</td><td>5</td><td>4</td><td>$301.54</td><td>$182.00</td><td>$483.54</td><td>39%</td><td>22</td><td>37.0 h</td><td>25</td><td>$21.98</td></tr></tbody>
+</table></div>
+
+<h2>Users (approved per-user detail)</h2>
+<div class="card tw"><table>
+<thead><tr><th scope="col">Login</th><th scope="col">Teams</th><th scope="col">Active days</th><th scope="col">Engaged days</th><th scope="col">Agentic days</th><th scope="col">AI cost</th><th scope="col">AI lines added</th><th scope="col">Acceptance</th><th scope="col">Merged PRs</th><th scope="col">Adoption phase</th></tr></thead>
+<tbody><tr><td>dev-k8s</td><td>platform-eng</td><td>20</td><td>20</td><td>14</td><td>$271.05</td><td>4317</td><td>41%</td><td>6</td><td>agentic</td></tr><tr><td>ada-platform</td><td>platform-eng</td><td>18</td><td>18</td><td>9</td><td>$186.17</td><td>3765</td><td>43%</td><td>4</td><td>agentic</td></tr><tr><td>ivy-ledger</td><td>payments</td><td>16</td><td>16</td><td>10</td><td>$171.71</td><td>2502</td><td>35%</td><td>7</td><td>integrating</td></tr><tr><td>ben-sre</td><td>platform-eng</td><td>16</td><td>16</td><td>11</td><td>$120.75</td><td>2930</td><td>39%</td><td>7</td><td>integrating</td></tr><tr><td>gia-pay</td><td>payments</td><td>16</td><td>16</td><td>10</td><td>$114.56</td><td>3573</td><td>43%</td><td>7</td><td>agentic</td></tr><tr><td>chen-infra</td><td>platform-eng</td><td>12</td><td>12</td><td>0</td><td>$10.98</td><td>459</td><td>35%</td><td>5</td><td>integrating</td></tr><tr><td>hal-api</td><td>payments</td><td>12</td><td>12</td><td>0</td><td>$8.74</td><td>780</td><td>36%</td><td>6</td><td>integrating</td></tr><tr><td>kai-fraud</td><td>payments</td><td>7</td><td>7</td><td>0</td><td>$5.37</td><td>279</td><td>34%</td><td>1</td><td>exploring</td></tr><tr><td>fay-net</td><td>platform-eng</td><td>8</td><td>0</td><td>0</td><td>$2.14</td><td>0</td><td>n/a</td><td>0</td><td>exploring</td></tr><tr><td>jon-risk</td><td>payments</td><td>5</td><td>0</td><td>0</td><td>$1.17</td><td>0</td><td>n/a</td><td>1</td><td>exploring</td></tr></tbody>
+</table></div>
+
+<h2>Definitions</h2>
+<dl><dt>AI cost</dt><dd>ai_credits_used x $0.0100 per credit (config pricing.ai_credit_usd)</dd><dt>active user</dt><dd>a Copilot-seated user with any interaction, generation, acceptance or agent use on a day</dd><dt>cost per merged PR</dt><dd>total cost in scope / merged pull requests in scope</dd><dt>cycle time</dt><dd>pull request created -&gt; merged, in hours</dd><dt>engaged user</dt><dd>accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day</dd><dt>seat cost</dt><dd>seats x $39.00 per month x days/30 (Copilot Enterprise)</dd></dl>
+<h2>Notes and caveats</h2>
+<ul><li>Teams with fewer than five Copilot-seated users are omitted from GitHub&#39;s user-teams report; users on several teams count toward each of their teams, so team rows do not sum to the scope total.</li><li>AI-assisted lines of code (loc_added_sum) are directional: they measure Copilot-suggested lines accepted or applied, not total output.</li></ul>
+</main>
+</div>
+<script>
+(function(){
+  "use strict";
+  const PALETTE = {"dark":["#3987e5","#d95926","#199e70","#c98500","#d55181","#008300","#9085e9","#e66767"],"light":["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948"]};
+  const META = {"adoption":"line","daily_cost":"bar","team_cpp":"hbar","team_scatter":"scatter","weekly_prs":"line"};
+  const css = (n) => getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(n).trim();
+  const isDark = () => {
+    const t = document.documentElement.getAttribute('data-theme');
+    if (t) return t === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+  function style(id, kind) {
+    const inst = echarts.getInstanceByDom(document.getElementById(id));
+    if (!inst) return;
+    const ink = css('--text-secondary'), muted = css('--muted'), grid = css('--grid'), axis = css('--axis'), surf = css('--surface-1');
+    const ax = {axisLine:{lineStyle:{color:axis}}, axisTick:{show:false}, axisLabel:{color:muted}, splitLine:{lineStyle:{color:grid, type:'solid', width:1}}, nameTextStyle:{color:muted}};
+    const opt = {
+      color: isDark() ? PALETTE.dark : PALETTE.light,
+      backgroundColor: 'transparent',
+      textStyle: {fontFamily: 'system-ui,-apple-system,"Segoe UI",sans-serif', color: ink},
+      legend: {textStyle:{color: ink}},
+      tooltip: {backgroundColor: surf, borderColor: grid, textStyle:{color: css('--text-primary')}},
+      xAxis: [ax], yAxis: [ax]
+    };
+    const n = (inst.getOption().series || []).length;
+    opt.legend.show = n > 1; 
+    const series = [];
+    for (let i = 0; i < n; i++) {
+      if (kind === 'line') series.push({lineStyle:{width:2}, symbolSize:8, endLabel:{show: n > 1 && n <= 4, formatter:'{a}', color: ink}, emphasis:{focus:'series'}});
+      else if (kind === 'bar') series.push({barMaxWidth:18, itemStyle:{borderRadius:[4,4,0,0]}});
+      else if (kind === 'hbar') series.push({barMaxWidth:18, itemStyle:{borderRadius:[0,4,4,0]}});
+      else if (kind === 'stack') series.push({barMaxWidth:18, itemStyle:{borderColor: surf, borderWidth:2, borderRadius: i === n-1 ? [0,4,4,0] : 0}});
+      else if (kind === 'scatter') series.push({symbolSize:10, itemStyle:{borderColor: surf, borderWidth:2}, label:{color: ink}});
+    }
+    
+    if (kind === 'line' && n > 1 && n <= 4) {
+      const src = inst.getOption().series;
+      const last = src.map(s => { const d = s.data || []; const v = d.length ? d[d.length-1] : 0; return Number(v && v.value !== undefined ? v.value : v) || 0; });
+      const max = Math.max(1, ...src.flatMap(s => (s.data || []).map(v => Number(v && v.value !== undefined ? v.value : v) || 0)));
+      const order = last.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+      for (let k = 1; k < order.length; k++) {
+        const [v, i] = order[k], [pv, pi] = order[k-1];
+        if (Math.abs(pv - v) < 0.08 * max) {
+          const prev = (series[pi].endLabel.offset || [0, 0])[1];
+          series[i].endLabel.offset = [0, prev + 14];
+        }
+      }
+    }
+    opt.series = series;
+    if (kind === 'line' && n > 1) opt.grid = [{right: 110}];
+    inst.setOption(opt);
+  }
+  function applyAll(){ for (const id in META) style(id, META[id]); }
+  applyAll();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAll);
+  new MutationObserver(applyAll).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+  window.addEventListener('resize', () => { for (const id in META) { const i = echarts.getInstanceByDom(document.getElementById(id)); if (i) i.resize(); } });
+})();
+</script>
+</body>
+</html>

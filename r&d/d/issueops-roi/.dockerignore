@@ -1,0 +1,10 @@
+.git
+.github
+bin
+out
+docs
+examples
+deploy/grafana
+deploy/aks
+deploy/azure
+*.md

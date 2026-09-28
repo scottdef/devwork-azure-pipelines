@@ -1,0 +1,40 @@
+{
+  "create_payload": {
+    "budget_amount": 450,
+    "prevent_further_usage": true,
+    "budget_alerting": {
+      "will_alert": false,
+      "alert_recipients": []
+    },
+    "budget_scope": "user",
+    "budget_entity_name": "",
+    "budget_type": "BundlePricing",
+    "budget_product_sku": "ai_credits",
+    "user": "sam-contract",
+    "expires_at": "2026-12-31"
+  },
+  "plan": {
+    "owner_kind": "organization",
+    "owner_name": "CoolEngOrg",
+    "form_scope": "user",
+    "scope": "user",
+    "entity_name": "",
+    "user": "sam-contract",
+    "sku": "ai_credits",
+    "budget_type": "BundlePricing",
+    "amount": 450,
+    "prevent_further_usage": true,
+    "alerting": {
+      "will_alert": false,
+      "alert_recipients": []
+    },
+    "expires_at": "2026-12-31",
+    "cost_center": "CC-4410-PAYMENTS",
+    "justification": "Contractor migrating the settlement batch jobs to Java 21 through December; needs agent mode beyond the default per-user allowance."
+  },
+  "update_payload": {
+    "budget_amount": 450,
+    "prevent_further_usage": true,
+    "expires_at": "2026-12-31"
+  }
+}

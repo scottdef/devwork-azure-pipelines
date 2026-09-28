@@ -1,0 +1,127 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "kai-fraud",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "invalid",
+      "escalated": false,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae",
+          "valid": false
+        },
+        "template": "comment.invalid.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae",
+      "labels_add": [
+        "issueops:invalid"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "kai-fraud",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "validated",
+      "escalated": false,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "kai-fraud",
+          "command": "submit",
+          "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": true,
+      "reason": "You are not eligible to request this: requests are limited to @CoolEngOrg/engineering-managers or @CoolEngOrg/copilot-admins or @CoolEngOrg/platform-admins.",
+      "allowlist": "false",
+      "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae",
+      "labels_add": [
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "comment",
+    "user": "kai-fraud",
+    "kind": "command",
+    "decision": {
+      "action": "cancelled",
+      "phase": "cancelled",
+      "escalated": false,
+      "comment": {
+        "event": "cancelled",
+        "data": {
+          "actor": "kai-fraud",
+          "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae"
+        },
+        "template": "comment.cancelled.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "close": "not_planned",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae",
+      "labels_add": [
+        "issueops:cancelled"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

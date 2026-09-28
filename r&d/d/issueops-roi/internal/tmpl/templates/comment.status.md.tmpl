@@ -1,0 +1,16 @@
+## ℹ️ Request status: `{{ .Phase }}`
+
+{{ template "request-table" . }}
+
+{{ template "messages" . }}
+{{- if .QA }}
+### Clarifying questions
+
+{{ template "questions" . }}
+{{- end }}
+
+### Approvals
+
+{{ if .Approval }}{{ template "approval-progress" . }}{{ else }}{{ template "rules" . }}{{ end }}
+
+{{ template "footer" . }}

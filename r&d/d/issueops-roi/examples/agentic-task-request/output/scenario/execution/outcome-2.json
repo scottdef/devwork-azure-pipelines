@@ -1,0 +1,14 @@
+{
+  "agent": {
+    "status": "completed",
+    "deliverable": "# Runbook: zero-downtime AKS node-pool upgrade to Kubernetes 1.30\n\n**Audience:** platform SRE on-call · **Cluster:** `aks-cooleng-prod-eus2` (resource group `rg-cooleng-aks-prod`) · **Change window:** Tuesdays 14:00–17:00 UTC\n\n## 1. Pre-checks (T-1 day)\n\n```bash\naz aks get-upgrades -g rg-cooleng-aks-prod -n aks-cooleng-prod-eus2 -o table\nkubectl version            # client v1.30.x\nkubectl get nodes -o wide\nkubectl get pdb -A         # every multi-replica workload must have a PDB with maxUnavailable \u003e= 1\nkubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded\n```\n\n- Confirm no deprecated APIs are in use (review the AKS upgrade insights for the cluster, or `kubectl get --raw /metrics | grep apiserver_requested_deprecated_apis`).\n- Confirm the etcd/cluster-state backup completed (Velero schedule `daily-cluster`, see answer A7).\n\n## 2. Upgrade the control plane only\n\n```bash\naz aks upgrade -g rg-cooleng-aks-prod -n aks-cooleng-prod-eus2 \\\n  --kubernetes-version 1.30.x --control-plane-only --yes\n```\n\n## 3. Upgrade node pools with surge and drain limits\n\n```bash\naz aks nodepool update -g rg-cooleng-aks-prod --cluster-name aks-cooleng-prod-eus2 \\\n  -n userpool1 --max-surge 33% --drain-timeout 45\naz aks nodepool upgrade -g rg-cooleng-aks-prod --cluster-name aks-cooleng-prod-eus2 \\\n  -n userpool1 --kubernetes-version 1.30.x --yes\n```\n\nWatch in a second terminal:\n\n```bash\nkubectl get nodes -L kubernetes.azure.com/agentpool -w\nkubectl get events -A --field-selector reason=Evicted -w\n```\n\n## 4. Stuck drain\n\nIf a node stays `SchedulingDisabled` beyond the drain timeout, find the blocking PDB:\n\n```bash\nkubectl get pdb -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ALLOWED:.status.disruptionsAllowed\n```\n\nScale the owning workload up by one replica rather than deleting the PDB.\n\n## 5. Rollback\n\nAKS does not downgrade node pools. Roll back by creating a new node pool on the previous version, cordoning the upgraded pool and draining it (`kubectl cordon`, `kubectl drain --ignore-daemonsets --delete-emptydir-data`).\n\n## 6. Post-checks\n\n`kubectl get nodes` shows v1.30.x everywhere; Grafana **Kubernetes / Cluster** dashboard error rate and p95 latency within 10% of the previous week.\n",
+    "critique": "Final critique: all four acceptance criteria met; commands verified against az aks and kubectl 1.30 syntax; rollback section present.",
+    "iterations": 3,
+    "model": "gpt-4.1-agents",
+    "usage": {
+      "prompt_tokens": 18450,
+      "completion_tokens": 3920,
+      "requests": 6
+    }
+  }
+}

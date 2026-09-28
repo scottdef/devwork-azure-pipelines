@@ -1,0 +1,11 @@
+login,teams,active_days,engaged_days,agentic_days,ai_credits,ai_cost_usd,ai_loc_added,acceptance_rate,merged_prs,adoption_phase
+dev-k8s,platform-eng,20,20,14,27104.98,271.05,4317,0.4073,6,agentic
+ada-platform,platform-eng,18,18,9,18617.17,186.17,3765,0.4322,4,agentic
+ivy-ledger,payments,16,16,10,17170.65,171.71,2502,0.3520,7,integrating
+ben-sre,platform-eng,16,16,11,12074.83,120.75,2930,0.3934,7,integrating
+gia-pay,payments,16,16,10,11456.10,114.56,3573,0.4277,7,agentic
+chen-infra,platform-eng,12,12,0,1097.96,10.98,459,0.3525,5,integrating
+hal-api,payments,12,12,0,873.59,8.74,780,0.3631,6,integrating
+kai-fraud,payments,7,7,0,536.88,5.37,279,0.3354,1,exploring
+fay-net,platform-eng,8,0,0,214.48,2.14,0,,0,exploring
+jon-risk,payments,5,0,0,116.65,1.17,0,,1,exploring

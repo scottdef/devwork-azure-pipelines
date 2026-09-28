@@ -1,0 +1,70 @@
+name: IssueOps execution gate
+description: >-
+  Re-verifies from the issue timeline that the current request content is
+  approved (digest-bound), refuses otherwise, and posts the "executing" marker.
+  Every execution path (router call or workflow_dispatch) runs this first.
+inputs:
+  token:
+    required: true
+  bot-login:
+    required: true
+  issue-number:
+    required: true
+  request-type:
+    required: true
+  force:
+    description: Allow re-execution when a previous run is stuck in "executing".
+    required: false
+    default: 'false'
+outputs:
+  digest:
+    description: Approved content digest; execution jobs must pass it as --expect-digest.
+    value: ${{ steps.gate.outputs.digest }}
+  environment:
+    description: GitHub environment for the execution job.
+    value: ${{ steps.gate.outputs.environment }}
+runs:
+  using: composite
+  steps:
+    - name: Gate
+      id: gate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE: ${{ inputs.issue-number }}
+        TYPE: ${{ inputs.request-type }}
+        FORCE: ${{ inputs.force }}
+      run: |
+        set +e
+        issueops gate --issue "$ISSUE" --type "$TYPE" --force="$FORCE"
+        rc=$?
+        set -e
+        echo "rc=$rc" >> "$GITHUB_OUTPUT"
+        # 0 = authorized, 3 = refused (reported below), anything else = error.
+        if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then exit "$rc"; fi
+
+    - name: Post executing marker
+      if: steps.gate.outputs.rc == '0'
+      uses: ./.github/actions/apply-decision
+      with:
+        token: ${{ inputs.token }}
+        bot-login: ${{ inputs.bot-login }}
+        issue-number: ${{ inputs.issue-number }}
+        labels-add: ${{ steps.gate.outputs.labels_add }}
+        labels-remove: ${{ steps.gate.outputs.labels_remove }}
+        comment-path: ${{ steps.gate.outputs.comment_path }}
+
+    - name: Report refusal
+      if: steps.gate.outputs.rc == '3' && steps.gate.outputs.comment_path != ''
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+      with:
+        token: ${{ inputs.token }}
+        issue-number: ${{ inputs.issue-number }}
+        body-path: ${{ steps.gate.outputs.comment_path }}
+
+    - name: Stop when refused
+      if: steps.gate.outputs.rc == '3'
+      shell: bash
+      run: |
+        echo "::error::The execution gate refused this request; see the issue comment."
+        exit 1

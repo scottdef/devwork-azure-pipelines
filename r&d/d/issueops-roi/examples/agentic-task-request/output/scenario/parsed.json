@@ -1,0 +1,22 @@
+{
+  "agent_acceptance_criteria": "- Uses az CLI and kubectl 1.30 commands only\n- Covers PodDisruptionBudget checks before draining\n- Includes a rollback section\n- Fits on two printed pages",
+  "agent_acknowledgements": {
+    "selected": [
+      "I will review all agent output (pull requests, documents) before it is merged or relied on",
+      "The objective and answers contain no secrets, credentials, or personal data"
+    ],
+    "unselected": []
+  },
+  "agent_backend": [
+    "aks-foundry-agent"
+  ],
+  "agent_catalog_workflow": [
+    "none"
+  ],
+  "agent_data_classification": [
+    "confidential"
+  ],
+  "agent_objective": "Produce an on-call runbook for upgrading the production AKS cluster's user node pools to Kubernetes 1.30 without dropping traffic, including pre-checks, surge/drain settings, stuck-drain handling and rollback.",
+  "agent_target_repository": "platform-infra",
+  "agent_task_title": "Runbook: zero-downtime AKS node-pool upgrade to Kubernetes 1.30"
+}

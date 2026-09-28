@@ -1,0 +1,31 @@
+{
+  "report_cost_basis": [
+    "AI credits only"
+  ],
+  "report_end_date": "",
+  "report_outputs": {
+    "selected": [
+      "Interactive HTML report"
+    ],
+    "unselected": [
+      "CSV exports",
+      "Publish metrics to Grafana"
+    ]
+  },
+  "report_period": [
+    "Last 7 days"
+  ],
+  "report_purpose": "Curious how much the fraud rules refactor cost in AI credits.",
+  "report_repositories": "payments-api",
+  "report_scope": [
+    "repositories"
+  ],
+  "report_start_date": "",
+  "report_teams": "",
+  "report_user_detail": {
+    "selected": [],
+    "unselected": [
+      "Include a per-user breakdown (requires Copilot admin approval)"
+    ]
+  }
+}

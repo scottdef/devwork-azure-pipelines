@@ -1,0 +1,149 @@
+# IssueOps command router.
+#
+# Handles `.submit`, `.approve`, `.deny`, `.cancel`, `.answers`, `.retry`,
+# `.status` and `.help` on IssueOps issues. github/command acknowledges the
+# command (reactions) and checks the context; the issueops CLI rebuilds the
+# request state from the timeline (bot markers + commands + content digest),
+# authorizes the actor against the approval policy and decides what happens.
+#
+# When a decision says "execute", the matching reusable execution workflow is
+# called. Each one re-runs the gate before touching anything.
+#
+# No workflow-level concurrency: every handler recomputes state from the full
+# timeline, so the handler for the last approval always sees every vote.
+# Double execution is prevented by the gate (serialized per issue).
+name: IssueOps · command router
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  handle:
+    name: Handle command
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.type != 'Bot' &&
+      startsWith(github.event.comment.body, '.') &&
+      contains(github.event.issue.labels.*.name, 'issueops')
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    outputs:
+      execute: ${{ steps.handle.outputs.execute }}
+      request_type: ${{ steps.handle.outputs.request_type }}
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up IssueOps
+        id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*'
+          permission-issues: write
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+          permission-organization-custom-org-roles: read
+          permission-organization-administration: read
+
+      - name: Classify comment
+        id: classify
+        run: issueops command classify
+
+      - name: Acknowledge command
+        if: steps.classify.outputs.command != ''
+        id: command
+        uses: github/command@3442f3fa1efe01bdb024b157083c337902d17372 # v2.0.3
+        with:
+          github_token: ${{ steps.setup.outputs.token }}
+          command: ${{ steps.classify.outputs.trigger }}
+          allowed_contexts: issue
+          # Authorization is done by the issueops CLI against the approval
+          # policy; github/command only requires that the actor can see the repo.
+          permissions: read,write,admin
+          reaction: eyes
+
+      - name: Resolve request type
+        if: steps.command.outputs.continue == 'true'
+        id: resolve
+        run: issueops resolve
+
+      - name: Parse issue body
+        if: steps.command.outputs.continue == 'true'
+        id: parse
+        uses: issue-ops/parser@cb7e2e4e5da701aad0e23e718bc4c91d442ca8ba # v5.0.0
+        with:
+          body: ${{ github.event.issue.body }}
+          issue-form-template: ${{ steps.resolve.outputs.template }}
+          workspace: ${{ github.workspace }}
+
+      - name: Handle command
+        if: steps.command.outputs.continue == 'true'
+        id: handle
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          PARSED_JSON: ${{ steps.parse.outputs.json }}
+        run: issueops command handle
+
+      - name: Apply decision
+        if: steps.command.outputs.continue == 'true'
+        uses: ./.github/actions/apply-decision
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ github.event.issue.number }}
+          labels-add: ${{ steps.handle.outputs.labels_add }}
+          labels-remove: ${{ steps.handle.outputs.labels_remove }}
+          comment-path: ${{ steps.handle.outputs.comment_path }}
+          comment-update-prefix: ${{ steps.handle.outputs.comment_update_prefix }}
+          close: ${{ steps.handle.outputs.close }}
+
+  execute-copilot-budget:
+    needs: handle
+    if: needs.handle.outputs.execute == 'true' && needs.handle.outputs.request_type == 'copilot-budget-request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/execute-copilot-budget.yml
+    with:
+      issue: ${{ github.event.issue.number }}
+    secrets: inherit
+
+  execute-copilot-report:
+    needs: handle
+    if: needs.handle.outputs.execute == 'true' && needs.handle.outputs.request_type == 'copilot-usage-report'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/execute-copilot-report.yml
+    with:
+      issue: ${{ github.event.issue.number }}
+    secrets: inherit
+
+  execute-foundry-deploy:
+    needs: handle
+    if: needs.handle.outputs.execute == 'true' && needs.handle.outputs.request_type == 'foundry-model-deployment'
+    permissions:
+      contents: read
+      id-token: write # Azure OIDC in the called workflow
+    uses: ./.github/workflows/execute-foundry-deploy.yml
+    with:
+      issue: ${{ github.event.issue.number }}
+    secrets: inherit
+
+  execute-agentic-task:
+    needs: handle
+    if: needs.handle.outputs.execute == 'true' && needs.handle.outputs.request_type == 'agentic-task-request'
+    permissions:
+      contents: read
+      id-token: write # Azure OIDC for the AKS backend
+    uses: ./.github/workflows/execute-agentic-task.yml
+    with:
+      issue: ${{ github.event.issue.number }}
+    secrets: inherit

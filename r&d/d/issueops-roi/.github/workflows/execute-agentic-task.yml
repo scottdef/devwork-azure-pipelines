@@ -1,0 +1,309 @@
+# Execute an approved agentic-task-request on one of three backends:
+#
+#   copilot-cloud-agent       create an issue in the target repository assigned
+#                             to Copilot (user-to-server token of a Copilot-
+#                             licensed machine user), which opens a draft PR
+#   agentic-workflow-catalog  workflow_dispatch a pre-approved GitHub Agentic
+#                             Workflow in the target repository
+#   aks-foundry-agent         run the agent-runner Job on AKS (workload identity
+#                             to a Foundry deployment) and post its deliverable,
+#                             or its follow-up questions (needs_input)
+name: IssueOps · execute agentic task
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        type: number
+        required: true
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: IssueOps issue number
+        type: number
+        required: true
+      force:
+        description: Re-run even if a previous run is marked executing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    concurrency:
+      group: issueops-execute-${{ inputs.issue }}
+      cancel-in-progress: false
+    outputs:
+      digest: ${{ steps.gate.outputs.digest }}
+      environment: ${{ steps.gate.outputs.environment }}
+      backend: ${{ steps.spec.outputs.backend }}
+      repo: ${{ steps.spec.outputs.repo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*'
+          permission-issues: write
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+          permission-organization-custom-org-roles: read
+      - id: gate
+        uses: ./.github/actions/gate
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ inputs.issue }}
+          request-type: agentic-task-request
+          force: ${{ inputs.force || false }}
+      - name: Task specification
+        id: spec
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          ISSUE: ${{ inputs.issue }}
+          DIGEST: ${{ steps.gate.outputs.digest }}
+        run: |
+          issueops agent spec --issue "$ISSUE" --expect-digest "$DIGEST"
+          jq '{backend, target_repo, classification, catalog, answers}' "$RUNNER_TEMP/issueops/spec.json"
+
+  copilot:
+    name: Copilot cloud agent
+    needs: gate
+    if: needs.gate.outputs.backend == 'copilot-cloud-agent'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 15
+    environment: ${{ needs.gate.outputs.environment }} # agentic-copilot (holds COPILOT_AGENT_TOKEN)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*'
+          permission-issues: read
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+      - name: Delegate to the Copilot cloud agent
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          # Fine-grained PAT (or GitHub App user token) of a Copilot-licensed
+          # machine user with issues/pull requests/contents write on target repos.
+          COPILOT_AGENT_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+          ISSUE: ${{ inputs.issue }}
+          DIGEST: ${{ needs.gate.outputs.digest }}
+        run: issueops agent dispatch --issue "$ISSUE" --expect-digest "$DIGEST"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: ${{ runner.temp }}/issueops/outcome.json
+          retention-days: 30
+
+  catalog:
+    name: Agentic workflow catalog
+    needs: gate
+    if: needs.gate.outputs.backend == 'agentic-workflow-catalog'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 15
+    environment: ${{ needs.gate.outputs.environment }} # agentic-catalog
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          # This repository (read the request) + the target repository (dispatch).
+          repositories: ${{ github.event.repository.name }},${{ needs.gate.outputs.repo }}
+          permission-issues: read
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+          permission-actions: write
+      - name: Dispatch catalog workflow
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          ISSUE: ${{ inputs.issue }}
+          DIGEST: ${{ needs.gate.outputs.digest }}
+        run: issueops agent dispatch --issue "$ISSUE" --expect-digest "$DIGEST"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: ${{ runner.temp }}/issueops/outcome.json
+          retention-days: 30
+
+  aks:
+    name: AKS agent runner
+    needs: gate
+    if: needs.gate.outputs.backend == 'aks-foundry-agent'
+    # Must reach the AKS API server (private cluster): self-hosted runner in the VNet.
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_AKS_RUNS_ON || vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 30
+    environment: ${{ needs.gate.outputs.environment }} # agentic-aks
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*'
+          permission-issues: read
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+      - name: Render Job manifest (Go templates)
+        id: render
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          ISSUE: ${{ inputs.issue }}
+          DIGEST: ${{ needs.gate.outputs.digest }}
+        run: issueops agent render-k8s --issue "$ISSUE" --expect-digest "$DIGEST"
+      - name: Azure login (OIDC)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Set up kubectl 1.30
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        with:
+          version: v1.30.14
+      - name: Set up kubelogin
+        uses: azure/use-kubelogin@0ce7c36141aa27d4934872cf00b0120804c98a29 # v1.3
+      - name: AKS context
+        uses: azure/aks-set-context@60623acbdcbbdcf799ad50a1adf8703874339f8b # v5.0.0
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+          use-kubelogin: 'true'
+      - name: Run agent Job
+        env:
+          MANIFEST: ${{ steps.render.outputs.manifest }}
+          JOB: ${{ steps.render.outputs.job_name }}
+          NS: ${{ steps.render.outputs.namespace }}
+        run: |
+          # A .retry or forced re-run of the same digest reuses the Job name:
+          # remove the finished (or stuck) previous Job and its spec first.
+          kubectl -n "$NS" delete job "$JOB" --ignore-not-found --wait=true
+          kubectl -n "$NS" delete configmap "${JOB}-spec" --ignore-not-found
+          kubectl -n "$NS" apply --dry-run=server -f "$MANIFEST"
+          kubectl -n "$NS" apply -f "$MANIFEST"
+          # kubectl 1.30: poll for either terminal condition (25 min < job timeout).
+          done=""
+          for _ in $(seq 1 150); do
+            state=$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}')
+            case "$state" in
+              *Complete*) done=complete; break ;;
+              *Failed*) done=failed; break ;;
+            esac
+            sleep 10
+          done
+          kubectl -n "$NS" logs "job/$JOB" -c runner --tail=-1 > "$RUNNER_TEMP/issueops/runner.log" || true
+          kubectl -n "$NS" get job "$JOB" -o wide || true
+          if [ -z "$done" ]; then
+            echo "::error::agent Job $JOB did not finish within 25 minutes"
+            kubectl -n "$NS" describe job "$JOB" || true
+            exit 1
+          fi
+          echo "agent Job $done"
+      - name: Read result
+        id: result
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/issueops/runner.log" ] || echo "no runner log" > "$RUNNER_TEMP/issueops/runner.log"
+          issueops agent result --log "$RUNNER_TEMP/issueops/runner.log"
+      - name: Clean up spec ConfigMap
+        if: always()
+        env:
+          JOB: ${{ steps.render.outputs.job_name }}
+          NS: ${{ steps.render.outputs.namespace }}
+        run: kubectl -n "$NS" delete configmap "${JOB}-spec" --ignore-not-found
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: |
+            ${{ runner.temp }}/issueops/outcome.json
+            ${{ runner.temp }}/issueops/runner.log
+            ${{ runner.temp }}/issueops/agent-job.yaml
+          retention-days: 30
+          if-no-files-found: ignore
+
+  report:
+    name: Report
+    needs: [gate, copilot, catalog, aks]
+    if: always() && needs.gate.result == 'success'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*'
+          permission-issues: write
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: ${{ runner.temp }}/outcome
+      - name: Outcome status
+        id: status
+        env:
+          COPILOT: ${{ needs.copilot.result }}
+          CATALOG: ${{ needs.catalog.result }}
+          AKS: ${{ needs.aks.result }}
+          AGENT_STATUS: ${{ needs.aks.outputs.status }}
+        run: |
+          status=failed
+          if [ "$COPILOT" = success ] || [ "$CATALOG" = success ]; then status=completed; fi
+          if [ "$AKS" = success ] && [ -n "$AGENT_STATUS" ]; then status="$AGENT_STATUS"; fi
+          err="Backend jobs: copilot=$COPILOT catalog=$CATALOG aks=$AKS."
+          if [ -f "$RUNNER_TEMP/outcome/outcome.json" ]; then
+            agent_err=$(jq -r '.agent.error // empty' "$RUNNER_TEMP/outcome/outcome.json")
+            [ -n "$agent_err" ] && err="$agent_err"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          {
+            echo "error<<ISSUEOPS_EOF_$GITHUB_RUN_ID"
+            echo "$err"
+            echo "ISSUEOPS_EOF_$GITHUB_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/finish
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ inputs.issue }}
+          status: ${{ steps.status.outputs.status }}
+          result: ${{ runner.temp }}/outcome/outcome.json
+          error: ${{ steps.status.outputs.status == 'failed' && steps.status.outputs.error || '' }}

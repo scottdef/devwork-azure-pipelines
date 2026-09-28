@@ -1,0 +1,14 @@
+{{- /* Rendered by `issueops agent render-k8s`; every value is quoted with yamlString. */ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .JobName }}-spec
+  namespace: {{ .Namespace }}
+  labels:
+    app.kubernetes.io/name: issueops-agent-runner
+    app.kubernetes.io/part-of: issueops
+    issueops.coolengorg.io/issue: {{ yamlString .Issue }}
+data:
+  spec.json: {{ yamlString .SpecJSON }}
+  system-prompt.md: {{ yamlString .SystemPrompt }}
+  task-prompt.md: {{ yamlString .TaskPrompt }}

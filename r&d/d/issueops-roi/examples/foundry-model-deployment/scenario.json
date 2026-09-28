@@ -1,0 +1,33 @@
+{
+  "name": "Self-service dev deployment of gpt-4.1-mini (policy auto-approval)",
+  "description": "A developer deploys gpt-4.1-mini with 10k TPM GlobalStandard capacity on the dev Foundry resource. The request matches the registry's auto_approve condition (dev + Global/DataZone Standard + capacity ≤ 10), so `.submit` approves it and the execute workflow logs in to Azure with OIDC, runs the `az` pre-flight and deploys the Bicep template.",
+  "type": "foundry-model-deployment",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 301, "title": "[IssueOps] Foundry deployment: gpt-4.1-mini on dev", "requestor": "lea-ml" },
+  "values": {
+    "foundry_account": ["aif-cooleng-dev-eus2"],
+    "foundry_model": "gpt-4.1-mini",
+    "foundry_model_version": "2025-04-14",
+    "foundry_model_format": ["OpenAI"],
+    "foundry_sku": ["GlobalStandard"],
+    "foundry_capacity": "10",
+    "foundry_deployment_name": "gpt-4.1-mini-ml-eval",
+    "foundry_version_upgrade": ["OnceNewDefaultVersionAvailable"],
+    "foundry_use_case": "Evaluation harness for the feature-store triage agent: an agentic workflow that reads pipeline failures, proposes a fix and opens a draft PR in ml-pipelines. Dev only; synthetic data.",
+    "foundry_consumers": "CoolEngOrg/ml-pipelines",
+    "foundry_cost_center": "CC-5120-DATA",
+    "foundry_review_date": "2026-12-15",
+    "foundry_acknowledgements": { "selected": [
+      "Only data classified Internal or lower will be sent to this deployment unless it is approved for Confidential data",
+      "I understand provisioned (PTU) deployments are billed hourly whether or not they are used" ] }
+  },
+  "directory": { "teams": { "platform-ai": ["priya-ai", "tom-ai"], "ai-governance": ["gwen-gov"], "finops-approvers": ["fran-finops"] } },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "validated", "escalated": false } },
+    { "do": "comment", "user": "lea-ml", "body": ".submit", "after": "2m", "expect": { "action": "approved", "execute": true, "environment": "foundry-dev" } },
+    { "do": "execute", "after": "1m",
+      "execution": { "azure": { "models": "fixtures/az-list-models.json", "usage": "fixtures/az-usage-dev.json", "deployments": "fixtures/az-deployments-dev.json",
+        "endpoint": "https://aif-cooleng-dev-eus2.openai.azure.com/" } },
+      "expect": { "action": "completed", "close": "completed" } }
+  ]
+}

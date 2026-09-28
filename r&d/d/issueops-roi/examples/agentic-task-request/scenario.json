@@ -1,0 +1,251 @@
+{
+  "name": "AKS/Foundry agent runner: upgrade runbook with Q&A and an agent follow-up question",
+  "description": "A platform engineer asks the AKS agent runner (gpt-4.1-agents on Foundry, workload identity) to draft a zero-downtime node-pool upgrade runbook. Details are collected through `.answers` comments; the request is confidential, so the AI-governance escalation applies in addition to the platform-ai and target-repository-maintainer rules. On its first run the agent asks one follow-up question, which re-opens Q&A: the new answer changes the digest, so the request is re-submitted and re-approved before the second run delivers the runbook.",
+  "type": "agentic-task-request",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": {
+    "number": 401,
+    "title": "[IssueOps] Agentic task: AKS 1.30 node-pool upgrade runbook",
+    "requestor": "ada-platform"
+  },
+  "values": {
+    "agent_backend": [
+      "aks-foundry-agent"
+    ],
+    "agent_target_repository": "platform-infra",
+    "agent_task_title": "Runbook: zero-downtime AKS node-pool upgrade to Kubernetes 1.30",
+    "agent_objective": "Produce an on-call runbook for upgrading the production AKS cluster's user node pools to Kubernetes 1.30 without dropping traffic, including pre-checks, surge/drain settings, stuck-drain handling and rollback.",
+    "agent_acceptance_criteria": "- Uses az CLI and kubectl 1.30 commands only\n- Covers PodDisruptionBudget checks before draining\n- Includes a rollback section\n- Fits on two printed pages",
+    "agent_catalog_workflow": [
+      "none"
+    ],
+    "agent_data_classification": [
+      "confidential"
+    ],
+    "agent_acknowledgements": {
+      "selected": [
+        "I will review all agent output (pull requests, documents) before it is merged or relied on",
+        "The objective and answers contain no secrets, credentials, or personal data"
+      ]
+    }
+  },
+  "directory": {
+    "teams": {
+      "platform-ai": [
+        "priya-ai",
+        "tom-ai"
+      ],
+      "ai-governance": [
+        "gwen-gov"
+      ]
+    },
+    "repo_permissions": {
+      "platform-infra": {
+        "ada-platform": "write",
+        "mia-maint": "maintain",
+        "priya-ai": "read"
+      }
+    }
+  },
+  "steps": [
+    {
+      "do": "open",
+      "note": "Q&A request types start in `awaiting-answers`; the summary lists the backend's question set.",
+      "expect": {
+        "action": "summary",
+        "phase": "awaiting-answers",
+        "escalated": true,
+        "contains": [
+          "Q5"
+        ]
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "after": "6m",
+      "body": ".answers\nA1: runbook\nA2: Platform SRE on-call engineers (comfortable with kubectl, new to AKS upgrades)\nA3: Production cluster aks-cooleng-prod-eus2 runs 1.29 with two user node pools (userpool1: 12 nodes, userpool2: 6 nodes). All tier-1 services have PDBs. Upgrades happen in the Tuesday 14:00-17:00 UTC change window.\nA4: az CLI 2.6x, kubectl 1.30; no third-party upgrade tooling; must follow CHG-policy-7 (control plane before node pools).",
+      "expect": {
+        "action": "answers",
+        "phase": "awaiting-answers"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "body": ".submit",
+      "after": "1m",
+      "expect": {
+        "action": "rejected",
+        "contains": [
+          "Answer all required clarifying questions"
+        ]
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "body": ".answers\nA5: gpt-4.1-agents\nA6: 3",
+      "after": "2m",
+      "expect": {
+        "action": "answers",
+        "phase": "validated"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "body": ".submit",
+      "after": "1m",
+      "expect": {
+        "action": "submitted",
+        "contains": [
+          "@CoolEngOrg/platform-ai",
+          "@CoolEngOrg/ai-governance"
+        ]
+      }
+    },
+    {
+      "do": "comment",
+      "user": "mia-maint",
+      "body": ".approve",
+      "after": "15m",
+      "note": "mia-maint has maintain on CoolEngOrg/platform-infra (target_repo_permissions rule).",
+      "expect": {
+        "action": "approval-recorded"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "priya-ai",
+      "body": ".approve",
+      "after": "10m",
+      "expect": {
+        "action": "approval-recorded"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "gwen-gov",
+      "body": ".approve Confidential OK on gpt-4.1-agents (DPIA-2026-114).",
+      "after": "35m",
+      "expect": {
+        "action": "approved",
+        "execute": true,
+        "environment": "agentic-aks"
+      }
+    },
+    {
+      "do": "execute",
+      "after": "1m",
+      "note": "The runner job starts in the issueops-agents namespace; the agent decides it needs one more fact.",
+      "execution": {
+        "agent_result": {
+          "status": "needs_input",
+          "iterations": 1,
+          "model": "gpt-4.1-agents",
+          "usage": {
+            "prompt_tokens": 5120,
+            "completion_tokens": 410,
+            "requests": 2
+          },
+          "questions": [
+            {
+              "id": "D1",
+              "key": "backup_procedure",
+              "text": "Which backup must be confirmed before the upgrade (tool and schedule name)?",
+              "required": true,
+              "max_length": 500
+            }
+          ]
+        }
+      },
+      "expect": {
+        "action": "needs-input",
+        "phase": "awaiting-answers",
+        "contains": [
+          "Q7"
+        ]
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "body": ".answers\nA7: Velero schedule daily-cluster (namespaces + PVC snapshots), must show a Completed backup from the last 24h",
+      "after": "12m",
+      "expect": {
+        "action": "answers",
+        "phase": "validated"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "mia-maint",
+      "body": ".approve",
+      "after": "1m",
+      "note": "Answers are part of the digest, so the earlier approvals and submission no longer apply.",
+      "expect": {
+        "action": "rejected"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ada-platform",
+      "body": ".submit",
+      "after": "1m",
+      "expect": {
+        "action": "submitted"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "mia-maint",
+      "body": ".approve",
+      "after": "5m",
+      "expect": {
+        "action": "approval-recorded"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "tom-ai",
+      "body": ".approve",
+      "after": "8m",
+      "expect": {
+        "action": "approval-recorded"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "gwen-gov",
+      "body": ".approve",
+      "after": "20m",
+      "expect": {
+        "action": "approved",
+        "execute": true
+      }
+    },
+    {
+      "do": "execute",
+      "after": "1m",
+      "execution": {
+        "agent_result": {
+          "status": "completed",
+          "iterations": 3,
+          "model": "gpt-4.1-agents",
+          "usage": {
+            "prompt_tokens": 18450,
+            "completion_tokens": 3920,
+            "requests": 6
+          },
+          "critique": "Final critique: all four acceptance criteria met; commands verified against az aks and kubectl 1.30 syntax; rollback section present.",
+          "deliverable": "# Runbook: zero-downtime AKS node-pool upgrade to Kubernetes 1.30\n\n**Audience:** platform SRE on-call · **Cluster:** `aks-cooleng-prod-eus2` (resource group `rg-cooleng-aks-prod`) · **Change window:** Tuesdays 14:00–17:00 UTC\n\n## 1. Pre-checks (T-1 day)\n\n```bash\naz aks get-upgrades -g rg-cooleng-aks-prod -n aks-cooleng-prod-eus2 -o table\nkubectl version            # client v1.30.x\nkubectl get nodes -o wide\nkubectl get pdb -A         # every multi-replica workload must have a PDB with maxUnavailable >= 1\nkubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded\n```\n\n- Confirm no deprecated APIs are in use (review the AKS upgrade insights for the cluster, or `kubectl get --raw /metrics | grep apiserver_requested_deprecated_apis`).\n- Confirm the etcd/cluster-state backup completed (Velero schedule `daily-cluster`, see answer A7).\n\n## 2. Upgrade the control plane only\n\n```bash\naz aks upgrade -g rg-cooleng-aks-prod -n aks-cooleng-prod-eus2 \\\n  --kubernetes-version 1.30.x --control-plane-only --yes\n```\n\n## 3. Upgrade node pools with surge and drain limits\n\n```bash\naz aks nodepool update -g rg-cooleng-aks-prod --cluster-name aks-cooleng-prod-eus2 \\\n  -n userpool1 --max-surge 33% --drain-timeout 45\naz aks nodepool upgrade -g rg-cooleng-aks-prod --cluster-name aks-cooleng-prod-eus2 \\\n  -n userpool1 --kubernetes-version 1.30.x --yes\n```\n\nWatch in a second terminal:\n\n```bash\nkubectl get nodes -L kubernetes.azure.com/agentpool -w\nkubectl get events -A --field-selector reason=Evicted -w\n```\n\n## 4. Stuck drain\n\nIf a node stays `SchedulingDisabled` beyond the drain timeout, find the blocking PDB:\n\n```bash\nkubectl get pdb -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ALLOWED:.status.disruptionsAllowed\n```\n\nScale the owning workload up by one replica rather than deleting the PDB.\n\n## 5. Rollback\n\nAKS does not downgrade node pools. Roll back by creating a new node pool on the previous version, cordoning the upgraded pool and draining it (`kubectl cordon`, `kubectl drain --ignore-daemonsets --delete-emptydir-data`).\n\n## 6. Post-checks\n\n`kubectl get nodes` shows v1.30.x everywhere; Grafana **Kubernetes / Cluster** dashboard error rate and p95 latency within 10% of the previous week.\n"
+        }
+      },
+      "expect": {
+        "action": "completed",
+        "phase": "completed"
+      }
+    }
+  ]
+}

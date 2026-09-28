@@ -1,0 +1,22 @@
+{
+  "name": "Organization-wide 14-day report (auto-approved)",
+  "description": "Without per-user detail the report type has no approval rules, so `.submit` auto-approves and the router dispatches the execution workflow immediately. The organization-1-day report supplies organization pull-request totals.",
+  "type": "copilot-usage-report",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 202, "title": "[IssueOps] Copilot usage report: CoolEngOrg, last 14 days", "requestor": "pia-platform" },
+  "values": {
+    "report_scope": ["organization"],
+    "report_period": ["Last 14 days"],
+    "report_cost_basis": ["AI credits only"],
+    "report_outputs": { "selected": ["Interactive HTML report", "Publish metrics to Grafana"] },
+    "report_user_detail": { "selected": [] },
+    "report_purpose": "Weekly platform review of Copilot adoption and AI-credit burn rate across CoolEngOrg."
+  },
+  "directory": { "teams": { "platform-admins": ["pia-platform"], "copilot-admins": ["alex-admin"] } },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "validated", "escalated": false } },
+    { "do": "comment", "user": "pia-platform", "body": ".submit", "after": "1m",
+      "expect": { "action": "approved", "execute": true, "environment": "copilot-reports" } },
+    { "do": "execute", "after": "1m", "execution": { "fixtures": "fixtures" }, "expect": { "action": "completed" } }
+  ]
+}

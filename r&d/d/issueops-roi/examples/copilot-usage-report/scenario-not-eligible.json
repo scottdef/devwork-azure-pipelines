@@ -1,0 +1,23 @@
+{
+  "name": "Requestor gating: a developer outside the eligible teams",
+  "description": "Only engineering-managers, copilot-admins and platform-admins may request usage reports. The request is marked invalid at intake, `.submit` is refused, and the requestor cancels.",
+  "type": "copilot-usage-report",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 203, "title": "[IssueOps] Copilot usage report: payments-api", "requestor": "kai-fraud" },
+  "values": {
+    "report_scope": ["repositories"],
+    "report_repositories": "payments-api",
+    "report_period": ["Last 7 days"],
+    "report_cost_basis": ["AI credits only"],
+    "report_outputs": { "selected": ["Interactive HTML report"] },
+    "report_user_detail": { "selected": [] },
+    "report_purpose": "Curious how much the fraud rules refactor cost in AI credits."
+  },
+  "directory": { "teams": { "engineering-managers": ["dana-dev"], "copilot-admins": ["alex-admin"], "platform-admins": ["pia-platform"] } },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "invalid", "contains": ["not eligible"] } },
+    { "do": "comment", "user": "kai-fraud", "body": ".submit", "after": "1m", "expect": { "action": "rejected" } },
+    { "do": "comment", "user": "kai-fraud", "body": ".cancel I'll ask my manager to request it.", "after": "3m",
+      "expect": { "action": "cancelled", "phase": "cancelled", "close": "not_planned" } }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "name": "[IssueOps] Copilot usage and ROI report",
+  "description": "Generate a Copilot usage, AI-cost, and developer-output (ROI) report for CoolEngOrg, specific teams, or specific repositories.",
+  "title": "[IssueOps] Copilot usage and ROI report",
+  "labels": [
+    "issueops",
+    "issueops:copilot-report"
+  ],
+  "body": [
+    {
+      "type": "markdown",
+      "attributes": {
+        "value": "## Copilot usage and ROI report\n\nThe report joins the Copilot usage-metrics reports (daily per-user, user-teams, and repository reports)\nwith pull-request output data and AI-credit cost. You receive a summary comment, and optionally an\ninteractive HTML report and CSV exports as a workflow artifact.\n\n* Team-level data excludes teams with fewer than five Copilot-seated users (GitHub privacy threshold).\n* Aggregated team and repository reports run without approval once you comment `.submit`.\n* A per-user breakdown requires approval from `@CoolEngOrg/copilot-admins`.\n"
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "report_scope",
+      "attributes": {
+        "label": "Report scope",
+        "options": [
+          "organization",
+          "teams",
+          "repositories"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "report_teams",
+      "attributes": {
+        "label": "Teams",
+        "description": "Comma-separated team slugs in CoolEngOrg (required for the teams scope, max 20).",
+        "placeholder": "platform-eng, payments, data-eng"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "input",
+      "id": "report_repositories",
+      "attributes": {
+        "label": "Repositories",
+        "description": "Comma-separated repository names in CoolEngOrg (required for the repositories scope, max 25).",
+        "placeholder": "payments-api, ledger-service"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "report_period",
+      "attributes": {
+        "label": "Reporting period",
+        "options": [
+          "Last 7 days",
+          "Last 14 days",
+          "Last 28 days",
+          "Last 56 days",
+          "Last 90 days",
+          "Custom range"
+        ],
+        "default": 2
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "report_start_date",
+      "attributes": {
+        "label": "Custom start date",
+        "description": "YYYY-MM-DD (custom range only).",
+        "placeholder": "2026-08-01"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "input",
+      "id": "report_end_date",
+      "attributes": {
+        "label": "Custom end date",
+        "description": "YYYY-MM-DD (custom range only). Metrics usually lag by about two days.",
+        "placeholder": "2026-08-31"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "report_cost_basis",
+      "attributes": {
+        "label": "Cost basis",
+        "description": "Include prorated seat licences in cost-per-output figures, or only metered AI credits.",
+        "options": [
+          "AI credits and seats",
+          "AI credits only"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "report_outputs",
+      "attributes": {
+        "label": "Outputs",
+        "description": "The summary comment is always posted.",
+        "options": [
+          {
+            "label": "Interactive HTML report"
+          },
+          {
+            "label": "CSV exports"
+          },
+          {
+            "label": "Publish metrics to Grafana"
+          }
+        ]
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "report_user_detail",
+      "attributes": {
+        "label": "Per-user detail",
+        "options": [
+          {
+            "label": "Include a per-user breakdown (requires Copilot admin approval)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "report_purpose",
+      "attributes": {
+        "label": "Purpose",
+        "description": "What decision will this report inform?"
+      },
+      "validations": {
+        "required": true
+      }
+    }
+  ]
+}

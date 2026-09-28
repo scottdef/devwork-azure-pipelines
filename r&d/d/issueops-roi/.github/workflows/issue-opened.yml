@@ -1,0 +1,100 @@
+# IssueOps intake: parse → validate → summarize.
+#
+# Runs for issues created from the CoolEngOrg IssueOps issue forms (label
+# `issueops`). The body is parsed with issue-ops/parser, validated against the
+# form and the custom validators in .github/validator with issue-ops/validator,
+# then the issueops CLI evaluates type-specific rules, requestor eligibility and
+# the approval policy and renders the summary comment (Go templates).
+#
+# Security: `on: issues` always runs the workflow file from the default branch.
+# Untrusted issue text only ever reaches actions through `with:` inputs or env
+# variables, never through ${{ }} inside `run:` scripts.
+name: IssueOps · intake
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  # The newest body wins: an in-flight intake for an older revision is cancelled.
+  group: issueops-intake-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  intake:
+    name: Validate and summarize
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'issueops')
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up IssueOps
+        id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          repositories: '*' # agentic-task requestor checks read target-repository permissions
+          permission-issues: write
+          permission-contents: read
+          permission-metadata: read
+          permission-members: read
+          permission-organization-custom-org-roles: read
+          permission-organization-administration: read # current budget lookup
+
+      - name: Resolve request type
+        id: resolve
+        run: issueops resolve
+
+      - name: Parse issue body
+        id: parse
+        uses: issue-ops/parser@cb7e2e4e5da701aad0e23e718bc4c91d442ca8ba # v5.0.0
+        with:
+          body: ${{ github.event.issue.body }}
+          issue-form-template: ${{ steps.resolve.outputs.template }}
+          workspace: ${{ github.workspace }}
+
+      - name: Validate against the issue form
+        id: validate
+        uses: issue-ops/validator@3aec708c72ec4cb8dfca562d4addad3e78e55e26 # v4.0.0
+        env:
+          # Read by the custom validators in .github/validator (Node built-in fetch).
+          ISSUEOPS_VALIDATOR_TOKEN: ${{ steps.setup.outputs.token }}
+          ORGANIZATION: ${{ github.repository_owner }}
+          GITHUB_API_URL: ${{ github.api_url }}
+        with:
+          add-comment: 'false' # the IssueOps summary comment reports errors
+          issue-form-template: ${{ steps.resolve.outputs.template }}
+          parsed-issue-body: ${{ steps.parse.outputs.json }}
+          workspace: ${{ github.workspace }}
+
+      - name: Evaluate request
+        id: intake
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          PARSED_JSON: ${{ steps.parse.outputs.json }}
+          FORM_RESULT: ${{ steps.validate.outputs.result }}
+          FORM_ERRORS: ${{ steps.validate.outputs.errors }}
+        run: issueops intake
+
+      - name: Apply decision
+        uses: ./.github/actions/apply-decision
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ github.event.issue.number }}
+          labels-add: ${{ steps.intake.outputs.labels_add }}
+          labels-remove: ${{ steps.intake.outputs.labels_remove }}
+          comment-path: ${{ steps.intake.outputs.comment_path }}
+          comment-update-prefix: ${{ steps.intake.outputs.comment_update_prefix }}
+          close: ${{ steps.intake.outputs.close }}

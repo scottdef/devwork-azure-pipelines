@@ -1,0 +1,64 @@
+{{- $r := .Result.report -}}
+{{- $t := $r.Totals -}}
+## 📊 Copilot usage and ROI report
+
+**{{ $r.Org }}** · {{ $r.Spec.Scope }}{{ if $r.Spec.Teams }}: {{ join ", " $r.Spec.Teams }}{{ end }}{{ if $r.Spec.Repos }}: {{ join ", " $r.Spec.Repos }}{{ end }} · {{ date "2006-01-02" $r.Spec.Start }} to {{ date "2006-01-02" $r.Spec.End }} ({{ $r.DaysFound }} days with data)
+
+| Metric | Value |
+| ------ | ----- |
+| Total cost | **{{ usd $t.TotalCostUSD }}**{{ if $r.Spec.IncludeSeats }} ({{ usd $t.AICostUSD }} AI credits + {{ usd $t.SeatCostUSD }} seats){{ end }} |
+| AI credits | {{ num $t.Credits }} ({{ usd $t.AICostUSD }}) |
+| Active / engaged users | {{ $t.ActiveUsers }} / {{ $t.EngagedUsers }} ({{ pct (deref $t.EngagedShare) }} engaged) |
+| Merged pull requests | {{ num (deref $t.MergedPRs) }}{{ if not (isNil $t.CopilotShare) }} ({{ pct (deref $t.CopilotShare) }} Copilot-authored){{ end }} |
+| Cost per merged PR | **{{ usd (deref $t.CostPerMergedPR) }}** (AI only {{ usd (deref $t.AICostPerPR) }}) |
+| Median time to merge | {{ hours (deref $t.MedianCycleHrs) }} |
+| Code acceptance rate | {{ pct (deref $t.AcceptanceRate) }} · {{ num $t.LocAdded }} AI-assisted lines added |
+
+### Findings
+{{ range $r.Findings }}
+- {{ safe . }}
+{{- end }}
+{{- if $r.Teams }}
+
+<details><summary>Teams ({{ len $r.Teams }})</summary>
+
+| Team | Seats | Active | Engaged | Total cost | Merged PRs | Cost / PR | Median cycle |
+| ---- | ----- | ------ | ------- | ---------- | ---------- | --------- | ------------ |
+{{- range $r.Teams }}
+| {{ cell .Slug }} | {{ .Seats }} | {{ .ActiveUsers }} | {{ .EngagedUsers }} | {{ usd .TotalCostUSD }} | {{ num (deref .MergedPRs) }} | {{ usd (deref .CostPerMergedPR) }} | {{ hours (deref .MedianCycleHrs) }} |
+{{- end }}
+
+</details>
+{{- end }}
+{{- if $r.Repos }}
+
+<details><summary>Repositories ({{ len $r.Repos }})</summary>
+
+| Repository | Merged PRs | Copilot-authored | Commits | Attributed AI cost | AI cost / PR |
+| ---------- | ---------- | ---------------- | ------- | ------------------ | ------------ |
+{{- range $r.Repos }}
+| {{ cell .Name }} | {{ .MergedPRs }} | {{ .MergedCopilot }} ({{ pct (deref .CopilotShare) }}) | {{ num (deref .Commits) }} | {{ usd (deref .AttributedAICostUSD) }} | {{ usd (deref .CostPerMergedPR) }} |
+{{- end }}
+
+</details>
+{{- end }}
+{{- if .Result.artifact_url }}
+
+📦 **Artifacts:** [download the report bundle]({{ .Result.artifact_url }}){{ if $r.Spec.HTML }} (interactive `copilot-roi.html` with table views){{ end }}{{ if $r.Spec.CSV }}, CSV exports{{ end }}, `report.json`. Artifacts are retained for {{ default 30 .Result.retention_days }} days.
+{{- end }}
+{{- if .Result.grafana }}
+
+📈 Metrics were pushed to the Pushgateway and appear on the **IssueOps / Copilot ROI** Grafana dashboard.
+{{- end }}
+
+<details><summary>Notes and definitions</summary>
+{{ range $r.Notes }}
+- {{ safe . }}
+{{- end }}
+{{ range $k, $v := $r.Definitions }}
+- **{{ $k }}**: {{ safe $v }}
+{{- end }}
+
+</details>
+
+{{ template "footer" . }}

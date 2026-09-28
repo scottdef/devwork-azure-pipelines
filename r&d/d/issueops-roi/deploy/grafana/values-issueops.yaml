@@ -1,0 +1,48 @@
+# Grafana OSS 12 overlay for the IssueOps dashboards. Layer it on top of the
+# existing CoolEngOrg Grafana values (e.g. gold-graf-values.yaml):
+#
+#   helm upgrade --install grafana grafana-community/grafana -n grafana \
+#     -f gold-graf-values.yaml -f deploy/grafana/values-issueops.yaml --version 13.2.6
+#
+# The grafana/helm-charts "grafana" chart is deprecated (last 10.5.15); the
+# chart continues in grafana-community/helm-charts. Either chart works with this
+# overlay. The image is pinned to Grafana OSS 12 regardless of the chart's
+# appVersion. Verify the tag before upgrading:
+#   docker manifest inspect grafana/grafana-oss:12.4.11
+image:
+  repository: grafana/grafana-oss
+  tag: "12.4.11"
+
+datasources:
+  issueops-datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: IssueOps Prometheus
+        uid: issueops-prometheus
+        type: prometheus
+        access: proxy
+        url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+        isDefault: false
+        jsonData:
+          timeInterval: 60s
+          httpMethod: POST
+
+dashboardProviders:
+  issueops-dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: issueops
+        orgId: 1
+        folder: IssueOps
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/issueops
+
+# Mount the dashboard JSON from a ConfigMap created from this directory:
+#   kubectl -n grafana create configmap issueops-dashboards \
+#     --from-file=deploy/grafana/dashboards/ --dry-run=client -o yaml | kubectl apply -f -
+dashboardsConfigMaps:
+  issueops: issueops-dashboards

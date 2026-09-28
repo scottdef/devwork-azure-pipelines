@@ -1,0 +1,168 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "lea-ml",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": false,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-foundry-deploy.yml",
+      "request_type": "foundry-model-deployment",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+      "labels_add": [
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "lea-ml",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": false,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "lea-ml",
+          "auto": true,
+          "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+          "environment": "foundry-dev",
+          "escalations": null
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "foundry-dev",
+      "workflow": "execute-foundry-deploy.yml",
+      "request_type": "foundry-model-deployment",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+      "labels_add": [
+        "issueops:approved"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": false,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100030101"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "foundry-dev",
+      "workflow": "execute-foundry-deploy.yml",
+      "request_type": "foundry-model-deployment",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+      "labels_add": [
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": false,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100030101"
+        },
+        "template": "comment.completed.foundry-model-deployment.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-foundry-deploy.yml",
+      "request_type": "foundry-model-deployment",
+      "close": "completed",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799",
+      "labels_add": [
+        "issueops:completed"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

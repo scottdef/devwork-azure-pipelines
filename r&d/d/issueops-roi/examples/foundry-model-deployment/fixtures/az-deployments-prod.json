@@ -1,0 +1,6 @@
+[
+  { "name": "gpt-4.1-mini-agents", "sku": { "name": "GlobalStandard", "capacity": 300 },
+    "properties": { "model": { "name": "gpt-4.1-mini", "version": "2025-04-14", "format": "OpenAI" }, "provisioningState": "Succeeded" } },
+  { "name": "o4-mini-agents", "sku": { "name": "GlobalStandard", "capacity": 150 },
+    "properties": { "model": { "name": "o4-mini", "version": "2025-04-16", "format": "OpenAI" }, "provisioningState": "Succeeded" } }
+]

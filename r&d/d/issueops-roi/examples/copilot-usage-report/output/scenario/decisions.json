@@ -1,0 +1,254 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "dana-dev",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": true,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "dana-dev",
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+          "environment": "copilot-reports",
+          "escalations": [
+            "Per-user detail requires a Copilot administrator"
+          ]
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "comment",
+    "user": "mo-manager",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "mo-manager",
+          "command": "approve",
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": true,
+      "reason": "@mo-manager: not an eligible approver for this request. Eligible approvers: @CoolEngOrg/copilot-admins.",
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 4,
+    "do": "comment",
+    "user": "cara-copilot",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": true,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "cara-copilot",
+          "approvers": [
+            "cara-copilot"
+          ],
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53"
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-reports",
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:approved",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": true,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100020101"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-reports",
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": true,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100020101"
+        },
+        "template": "comment.completed.copilot-usage-report.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "close": "completed",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins",
+      "digest": "sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53",
+      "labels_add": [
+        "issueops:completed",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

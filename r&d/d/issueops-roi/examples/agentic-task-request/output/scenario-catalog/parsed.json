@@ -1,0 +1,22 @@
+{
+  "agent_acceptance_criteria": "- One pull request with grouped upgrades\n- Each upgrade links its release notes",
+  "agent_acknowledgements": {
+    "selected": [
+      "I will review all agent output (pull requests, documents) before it is merged or relied on",
+      "The objective and answers contain no secrets, credentials, or personal data"
+    ],
+    "unselected": []
+  },
+  "agent_backend": [
+    "agentic-workflow-catalog"
+  ],
+  "agent_catalog_workflow": [
+    "dependency-hygiene"
+  ],
+  "agent_data_classification": [
+    "internal"
+  ],
+  "agent_objective": "Review outdated Python dependencies in ml-pipelines and open one upgrade pull request with release-note summaries.",
+  "agent_target_repository": "ml-pipelines",
+  "agent_task_title": "Monthly dependency hygiene"
+}

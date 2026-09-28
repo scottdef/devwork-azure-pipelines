@@ -1,0 +1,109 @@
+{
+  "name": "Copilot cloud agent: idempotency keys for the refunds endpoint",
+  "description": "A developer delegates a coding task to the Copilot cloud agent. All clarifying answers arrive in one `.answers` comment (Q1 falls back to its default). A payments-api maintainer approves; execution creates an issue in the target repository assigned to Copilot with rendered custom instructions, and the agent opens a draft pull request there.",
+  "type": "agentic-task-request",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": {
+    "number": 402,
+    "title": "[IssueOps] Agentic task: idempotency keys for POST /refunds",
+    "requestor": "gia-pay"
+  },
+  "values": {
+    "agent_backend": [
+      "copilot-cloud-agent"
+    ],
+    "agent_target_repository": "CoolEngOrg/payments-api",
+    "agent_task_title": "Add idempotency keys to POST /v2/refunds",
+    "agent_objective": "Retries from the mobile app occasionally create duplicate refunds. Add Idempotency-Key header support to POST /v2/refunds, persisting keys for 24 hours and returning the original response for duplicates.",
+    "agent_acceptance_criteria": "- Duplicate requests with the same key return the original 201 response\n- Keys expire after 24 hours\n- Unit and integration tests cover duplicate, expired and missing keys\n- OpenAPI spec updated",
+    "agent_catalog_workflow": [
+      "none"
+    ],
+    "agent_data_classification": [
+      "internal"
+    ],
+    "agent_acknowledgements": {
+      "selected": [
+        "I will review all agent output (pull requests, documents) before it is merged or relied on",
+        "The objective and answers contain no secrets, credentials, or personal data"
+      ]
+    }
+  },
+  "directory": {
+    "repo_permissions": {
+      "payments-api": {
+        "gia-pay": "write",
+        "hal-api": "maintain",
+        "ivy-ledger": "write"
+      }
+    }
+  },
+  "steps": [
+    {
+      "do": "open",
+      "expect": {
+        "action": "summary",
+        "phase": "awaiting-answers",
+        "escalated": false
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ivy-ledger",
+      "body": ".answers\nA1: develop",
+      "after": "3m",
+      "note": "Only the requestor's answers count.",
+      "expect": {
+        "action": "rejected"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "gia-pay",
+      "after": "5m",
+      "body": ".answers\nA2: src/main/java/com/coolengorg/payments/refunds/**, src/main/resources/openapi/refunds.yaml\nA3: Do not change the ledger module or database migrations other than adding the idempotency table\nA4: ./gradlew test integrationTest\nA5: skip",
+      "expect": {
+        "action": "answers",
+        "phase": "validated"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "gia-pay",
+      "body": ".submit",
+      "after": "2m",
+      "expect": {
+        "action": "submitted"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "ivy-ledger",
+      "body": ".approve",
+      "after": "5m",
+      "note": "write permission is not enough: the rule needs maintain or admin on the target repository.",
+      "expect": {
+        "action": "rejected"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "hal-api",
+      "body": ".approve",
+      "after": "20m",
+      "expect": {
+        "action": "approved",
+        "execute": true,
+        "environment": "agentic-copilot"
+      }
+    },
+    {
+      "do": "execute",
+      "after": "1m",
+      "expect": {
+        "action": "completed",
+        "phase": "completed"
+      }
+    }
+  ]
+}

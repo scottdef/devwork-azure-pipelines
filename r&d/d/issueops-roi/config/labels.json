@@ -1,0 +1,20 @@
+[
+  { "name": "issueops", "color": "1f6feb", "description": "Request handled by the IssueOps platform" },
+
+  { "name": "issueops:copilot-budget", "color": "8250df", "description": "Request type: Copilot AI budget" },
+  { "name": "issueops:copilot-report", "color": "8250df", "description": "Request type: Copilot usage and ROI report" },
+  { "name": "issueops:foundry-deploy", "color": "8250df", "description": "Request type: Microsoft Foundry model deployment" },
+  { "name": "issueops:agentic-task", "color": "8250df", "description": "Request type: agentic task" },
+
+  { "name": "issueops:validated", "color": "0e8a16", "description": "State: request body passed validation" },
+  { "name": "issueops:invalid", "color": "d93f0b", "description": "State: request body failed validation; edit the issue" },
+  { "name": "issueops:awaiting-answers", "color": "fbca04", "description": "State: waiting for .answers to clarifying questions" },
+  { "name": "issueops:submitted", "color": "0052cc", "description": "State: requestor ran .submit; awaiting approval" },
+  { "name": "issueops:escalated", "color": "b60205", "description": "Flag: additional approvers required by policy" },
+  { "name": "issueops:approved", "color": "0e8a16", "description": "State: approval quorum met" },
+  { "name": "issueops:denied", "color": "b60205", "description": "State: denied by an approver" },
+  { "name": "issueops:cancelled", "color": "6e7781", "description": "State: cancelled by the requestor" },
+  { "name": "issueops:executing", "color": "5319e7", "description": "State: execution in progress" },
+  { "name": "issueops:completed", "color": "0e8a16", "description": "State: executed successfully" },
+  { "name": "issueops:failed", "color": "d93f0b", "description": "State: execution failed; see the run log" }
+]

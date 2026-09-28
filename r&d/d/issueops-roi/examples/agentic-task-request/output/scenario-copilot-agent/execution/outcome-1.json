@@ -1,0 +1,81 @@
+{
+  "dispatch": {
+    "backend": "copilot-cloud-agent",
+    "kind": "issue",
+    "url": "https://github.com/CoolEngOrg/payments-api/issues/1102",
+    "reference": "CoolEngOrg/payments-api#1102",
+    "message": "Issue created in the target repository and assigned to the Copilot cloud agent; it will open a draft pull request."
+  },
+  "spec": {
+    "request_ref": "CoolEngOrg/issueops#402",
+    "request_url": "https://github.com/CoolEngOrg/issueops/issues/402",
+    "requestor": "gia-pay",
+    "backend": "copilot-cloud-agent",
+    "org": "CoolEngOrg",
+    "repo": "payments-api",
+    "target_repo": "CoolEngOrg/payments-api",
+    "title": "Add idempotency keys to POST /v2/refunds",
+    "objective": "Retries from the mobile app occasionally create duplicate refunds. Add Idempotency-Key header support to POST /v2/refunds, persisting keys for 24 hours and returning the original response for duplicates.",
+    "acceptance_criteria": [
+      "Duplicate requests with the same key return the original 201 response",
+      "Keys expire after 24 hours",
+      "Unit and integration tests cover duplicate, expired and missing keys",
+      "OpenAPI spec updated"
+    ],
+    "classification": "internal",
+    "answers": {
+      "base_branch": "main",
+      "in_scope_paths": "src/main/java/com/coolengorg/payments/refunds/**, src/main/resources/openapi/refunds.yaml",
+      "out_of_scope": "Do not change the ledger module or database migrations other than adding the idempotency table",
+      "test_command": "./gradlew test integrationTest"
+    },
+    "questions": [
+      {
+        "id": "Q1",
+        "key": "base_branch",
+        "text": "Which branch should the agent branch from?",
+        "required": true,
+        "default": "main",
+        "pattern": "^[A-Za-z0-9._/-]{1,100}$",
+        "answer": "main",
+        "answered": true,
+        "from_default": true
+      },
+      {
+        "id": "Q2",
+        "key": "in_scope_paths",
+        "text": "Which paths or modules are in scope? (comma-separated globs)",
+        "required": true,
+        "answer": "src/main/java/com/coolengorg/payments/refunds/**, src/main/resources/openapi/refunds.yaml",
+        "answered": true
+      },
+      {
+        "id": "Q3",
+        "key": "out_of_scope",
+        "text": "Anything the agent must NOT change?",
+        "required": false,
+        "answer": "Do not change the ledger module or database migrations other than adding the idempotency table",
+        "answered": true
+      },
+      {
+        "id": "Q4",
+        "key": "test_command",
+        "text": "Which command verifies the change (for example `make test`)?",
+        "required": true,
+        "max_length": 200,
+        "answer": "./gradlew test integrationTest",
+        "answered": true
+      },
+      {
+        "id": "Q5",
+        "key": "custom_agent",
+        "text": "Custom agent profile to use (leave blank for the default).",
+        "required": false,
+        "pattern": "^[A-Za-z0-9._-]{0,64}$",
+        "answer": "",
+        "answered": false
+      }
+    ],
+    "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d"
+  }
+}

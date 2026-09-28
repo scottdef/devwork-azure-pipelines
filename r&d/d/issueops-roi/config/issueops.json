@@ -1,0 +1,713 @@
+{
+  "version": 1,
+  "enterprise": "CoolEngEnt",
+  "organization": "CoolEngOrg",
+  "repository": "issueops",
+  "platform_label": "issueops",
+  "docs_url": "https://github.com/CoolEngOrg/issueops/tree/main/docs",
+  "pricing": {
+    "ai_credit_usd": 0.01,
+    "seat_monthly_usd": 39,
+    "seat_plan": "Copilot Enterprise",
+    "note": "Illustrative defaults. Replace with CoolEngEnt contract pricing; set ai_credit_usd to the pricePerUnit shown in the AI-credit billing usage report."
+  },
+  "request_types": [
+    {
+      "id": "copilot-budget-request",
+      "name": "Copilot AI budget request",
+      "description": "Create or update a Copilot AI-credit budget (organization, repository, user, all-users, or enterprise cost center).",
+      "template": "copilot-budget-request.yml",
+      "label": "issueops:copilot-budget",
+      "execute": {
+        "workflow": "execute-copilot-budget.yml",
+        "environment": "copilot-budgets"
+      },
+      "close_on_complete": true,
+      "approval": {
+        "require_submit": true,
+        "allow_self_approval": false,
+        "distinct_approvers": true,
+        "rules": [
+          {
+            "name": "Copilot administrators",
+            "min": 1,
+            "any_of": {
+              "teams": [
+                "copilot-admins"
+              ]
+            }
+          }
+        ],
+        "escalations": [
+          {
+            "name": "FinOps sign-off above $1,000 per month",
+            "when": {
+              "any": [
+                {
+                  "field": "budget_amount",
+                  "op": "gt",
+                  "value": 1000
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "FinOps approvers",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "finops-approvers"
+                  ]
+                }
+              }
+            ],
+            "environment": "copilot-budgets-high"
+          },
+          {
+            "name": "Enterprise cost-center budgets need an enterprise owner",
+            "when": {
+              "any": [
+                {
+                  "field": "budget_scope",
+                  "op": "eq",
+                  "value": "cost-center"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "Enterprise billing owners",
+                "min": 1,
+                "any_of": {
+                  "users": [
+                    "coolengent-billing-owner"
+                  ]
+                }
+              }
+            ],
+            "environment": "copilot-budgets-enterprise"
+          },
+          {
+            "name": "Budget for a named user: the user confirms",
+            "when": {
+              "all": [
+                {
+                  "field": "budget_scope",
+                  "op": "eq",
+                  "value": "user"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "Budget beneficiary",
+                "min": 1,
+                "any_of": {
+                  "field_users": [
+                    "budget_target"
+                  ],
+                  "requestor": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "settings": {
+        "max_amount_usd": 10000,
+        "enterprise_scopes_enabled": false,
+        "products": {
+          "AI credits": {
+            "sku": "ai_credits",
+            "budget_type": "BundlePricing"
+          },
+          "Premium requests (legacy)": {
+            "sku": "premium_requests",
+            "budget_type": "BundlePricing"
+          }
+        },
+        "default_alert_recipients": [
+          "copilot-billing-bot"
+        ]
+      }
+    },
+    {
+      "id": "copilot-usage-report",
+      "name": "Copilot usage and ROI report",
+      "description": "Join Copilot usage metrics, AI-credit cost, and pull-request output at organization, team, or repository level.",
+      "template": "copilot-usage-report.yml",
+      "label": "issueops:copilot-report",
+      "execute": {
+        "workflow": "execute-copilot-report.yml",
+        "environment": "copilot-reports"
+      },
+      "close_on_complete": true,
+      "requestors": {
+        "any_of": {
+          "teams": [
+            "engineering-managers",
+            "copilot-admins",
+            "platform-admins"
+          ]
+        }
+      },
+      "approval": {
+        "require_submit": true,
+        "allow_self_approval": false,
+        "distinct_approvers": true,
+        "rules": [],
+        "escalations": [
+          {
+            "name": "Per-user detail requires a Copilot administrator",
+            "when": {
+              "any": [
+                {
+                  "field": "report_user_detail",
+                  "op": "contains",
+                  "value": "Include a per-user breakdown (requires Copilot admin approval)"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "Copilot administrators",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "copilot-admins"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "settings": {
+        "max_days": 90,
+        "max_teams": 20,
+        "max_repositories": 25,
+        "data_lag_days": 2,
+        "earliest_report_day": "2025-10-10",
+        "max_search_users": 300,
+        "engaged_definition": "accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day",
+        "assets_host": "https://go-echarts.github.io/go-echarts-assets/assets/"
+      }
+    },
+    {
+      "id": "foundry-model-deployment",
+      "name": "Microsoft Foundry model deployment",
+      "description": "Deploy or resize an approved model on an approved Foundry resource with Bicep via OIDC.",
+      "template": "foundry-model-deployment.yml",
+      "label": "issueops:foundry-deploy",
+      "execute": {
+        "workflow": "execute-foundry-deploy.yml",
+        "environment": "foundry-{environment}"
+      },
+      "close_on_complete": true,
+      "approval": {
+        "require_submit": true,
+        "allow_self_approval": false,
+        "distinct_approvers": true,
+        "auto_approve": {
+          "all": [
+            {
+              "field": "$environment",
+              "op": "eq",
+              "value": "dev"
+            },
+            {
+              "field": "foundry_sku",
+              "op": "in",
+              "value": [
+                "GlobalStandard",
+                "DataZoneStandard"
+              ]
+            },
+            {
+              "field": "foundry_capacity",
+              "op": "lte",
+              "value": 10
+            }
+          ]
+        },
+        "rules": [
+          {
+            "name": "Platform AI team",
+            "min": 1,
+            "any_of": {
+              "teams": [
+                "platform-ai"
+              ]
+            }
+          }
+        ],
+        "escalations": [
+          {
+            "name": "Production needs AI governance",
+            "when": {
+              "any": [
+                {
+                  "field": "$environment",
+                  "op": "eq",
+                  "value": "prod"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "AI governance (security)",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "ai-governance"
+                  ],
+                  "org_roles": [
+                    "security_manager"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Provisioned throughput needs FinOps",
+            "when": {
+              "any": [
+                {
+                  "field": "foundry_sku",
+                  "op": "matches",
+                  "value": "ProvisionedManaged$"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "FinOps approvers",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "finops-approvers"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "settings": {
+        "accounts": {
+          "aif-cooleng-dev-eus2": {
+            "environment": "dev",
+            "resource_group": "rg-cooleng-ai-dev",
+            "region": "eastus2"
+          },
+          "aif-cooleng-uat-eus2": {
+            "environment": "uat",
+            "resource_group": "rg-cooleng-ai-uat",
+            "region": "eastus2"
+          },
+          "aif-cooleng-prod-eus2": {
+            "environment": "prod",
+            "resource_group": "rg-cooleng-ai-prod",
+            "region": "eastus2"
+          }
+        },
+        "models": [
+          {
+            "name": "gpt-4.1",
+            "format": "OpenAI",
+            "versions": [
+              "2025-04-14"
+            ],
+            "skus": [
+              "GlobalStandard",
+              "DataZoneStandard",
+              "GlobalProvisionedManaged"
+            ],
+            "environments": [
+              "dev",
+              "uat",
+              "prod"
+            ],
+            "max_capacity": {
+              "dev": 50,
+              "uat": 100,
+              "prod": 500
+            }
+          },
+          {
+            "name": "gpt-4.1-mini",
+            "format": "OpenAI",
+            "versions": [
+              "2025-04-14"
+            ],
+            "skus": [
+              "GlobalStandard",
+              "DataZoneStandard",
+              "GlobalBatch"
+            ],
+            "environments": [
+              "dev",
+              "uat",
+              "prod"
+            ],
+            "max_capacity": {
+              "dev": 100,
+              "uat": 200,
+              "prod": 1000
+            }
+          },
+          {
+            "name": "o4-mini",
+            "format": "OpenAI",
+            "versions": [
+              "2025-04-16"
+            ],
+            "skus": [
+              "GlobalStandard",
+              "DataZoneStandard"
+            ],
+            "environments": [
+              "dev",
+              "uat",
+              "prod"
+            ],
+            "max_capacity": {
+              "dev": 50,
+              "uat": 100,
+              "prod": 300
+            }
+          },
+          {
+            "name": "text-embedding-3-large",
+            "format": "OpenAI",
+            "versions": [
+              "1"
+            ],
+            "skus": [
+              "GlobalStandard",
+              "Standard"
+            ],
+            "environments": [
+              "dev",
+              "uat",
+              "prod"
+            ],
+            "max_capacity": {
+              "dev": 100,
+              "uat": 200,
+              "prod": 500
+            }
+          },
+          {
+            "name": "Phi-4-mini-instruct",
+            "format": "Microsoft",
+            "versions": [
+              "1"
+            ],
+            "skus": [
+              "GlobalStandard"
+            ],
+            "environments": [
+              "dev",
+              "uat"
+            ],
+            "max_capacity": {
+              "dev": 1,
+              "uat": 1
+            }
+          }
+        ],
+        "default_rai_policy": "Microsoft.DefaultV2",
+        "deployment_name_pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$",
+        "quota_strict": true,
+        "note": "Example allow-list. Confirm each model/version/SKU with `az cognitiveservices account list-models` before enabling it."
+      }
+    },
+    {
+      "id": "agentic-task-request",
+      "name": "Agentic task request",
+      "description": "Collect task details through issue-comment Q&A, then run a Copilot cloud agent, an agentic-workflow catalog entry, or the AKS/Foundry agent runner.",
+      "template": "agentic-task-request.yml",
+      "label": "issueops:agentic-task",
+      "execute": {
+        "workflow": "execute-agentic-task.yml",
+        "environment": "{backend_environment}"
+      },
+      "close_on_complete": false,
+      "qa": true,
+      "requestors": {
+        "target_repo_field": "agent_target_repository",
+        "any_of": {
+          "target_repo_permissions": [
+            "write",
+            "maintain",
+            "admin"
+          ]
+        }
+      },
+      "approval": {
+        "require_submit": true,
+        "allow_self_approval": false,
+        "distinct_approvers": true,
+        "target_repo_field": "agent_target_repository",
+        "rules": [
+          {
+            "name": "Target repository maintainer",
+            "min": 1,
+            "any_of": {
+              "target_repo_permissions": [
+                "maintain",
+                "admin"
+              ]
+            }
+          }
+        ],
+        "escalations": [
+          {
+            "name": "AKS agent runner needs the platform AI team",
+            "when": {
+              "any": [
+                {
+                  "field": "agent_backend",
+                  "op": "eq",
+                  "value": "aks-foundry-agent"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "Platform AI team",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "platform-ai"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Confidential data needs AI governance",
+            "when": {
+              "any": [
+                {
+                  "field": "agent_data_classification",
+                  "op": "eq",
+                  "value": "confidential"
+                }
+              ]
+            },
+            "rules": [
+              {
+                "name": "AI governance (security)",
+                "min": 1,
+                "any_of": {
+                  "teams": [
+                    "ai-governance"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "settings": {
+        "repository_allow": [
+          "*"
+        ],
+        "repository_deny": [
+          "issueops",
+          ".github",
+          "enterprise-policies"
+        ],
+        "backends": {
+          "copilot-cloud-agent": {
+            "max_classification": "internal",
+            "mode": "issue",
+            "environment": "agentic-copilot"
+          },
+          "agentic-workflow-catalog": {
+            "max_classification": "internal",
+            "environment": "agentic-catalog"
+          },
+          "aks-foundry-agent": {
+            "max_classification": "confidential",
+            "environment": "agentic-aks",
+            "namespace": "issueops-agents",
+            "image": "acrcooleng.azurecr.io/issueops/agent-runner:1.0.0",
+            "service_account": "issueops-agent-runner",
+            "foundry_endpoint": "https://aif-cooleng-prod-eus2.openai.azure.com",
+            "allowed_deployments": [
+              "gpt-4.1-agents",
+              "gpt-4.1-mini-agents",
+              "o4-mini-agents"
+            ],
+            "confidential_deployments": [
+              "gpt-4.1-agents"
+            ],
+            "max_iterations": 4,
+            "timeout_seconds": 900
+          }
+        },
+        "catalog": {
+          "dependency-hygiene": {
+            "workflow": "dependency-hygiene.lock.yml",
+            "description": "GitHub Agentic Workflow that reviews outdated dependencies and opens an upgrade PR.",
+            "inputs": {
+              "ecosystems": "Q1",
+              "open_pull_request": "Q2"
+            }
+          },
+          "docs-refresh": {
+            "workflow": "docs-refresh.lock.yml",
+            "description": "Refreshes README and docs for the listed paths against the current code.",
+            "inputs": {
+              "paths": "Q1"
+            }
+          },
+          "test-gap-analysis": {
+            "workflow": "test-gap-analysis.lock.yml",
+            "description": "Finds untested code paths in a package and proposes tests.",
+            "inputs": {
+              "package_path": "Q1",
+              "coverage_target": "Q2"
+            }
+          }
+        },
+        "question_sets": {
+          "copilot-cloud-agent": [
+            {
+              "id": "Q1",
+              "key": "base_branch",
+              "text": "Which branch should the agent branch from?",
+              "required": true,
+              "default": "main",
+              "pattern": "^[A-Za-z0-9._/-]{1,100}$"
+            },
+            {
+              "id": "Q2",
+              "key": "in_scope_paths",
+              "text": "Which paths or modules are in scope? (comma-separated globs)",
+              "required": true
+            },
+            {
+              "id": "Q3",
+              "key": "out_of_scope",
+              "text": "Anything the agent must NOT change?",
+              "required": false
+            },
+            {
+              "id": "Q4",
+              "key": "test_command",
+              "text": "Which command verifies the change (for example `make test`)?",
+              "required": true,
+              "max_length": 200
+            },
+            {
+              "id": "Q5",
+              "key": "custom_agent",
+              "text": "Custom agent profile to use (leave blank for the default).",
+              "required": false,
+              "pattern": "^[A-Za-z0-9._-]{0,64}$"
+            }
+          ],
+          "agentic-workflow-catalog": {
+            "dependency-hygiene": [
+              {
+                "id": "Q1",
+                "key": "ecosystems",
+                "text": "Which ecosystems? (comma-separated: npm, gomod, pip, maven, nuget)",
+                "required": true,
+                "pattern": "^[a-z, ]{2,60}$"
+              },
+              {
+                "id": "Q2",
+                "key": "open_pull_request",
+                "text": "Open a pull request with upgrades? (yes/no)",
+                "required": true,
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              }
+            ],
+            "docs-refresh": [
+              {
+                "id": "Q1",
+                "key": "paths",
+                "text": "Which documentation paths should be refreshed? (comma-separated)",
+                "required": true
+              }
+            ],
+            "test-gap-analysis": [
+              {
+                "id": "Q1",
+                "key": "package_path",
+                "text": "Which package or directory should be analysed?",
+                "required": true
+              },
+              {
+                "id": "Q2",
+                "key": "coverage_target",
+                "text": "Target line coverage percentage (1-100)?",
+                "required": true,
+                "pattern": "^(100|[1-9][0-9]?)$"
+              }
+            ]
+          },
+          "aks-foundry-agent": [
+            {
+              "id": "Q1",
+              "key": "deliverable_type",
+              "text": "What should the agent produce?",
+              "required": true,
+              "choices": [
+                "runbook",
+                "design-doc",
+                "analysis",
+                "test-plan",
+                "adr"
+              ]
+            },
+            {
+              "id": "Q2",
+              "key": "audience",
+              "text": "Who is the audience?",
+              "required": true,
+              "max_length": 200
+            },
+            {
+              "id": "Q3",
+              "key": "context",
+              "text": "Background and context the agent needs (links, constraints, current state).",
+              "required": true,
+              "max_length": 6000
+            },
+            {
+              "id": "Q4",
+              "key": "constraints",
+              "text": "Hard constraints (tools, versions, policies) the output must respect.",
+              "required": false,
+              "max_length": 2000
+            },
+            {
+              "id": "Q5",
+              "key": "model_deployment",
+              "text": "Which approved Foundry deployment should the agent use?",
+              "required": true,
+              "choices_from": "allowed_deployments"
+            },
+            {
+              "id": "Q6",
+              "key": "max_iterations",
+              "text": "Maximum draft/critique iterations (1-4, default 3).",
+              "required": false,
+              "default": "3",
+              "pattern": "^[1-4]$"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

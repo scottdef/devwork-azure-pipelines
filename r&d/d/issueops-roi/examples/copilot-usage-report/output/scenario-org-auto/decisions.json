@@ -1,0 +1,168 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "pia-platform",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": false,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+      "labels_add": [
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "pia-platform",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": false,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "pia-platform",
+          "auto": true,
+          "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+          "environment": "copilot-reports",
+          "escalations": null
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-reports",
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+      "labels_add": [
+        "issueops:approved"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": false,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100020201"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-reports",
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+      "labels_add": [
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": false,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100020201"
+        },
+        "template": "comment.completed.copilot-usage-report.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-report.yml",
+      "request_type": "copilot-usage-report",
+      "close": "completed",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:76fed101c7d2f90e2924fa339a6ed0fac82aa4959d700a3048ebe604ada473bf",
+      "labels_add": [
+        "issueops:completed"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

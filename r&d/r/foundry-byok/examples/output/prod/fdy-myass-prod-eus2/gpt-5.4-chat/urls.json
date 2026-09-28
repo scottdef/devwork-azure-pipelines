@@ -1,0 +1,71 @@
+{
+  "spec": {
+    "environment": "prod",
+    "resource": "fdy-myass-prod-eus2",
+    "host_kind": "openai",
+    "model": "gpt-5.4",
+    "model_version": "2026-03-05",
+    "deployment": "gpt-5.4-chat",
+    "surface": "auto",
+    "wire_api": "auto",
+    "auth": "api-key",
+    "api_key_secret": "FOUNDRY_PROD_API_KEY",
+    "tenant_id": "11111111-2222-3333-4444-555555555555",
+    "client_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "entra_authority_host": "login.microsoftonline.com",
+    "legacy_api_version": "2024-10-21",
+    "inference_api_version": "2024-05-01-preview",
+    "enterprise_url_style": "v1",
+    "runs_on": "self-hosted, linux, x64",
+    "disable_model_fallback": true
+  },
+  "host": "fdy-myass-prod-eus2.openai.azure.com",
+  "model_id": "gpt-5.4-2026-03-05",
+  "surface": "openai-v1",
+  "wire_api": "responses",
+  "urls": {
+    "origin": "https://fdy-myass-prod-eus2.openai.azure.com",
+    "v1_base": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1",
+    "v1_chat_completions": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/chat/completions",
+    "v1_responses": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/responses",
+    "v1_embeddings": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/embeddings",
+    "v1_models": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/models",
+    "v1_model": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/models/gpt-5.4-chat",
+    "legacy_deployment_base": "https://fdy-myass-prod-eus2.openai.azure.com/openai/deployments/gpt-5.4-chat",
+    "legacy_chat_completions": "https://fdy-myass-prod-eus2.openai.azure.com/openai/deployments/gpt-5.4-chat/chat/completions?api-version=2024-10-21",
+    "legacy_embeddings": "https://fdy-myass-prod-eus2.openai.azure.com/openai/deployments/gpt-5.4-chat/embeddings?api-version=2024-10-21",
+    "model_inference_chat_completions": "https://fdy-myass-prod-eus2.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview"
+  },
+  "gh_aw": {
+    "engine_model": "gpt-5.4-2026-03-05",
+    "provider_base_url": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1",
+    "provider_model_id": "gpt-5.4-chat",
+    "wire_api": "responses",
+    "api_key_expr": "${{ secrets.FOUNDRY_PROD_API_KEY }}",
+    "network_allowed": [
+      "defaults",
+      "fdy-myass-prod-eus2.openai.azure.com"
+    ],
+    "workflow_slug": "smoke-foundry-prod-fdy-myass-prod-eus2-gpt-5-4-chat"
+  },
+  "copilot_client": {
+    "cli_base_url": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1",
+    "cli_model": "gpt-5.4-2026-03-05",
+    "cli_azure_base_url": "https://fdy-myass-prod-eus2.openai.azure.com",
+    "sdk_base_url": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1/",
+    "sdk_type": "openai",
+    "sdk_model": "gpt-5.4-chat"
+  },
+  "copilot_enterprise": {
+    "provider": "Microsoft Foundry",
+    "key_name": "foundry-prod-fdy-myass-prod-eus2",
+    "deployment_url": "https://fdy-myass-prod-eus2.openai.azure.com/openai/v1",
+    "model_id": "gpt-5.4-chat",
+    "deployment_url_alternates": [
+      "https://fdy-myass-prod-eus2.openai.azure.com/openai/deployments/gpt-5.4-chat/chat/completions?api-version=2024-10-21",
+      "https://fdy-myass-prod-eus2.openai.azure.com"
+    ],
+    "host_accepted": true,
+    "supported": true
+  }
+}

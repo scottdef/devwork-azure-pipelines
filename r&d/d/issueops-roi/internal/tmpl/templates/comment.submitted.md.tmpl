@@ -1,0 +1,17 @@
+## 📨 Submitted for approval
+
+{{ mention .Actor }} submitted this {{ .TypeName }} (digest <code>{{ short .Digest }}</code>).
+
+{{ template "request-table" . }}
+{{ template "spec" . }}
+
+### Approval required
+
+{{ template "rules" . }}
+
+{{ range .Mentions }}{{ . }} {{ end }}please review. Comment **`.approve`** to approve or **`.deny <reason>`** to deny. Requestors cannot approve their own requests; each person counts toward one rule.
+
+> [!IMPORTANT]
+> Approvals are bound to this exact request content. Editing the issue body{{ if .QA }} or answers{{ end }} voids them.
+
+{{ template "footer" . }}

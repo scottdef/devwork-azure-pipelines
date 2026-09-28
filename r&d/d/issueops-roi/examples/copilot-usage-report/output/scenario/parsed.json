@@ -1,0 +1,30 @@
+{
+  "report_cost_basis": [
+    "AI credits and seats"
+  ],
+  "report_end_date": "",
+  "report_outputs": {
+    "selected": [
+      "Interactive HTML report",
+      "CSV exports",
+      "Publish metrics to Grafana"
+    ],
+    "unselected": []
+  },
+  "report_period": [
+    "Last 28 days"
+  ],
+  "report_purpose": "Quarterly business review: compare AI-credit spend against merged pull requests and review throughput for platform-eng and payments, and identify seats that are not being used before the October true-up.",
+  "report_repositories": "",
+  "report_scope": [
+    "teams"
+  ],
+  "report_start_date": "",
+  "report_teams": "platform-eng, @CoolEngOrg/payments",
+  "report_user_detail": {
+    "selected": [
+      "Include a per-user breakdown (requires Copilot admin approval)"
+    ],
+    "unselected": []
+  }
+}

@@ -1,0 +1,30 @@
+{{- $res := .Result.result -}}
+{{- $plan := .Result.plan -}}
+## ✅ Copilot budget {{ $res.Action }}
+
+| Field | Value |
+| ----- | ----- |
+| Endpoint | {{ $plan.OwnerKind }} {{ code $plan.OwnerName }} |
+| Scope | {{ code $plan.Scope }}{{ if $plan.User }} (@{{ $plan.User }}){{ else if $plan.EntityName }} ({{ code $plan.EntityName }}){{ end }} |
+| Product SKU | {{ code $plan.SKU }} |
+{{- with $res.Before }}
+| Previous amount | {{ usd .BudgetAmount }} per month |
+{{- end }}
+{{- with $res.After }}
+| New amount | {{ usd .BudgetAmount }} per month |
+| Stops usage at limit | {{ if .PreventFurtherUsage }}yes{{ else }}no (alert only){{ end }} |
+| Budget ID | {{ code .ID }} |
+{{- end }}
+{{- if $plan.ExpiresAt }}
+| Expires | {{ $plan.ExpiresAt }} |
+{{- end }}
+| Cost center | {{ code $plan.CostCenter }} |
+
+{{- if eq $res.Action "unchanged" }}
+
+The budget already had this amount and enforcement, so no change was made.
+{{- end }}
+
+Alerts fire at 75%, 90% and 100% of the budget for organization and repository budgets. Track spend with a **Copilot usage and ROI report** request.
+
+{{ template "footer" . }}

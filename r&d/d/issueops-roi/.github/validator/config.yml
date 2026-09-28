@@ -1,0 +1,52 @@
+# Custom validators for issue-ops/validator. `field` is the issue-form element
+# id (the key issue-ops/parser emits); fields absent from a form are skipped,
+# so one config serves every request type. Scripts are ESM and use only Node
+# built-ins (global fetch), so no npm install step is needed.
+#
+# These are fast, field-level checks. Cross-field rules, policy and anything
+# needing context (scope + target, allow-lists, quotas) live in the Go CLI.
+validators:
+  # copilot-budget-request
+  - field: budget_amount
+    script: usd-amount.js
+  - field: budget_target
+    script: budget-target.js
+  - field: budget_alert_recipients
+    script: logins.js
+  - field: budget_expires_on
+    script: date.js
+  - field: budget_cost_center
+    script: cost-center.js
+  - field: budget_justification
+    script: no-secrets.js
+  # copilot-usage-report
+  - field: report_teams
+    script: teams.js
+  - field: report_repositories
+    script: repositories.js
+  - field: report_start_date
+    script: date.js
+  - field: report_end_date
+    script: date.js
+  # foundry-model-deployment
+  - field: foundry_capacity
+    script: positive-int.js
+  - field: foundry_deployment_name
+    script: deployment-name.js
+  - field: foundry_review_date
+    script: date.js
+  - field: foundry_cost_center
+    script: cost-center.js
+  - field: foundry_consumers
+    script: no-secrets.js
+  - field: foundry_use_case
+    script: no-secrets.js
+  # agentic-task-request
+  - field: agent_target_repository
+    script: repositories.js
+  - field: agent_task_title
+    script: no-secrets.js
+  - field: agent_objective
+    script: no-secrets.js
+  - field: agent_acceptance_criteria
+    script: no-secrets.js

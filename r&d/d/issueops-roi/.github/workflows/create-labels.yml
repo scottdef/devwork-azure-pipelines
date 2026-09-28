@@ -1,0 +1,30 @@
+# Creates or updates the IssueOps labels (request types, state labels,
+# escalation flag) from config/labels.json.
+name: IssueOps · sync labels
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [config/labels.json]
+
+permissions:
+  contents: read
+
+jobs:
+  labels:
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: write
+      - env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+        run: issueops labels --file config/labels.json

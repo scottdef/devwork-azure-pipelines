@@ -1,0 +1,106 @@
+{
+  "request_ref": "CoolEngOrg/issueops#401",
+  "request_url": "https://github.com/CoolEngOrg/issueops/issues/401",
+  "requestor": "ada-platform",
+  "backend": "aks-foundry-agent",
+  "org": "CoolEngOrg",
+  "repo": "platform-infra",
+  "target_repo": "CoolEngOrg/platform-infra",
+  "title": "Runbook: zero-downtime AKS node-pool upgrade to Kubernetes 1.30",
+  "objective": "Produce an on-call runbook for upgrading the production AKS cluster's user node pools to Kubernetes 1.30 without dropping traffic, including pre-checks, surge/drain settings, stuck-drain handling and rollback.",
+  "acceptance_criteria": [
+    "Uses az CLI and kubectl 1.30 commands only",
+    "Covers PodDisruptionBudget checks before draining",
+    "Includes a rollback section",
+    "Fits on two printed pages"
+  ],
+  "classification": "confidential",
+  "answers": {
+    "audience": "Platform SRE on-call engineers (comfortable with kubectl, new to AKS upgrades)",
+    "backup_procedure": "Velero schedule daily-cluster (namespaces + PVC snapshots), must show a Completed backup from the last 24h",
+    "constraints": "az CLI 2.6x, kubectl 1.30; no third-party upgrade tooling; must follow CHG-policy-7 (control plane before node pools).",
+    "context": "Production cluster aks-cooleng-prod-eus2 runs 1.29 with two user node pools (userpool1: 12 nodes, userpool2: 6 nodes). All tier-1 services have PDBs. Upgrades happen in the Tuesday 14:00-17:00 UTC change window.",
+    "deliverable_type": "runbook",
+    "max_iterations": "3",
+    "model_deployment": "gpt-4.1-agents"
+  },
+  "questions": [
+    {
+      "id": "Q1",
+      "key": "deliverable_type",
+      "text": "What should the agent produce?",
+      "required": true,
+      "choices": [
+        "runbook",
+        "design-doc",
+        "analysis",
+        "test-plan",
+        "adr"
+      ],
+      "answer": "runbook",
+      "answered": true
+    },
+    {
+      "id": "Q2",
+      "key": "audience",
+      "text": "Who is the audience?",
+      "required": true,
+      "max_length": 200,
+      "answer": "Platform SRE on-call engineers (comfortable with kubectl, new to AKS upgrades)",
+      "answered": true
+    },
+    {
+      "id": "Q3",
+      "key": "context",
+      "text": "Background and context the agent needs (links, constraints, current state).",
+      "required": true,
+      "max_length": 6000,
+      "answer": "Production cluster aks-cooleng-prod-eus2 runs 1.29 with two user node pools (userpool1: 12 nodes, userpool2: 6 nodes). All tier-1 services have PDBs. Upgrades happen in the Tuesday 14:00-17:00 UTC change window.",
+      "answered": true
+    },
+    {
+      "id": "Q4",
+      "key": "constraints",
+      "text": "Hard constraints (tools, versions, policies) the output must respect.",
+      "required": false,
+      "max_length": 2000,
+      "answer": "az CLI 2.6x, kubectl 1.30; no third-party upgrade tooling; must follow CHG-policy-7 (control plane before node pools).",
+      "answered": true
+    },
+    {
+      "id": "Q5",
+      "key": "model_deployment",
+      "text": "Which approved Foundry deployment should the agent use?",
+      "required": true,
+      "choices": [
+        "gpt-4.1-agents",
+        "gpt-4.1-mini-agents",
+        "o4-mini-agents"
+      ],
+      "choices_from": "allowed_deployments",
+      "answer": "gpt-4.1-agents",
+      "answered": true
+    },
+    {
+      "id": "Q6",
+      "key": "max_iterations",
+      "text": "Maximum draft/critique iterations (1-4, default 3).",
+      "required": false,
+      "default": "3",
+      "pattern": "^[1-4]$",
+      "answer": "3",
+      "answered": true
+    },
+    {
+      "id": "Q7",
+      "key": "backup_procedure",
+      "text": "Which backup must be confirmed before the upgrade (tool and schedule name)?",
+      "required": true,
+      "max_length": 500,
+      "dynamic": true,
+      "answer": "Velero schedule daily-cluster (namespaces + PVC snapshots), must show a Completed backup from the last 24h",
+      "answered": true
+    }
+  ],
+  "digest": "sha256:195e80ee11152040c59b4f348bee55796d27f6c72bc83855c2cf411cf5bc76b0"
+}

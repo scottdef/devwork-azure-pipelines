@@ -1,0 +1,49 @@
+name: IssueOps finish
+description: Records the execution outcome on the issue (completed, failed or needs_input).
+inputs:
+  token:
+    required: true
+  bot-login:
+    required: true
+  issue-number:
+    required: true
+  status:
+    description: completed | failed | needs_input
+    required: true
+  result:
+    description: Outcome JSON written by the execution job (may be missing on failure).
+    required: false
+    default: ''
+  error:
+    description: Error summary for failed runs.
+    required: false
+    default: ''
+  extra:
+    description: Extra template data as k=v lines (artifact_url=..., grafana=true).
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Finish
+      id: finish
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE: ${{ inputs.issue-number }}
+        STATUS: ${{ inputs.status }}
+        RESULT: ${{ inputs.result }}
+        ISSUEOPS_ERROR: ${{ inputs.error }}
+        ISSUEOPS_EXTRA: ${{ inputs.extra }}
+      run: issueops finish --issue "$ISSUE" --status "$STATUS" --result "$RESULT"
+
+    - name: Apply decision
+      uses: ./.github/actions/apply-decision
+      with:
+        token: ${{ inputs.token }}
+        bot-login: ${{ inputs.bot-login }}
+        issue-number: ${{ inputs.issue-number }}
+        labels-add: ${{ steps.finish.outputs.labels_add }}
+        labels-remove: ${{ steps.finish.outputs.labels_remove }}
+        comment-path: ${{ steps.finish.outputs.comment_path }}
+        close: ${{ steps.finish.outputs.close }}

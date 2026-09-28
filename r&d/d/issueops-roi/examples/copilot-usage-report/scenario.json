@@ -1,0 +1,36 @@
+{
+  "name": "28-day AI-cost vs output report for two teams, with per-user detail",
+  "description": "An engineering manager asks for a Copilot ROI report for the platform-eng and payments teams. Ticking per-user detail triggers the Copilot-admin escalation. The execution job joins the users-1-day, user-teams-1-day NDJSON reports with merged pull requests, reviews and AI-credit cost, then renders the go-echarts HTML report, CSV exports and Prometheus metrics for Grafana.",
+  "type": "copilot-usage-report",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 201, "title": "[IssueOps] Copilot usage report: platform-eng + payments, last 28 days", "requestor": "dana-dev" },
+  "values": {
+    "report_scope": ["teams"],
+    "report_teams": "platform-eng, @CoolEngOrg/payments",
+    "report_repositories": "",
+    "report_period": ["Last 28 days"],
+    "report_start_date": "",
+    "report_end_date": "",
+    "report_cost_basis": ["AI credits and seats"],
+    "report_outputs": { "selected": ["Interactive HTML report", "CSV exports", "Publish metrics to Grafana"] },
+    "report_user_detail": { "selected": ["Include a per-user breakdown (requires Copilot admin approval)"] },
+    "report_purpose": "Quarterly business review: compare AI-credit spend against merged pull requests and review throughput for platform-eng and payments, and identify seats that are not being used before the October true-up."
+  },
+  "directory": {
+    "teams": {
+      "engineering-managers": ["dana-dev", "mo-manager"],
+      "copilot-admins": ["alex-admin", "cara-copilot"],
+      "platform-admins": ["pia-platform"]
+    }
+  },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "validated", "escalated": true } },
+    { "do": "comment", "user": "dana-dev", "body": ".submit", "after": "2m", "expect": { "action": "submitted", "contains": ["@CoolEngOrg/copilot-admins"] } },
+    { "do": "comment", "user": "mo-manager", "body": ".approve", "after": "9m", "note": "Another manager is not an eligible approver for the per-user escalation.",
+      "expect": { "action": "rejected", "rejected": true } },
+    { "do": "comment", "user": "cara-copilot", "body": ".approve Per-user detail OK for the QBR; do not forward the CSV outside the leadership group.", "after": "25m",
+      "expect": { "action": "approved", "execute": true, "environment": "copilot-reports" } },
+    { "do": "execute", "after": "1m", "execution": { "fixtures": "fixtures" },
+      "expect": { "action": "completed", "phase": "completed", "close": "completed" } }
+  ]
+}

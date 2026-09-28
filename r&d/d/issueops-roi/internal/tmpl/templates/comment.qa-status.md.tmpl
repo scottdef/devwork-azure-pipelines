@@ -1,0 +1,22 @@
+{{- if .QA.Complete }}
+## ✅ All required questions are answered
+
+{{ template "questions" . }}
+
+{{ template "spec" . }}
+{{- if .Stale }}
+
+> [!NOTE]
+> The answers changed after submission, so earlier approvals no longer apply.
+{{- end }}
+
+{{ mention .Requestor }}, if the specification is right, comment **`.submit`**. You can still change answers with another `.answers` comment before submitting.
+{{- else }}
+## ❓ Answers recorded: {{ len .QA.Missing }} required question(s) remaining
+
+{{ template "questions" . }}
+
+{{ template "answer-howto" . }}
+{{- end }}
+
+{{ template "footer" . }}

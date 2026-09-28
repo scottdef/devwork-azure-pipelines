@@ -1,0 +1,20 @@
+{{- $p := .Result.plan -}}
+{{- $pre := .Result.preflight -}}
+## ✅ Foundry model deployment {{ if eq $pre.Mode "update" }}updated{{ else }}created{{ end }}
+
+| Field | Value |
+| ----- | ----- |
+| Resource | {{ code $p.Account }} ({{ $p.Environment }}, {{ $p.Region }}) |
+| Deployment | {{ code $p.DeploymentName }} |
+| Model | {{ code $p.Model }} {{ code $p.Version }} ({{ $p.Format }}) |
+| SKU / capacity | {{ $p.SKU }} · {{ $p.Capacity }}{{ if $p.Provisioned }} PTU{{ else }}k TPM{{ end }} |
+| Provisioning state | {{ code (default "unknown" .Result.provisioning_state) }} |
+| Endpoint | {{ code (default "see resource" .Result.endpoint) }} |
+{{- if $pre.QuotaName }}
+| Quota ({{ code $pre.QuotaName }}) | {{ num $pre.QuotaUsed }} used of {{ num $pre.QuotaLimit }} before this change |
+{{- end }}
+| Review by | {{ $p.ReviewDate }} |
+
+{{ template "foundry-usage" .Result }}
+
+{{ template "footer" . }}

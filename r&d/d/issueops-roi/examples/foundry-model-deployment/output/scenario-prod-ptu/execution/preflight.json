@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "errors": null,
+  "warnings": null,
+  "mode": "create",
+  "quota_name": "OpenAI.GlobalProvisionedManaged",
+  "quota_limit": 500,
+  "quota_used": 250,
+  "quota_available": 250
+}

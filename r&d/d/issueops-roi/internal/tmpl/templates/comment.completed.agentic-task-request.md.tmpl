@@ -1,0 +1,45 @@
+{{- $d := .Result.dispatch -}}
+{{- $a := .Result.agent -}}
+{{- if $a }}
+## 🤖 Agent run completed
+
+The AKS agent runner finished in {{ $a.Iterations }} iteration(s) using deployment {{ code $a.Model }} ({{ num $a.Usage.PromptTokens }} prompt + {{ num $a.Usage.CompletionTokens }} completion tokens, {{ $a.Usage.Requests }} requests).
+
+> [!NOTE]
+> The document below is AI-generated. Review it against the acceptance criteria before relying on it.
+
+<details open><summary>Deliverable</summary>
+
+{{ mdsafe $a.Deliverable }}
+
+</details>
+{{- if $a.Critique }}
+
+<details><summary>Agent self-review against the acceptance criteria</summary>
+
+{{ mdsafe $a.Critique }}
+
+</details>
+{{- end }}
+{{- else }}
+## 🤖 Agent dispatched
+
+{{ safe $d.Message }}
+
+| Field | Value |
+| ----- | ----- |
+| Backend | {{ code $d.Backend }} |
+{{- if $d.URL }}
+| Link | {{ $d.URL }} |
+{{- end }}
+{{- if $d.Reference }}
+| Reference | {{ code $d.Reference }} |
+{{- end }}
+{{- if $d.Workflow }}
+| Workflow | {{ code $d.Workflow }} |
+{{- end }}
+
+Review the agent's pull request or workflow output before merging. This issue stays open until you close it.
+{{- end }}
+
+{{ template "footer" . }}

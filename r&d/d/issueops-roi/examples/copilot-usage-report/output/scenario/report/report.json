@@ -1,0 +1,510 @@
+{
+  "organization": "CoolEngOrg",
+  "spec": {
+    "scope": "teams",
+    "teams": [
+      "platform-eng",
+      "payments"
+    ],
+    "start": "2026-08-23T00:00:00Z",
+    "end": "2026-09-19T00:00:00Z",
+    "days": 28,
+    "include_seats": true,
+    "html": true,
+    "csv": true,
+    "grafana": true,
+    "user_detail": true,
+    "purpose": "Quarterly business review: compare AI-credit spend against merged pull requests and review throughput for platform-eng and payments, and identify seats that are not being used before the October true-up.",
+    "period": "Last 28 days"
+  },
+  "generated_at": "2026-09-21T14:40:00Z",
+  "pricing": {
+    "ai_credit_usd": 0.01,
+    "seat_monthly_usd": 39,
+    "seat_plan": "Copilot Enterprise",
+    "note": "Illustrative defaults. Replace with CoolEngEnt contract pricing; set ai_credit_usd to the pricePerUnit shown in the AI-credit billing usage report."
+  },
+  "days_with_data": 28,
+  "totals": {
+    "seats": 11,
+    "active_users": 10,
+    "engaged_users": 8,
+    "agentic_users": 5,
+    "active_user_days": 130,
+    "engaged_user_days": 117,
+    "ai_credits": 89263.29,
+    "ai_cost_usd": 892.63,
+    "seat_cost_usd": 400.4,
+    "total_cost_usd": 1293.03,
+    "interactions": 1182,
+    "code_generation_activities": 3827,
+    "code_acceptance_activities": 1525,
+    "ai_loc_added": 18605,
+    "acceptance_rate": 0.3984844525738176,
+    "engaged_share": 0.8,
+    "merged_prs": 44,
+    "merged_copilot_authored": null,
+    "copilot_authored_share": null,
+    "median_cycle_hours": 35,
+    "p90_cycle_hours": 56.4,
+    "reviews": null,
+    "cost_per_merged_pr_usd": 29.39,
+    "ai_cost_per_merged_pr_usd": 20.29,
+    "ai_loc_added_per_usd": 14.39
+  },
+  "daily": [
+    {
+      "day": "2026-08-23",
+      "active_users": 1,
+      "engaged_users": 0,
+      "ai_credits": 35.59,
+      "ai_cost_usd": 0.36
+    },
+    {
+      "day": "2026-08-24",
+      "active_users": 7,
+      "engaged_users": 5,
+      "ai_credits": 563.06,
+      "ai_cost_usd": 5.63
+    },
+    {
+      "day": "2026-08-25",
+      "active_users": 5,
+      "engaged_users": 5,
+      "ai_credits": 3254.42,
+      "ai_cost_usd": 32.54
+    },
+    {
+      "day": "2026-08-26",
+      "active_users": 6,
+      "engaged_users": 5,
+      "ai_credits": 6198.4,
+      "ai_cost_usd": 61.98
+    },
+    {
+      "day": "2026-08-27",
+      "active_users": 6,
+      "engaged_users": 6,
+      "ai_credits": 10951.07,
+      "ai_cost_usd": 109.51
+    },
+    {
+      "day": "2026-08-28",
+      "active_users": 4,
+      "engaged_users": 4,
+      "ai_credits": 1865.17,
+      "ai_cost_usd": 18.65
+    },
+    {
+      "day": "2026-08-29",
+      "active_users": 3,
+      "engaged_users": 2,
+      "ai_credits": 1992.44,
+      "ai_cost_usd": 19.92
+    },
+    {
+      "day": "2026-08-30",
+      "active_users": 2,
+      "engaged_users": 2,
+      "ai_credits": 1609.83,
+      "ai_cost_usd": 16.1
+    },
+    {
+      "day": "2026-08-31",
+      "active_users": 5,
+      "engaged_users": 4,
+      "ai_credits": 1328.54,
+      "ai_cost_usd": 13.29
+    },
+    {
+      "day": "2026-09-01",
+      "active_users": 3,
+      "engaged_users": 2,
+      "ai_credits": 1640.3,
+      "ai_cost_usd": 16.4
+    },
+    {
+      "day": "2026-09-02",
+      "active_users": 5,
+      "engaged_users": 4,
+      "ai_credits": 4030.79,
+      "ai_cost_usd": 40.31
+    },
+    {
+      "day": "2026-09-03",
+      "active_users": 4,
+      "engaged_users": 4,
+      "ai_credits": 471.36,
+      "ai_cost_usd": 4.71
+    },
+    {
+      "day": "2026-09-04",
+      "active_users": 6,
+      "engaged_users": 5,
+      "ai_credits": 5459.67,
+      "ai_cost_usd": 54.6
+    },
+    {
+      "day": "2026-09-05",
+      "active_users": 1,
+      "engaged_users": 1,
+      "ai_credits": 32.47,
+      "ai_cost_usd": 0.32
+    },
+    {
+      "day": "2026-09-06",
+      "active_users": 1,
+      "engaged_users": 1,
+      "ai_credits": 1440.86,
+      "ai_cost_usd": 14.41
+    },
+    {
+      "day": "2026-09-07",
+      "active_users": 6,
+      "engaged_users": 6,
+      "ai_credits": 6652.81,
+      "ai_cost_usd": 66.53
+    },
+    {
+      "day": "2026-09-08",
+      "active_users": 7,
+      "engaged_users": 7,
+      "ai_credits": 11246.02,
+      "ai_cost_usd": 112.46
+    },
+    {
+      "day": "2026-09-09",
+      "active_users": 7,
+      "engaged_users": 7,
+      "ai_credits": 5121.71,
+      "ai_cost_usd": 51.22
+    },
+    {
+      "day": "2026-09-10",
+      "active_users": 5,
+      "engaged_users": 5,
+      "ai_credits": 1678.67,
+      "ai_cost_usd": 16.79
+    },
+    {
+      "day": "2026-09-11",
+      "active_users": 5,
+      "engaged_users": 5,
+      "ai_credits": 1175.33,
+      "ai_cost_usd": 11.75
+    },
+    {
+      "day": "2026-09-12",
+      "active_users": 0,
+      "engaged_users": 0,
+      "ai_credits": 0,
+      "ai_cost_usd": 0
+    },
+    {
+      "day": "2026-09-13",
+      "active_users": 2,
+      "engaged_users": 2,
+      "ai_credits": 1794.11,
+      "ai_cost_usd": 17.94
+    },
+    {
+      "day": "2026-09-14",
+      "active_users": 8,
+      "engaged_users": 7,
+      "ai_credits": 3419.14,
+      "ai_cost_usd": 34.19
+    },
+    {
+      "day": "2026-09-15",
+      "active_users": 8,
+      "engaged_users": 7,
+      "ai_credits": 7762.8,
+      "ai_cost_usd": 77.63
+    },
+    {
+      "day": "2026-09-16",
+      "active_users": 9,
+      "engaged_users": 8,
+      "ai_credits": 2822.93,
+      "ai_cost_usd": 28.23
+    },
+    {
+      "day": "2026-09-17",
+      "active_users": 8,
+      "engaged_users": 7,
+      "ai_credits": 4471.95,
+      "ai_cost_usd": 44.72
+    },
+    {
+      "day": "2026-09-18",
+      "active_users": 6,
+      "engaged_users": 6,
+      "ai_credits": 2243.85,
+      "ai_cost_usd": 22.44
+    },
+    {
+      "day": "2026-09-19",
+      "active_users": 0,
+      "engaged_users": 0,
+      "ai_credits": 0,
+      "ai_cost_usd": 0
+    }
+  ],
+  "weekly": [
+    {
+      "week": "2026-08-17",
+      "merged_prs": 0,
+      "ai_cost_usd": 0.36
+    },
+    {
+      "week": "2026-08-24",
+      "merged_prs": 12,
+      "ai_cost_usd": 264.33
+    },
+    {
+      "week": "2026-08-31",
+      "merged_prs": 8,
+      "ai_cost_usd": 144.04
+    },
+    {
+      "week": "2026-09-07",
+      "merged_prs": 13,
+      "ai_cost_usd": 276.69
+    },
+    {
+      "week": "2026-09-14",
+      "merged_prs": 11,
+      "ai_cost_usd": 207.21
+    }
+  ],
+  "teams": [
+    {
+      "slug": "platform-eng",
+      "seats": 6,
+      "active_users": 5,
+      "engaged_users": 4,
+      "agentic_users": 3,
+      "active_user_days": 74,
+      "engaged_user_days": 66,
+      "ai_credits": 59109.42,
+      "ai_cost_usd": 591.09,
+      "seat_cost_usd": 218.4,
+      "total_cost_usd": 809.49,
+      "interactions": 725,
+      "code_generation_activities": 2262,
+      "code_acceptance_activities": 921,
+      "ai_loc_added": 11471,
+      "acceptance_rate": 0.40716180371352784,
+      "engaged_share": 0.8,
+      "merged_prs": 22,
+      "merged_copilot_authored": null,
+      "copilot_authored_share": null,
+      "median_cycle_hours": 33,
+      "p90_cycle_hours": 54.7,
+      "reviews": 15,
+      "cost_per_merged_pr_usd": 36.8,
+      "ai_cost_per_merged_pr_usd": 26.87,
+      "ai_loc_added_per_usd": 14.17
+    },
+    {
+      "slug": "payments",
+      "seats": 5,
+      "active_users": 5,
+      "engaged_users": 4,
+      "agentic_users": 2,
+      "active_user_days": 56,
+      "engaged_user_days": 51,
+      "ai_credits": 30153.87,
+      "ai_cost_usd": 301.54,
+      "seat_cost_usd": 182,
+      "total_cost_usd": 483.54,
+      "interactions": 457,
+      "code_generation_activities": 1565,
+      "code_acceptance_activities": 604,
+      "ai_loc_added": 7134,
+      "acceptance_rate": 0.3859424920127795,
+      "engaged_share": 0.8,
+      "merged_prs": 22,
+      "merged_copilot_authored": null,
+      "copilot_authored_share": null,
+      "median_cycle_hours": 37,
+      "p90_cycle_hours": 56.8,
+      "reviews": 25,
+      "cost_per_merged_pr_usd": 21.98,
+      "ai_cost_per_merged_pr_usd": 13.71,
+      "ai_loc_added_per_usd": 14.75
+    }
+  ],
+  "repositories": null,
+  "users": [
+    {
+      "login": "dev-k8s",
+      "teams": [
+        "platform-eng"
+      ],
+      "active_days": 20,
+      "engaged_days": 20,
+      "agentic_days": 14,
+      "ai_credits": 27104.98,
+      "ai_cost_usd": 271.05,
+      "ai_loc_added": 4317,
+      "acceptance_rate": 0.4072992700729927,
+      "merged_prs": 6,
+      "adoption_phase": "agentic"
+    },
+    {
+      "login": "ada-platform",
+      "teams": [
+        "platform-eng"
+      ],
+      "active_days": 18,
+      "engaged_days": 18,
+      "agentic_days": 9,
+      "ai_credits": 18617.17,
+      "ai_cost_usd": 186.17,
+      "ai_loc_added": 3765,
+      "acceptance_rate": 0.43217286914765907,
+      "merged_prs": 4,
+      "adoption_phase": "agentic"
+    },
+    {
+      "login": "ivy-ledger",
+      "teams": [
+        "payments"
+      ],
+      "active_days": 16,
+      "engaged_days": 16,
+      "agentic_days": 10,
+      "ai_credits": 17170.65,
+      "ai_cost_usd": 171.71,
+      "ai_loc_added": 2502,
+      "acceptance_rate": 0.352,
+      "merged_prs": 7,
+      "adoption_phase": "integrating"
+    },
+    {
+      "login": "ben-sre",
+      "teams": [
+        "platform-eng"
+      ],
+      "active_days": 16,
+      "engaged_days": 16,
+      "agentic_days": 11,
+      "ai_credits": 12074.83,
+      "ai_cost_usd": 120.75,
+      "ai_loc_added": 2930,
+      "acceptance_rate": 0.39337474120082816,
+      "merged_prs": 7,
+      "adoption_phase": "integrating"
+    },
+    {
+      "login": "gia-pay",
+      "teams": [
+        "payments"
+      ],
+      "active_days": 16,
+      "engaged_days": 16,
+      "agentic_days": 10,
+      "ai_credits": 11456.1,
+      "ai_cost_usd": 114.56,
+      "ai_loc_added": 3573,
+      "acceptance_rate": 0.42773722627737226,
+      "merged_prs": 7,
+      "adoption_phase": "agentic"
+    },
+    {
+      "login": "chen-infra",
+      "teams": [
+        "platform-eng"
+      ],
+      "active_days": 12,
+      "engaged_days": 12,
+      "agentic_days": 0,
+      "ai_credits": 1097.96,
+      "ai_cost_usd": 10.98,
+      "ai_loc_added": 459,
+      "acceptance_rate": 0.3524904214559387,
+      "merged_prs": 5,
+      "adoption_phase": "integrating"
+    },
+    {
+      "login": "hal-api",
+      "teams": [
+        "payments"
+      ],
+      "active_days": 12,
+      "engaged_days": 12,
+      "agentic_days": 0,
+      "ai_credits": 873.59,
+      "ai_cost_usd": 8.74,
+      "ai_loc_added": 780,
+      "acceptance_rate": 0.3631123919308357,
+      "merged_prs": 6,
+      "adoption_phase": "integrating"
+    },
+    {
+      "login": "kai-fraud",
+      "teams": [
+        "payments"
+      ],
+      "active_days": 7,
+      "engaged_days": 7,
+      "agentic_days": 0,
+      "ai_credits": 536.88,
+      "ai_cost_usd": 5.37,
+      "ai_loc_added": 279,
+      "acceptance_rate": 0.33544303797468356,
+      "merged_prs": 1,
+      "adoption_phase": "exploring"
+    },
+    {
+      "login": "fay-net",
+      "teams": [
+        "platform-eng"
+      ],
+      "active_days": 8,
+      "engaged_days": 0,
+      "agentic_days": 0,
+      "ai_credits": 214.48,
+      "ai_cost_usd": 2.14,
+      "ai_loc_added": 0,
+      "acceptance_rate": null,
+      "merged_prs": 0,
+      "adoption_phase": "exploring"
+    },
+    {
+      "login": "jon-risk",
+      "teams": [
+        "payments"
+      ],
+      "active_days": 5,
+      "engaged_days": 0,
+      "agentic_days": 0,
+      "ai_credits": 116.65,
+      "ai_cost_usd": 1.17,
+      "ai_loc_added": 0,
+      "acceptance_rate": null,
+      "merged_prs": 1,
+      "adoption_phase": "exploring"
+    }
+  ],
+  "findings": [
+    "8 of 10 active Copilot users (80%) were engaged: they accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day.",
+    "50% of active users used an agentic surface (agent mode, CLI, Copilot app or cloud agent) at least once.",
+    "Total cost per merged pull request: $29.39 (AI credits alone: $20.29).",
+    "Lowest cost per merged PR: payments ($21.98); highest: platform-eng ($36.80).",
+    "AI-credit spend in the second half of the period changed +26% versus the first half."
+  ],
+  "notes": [
+    "Teams with fewer than five Copilot-seated users are omitted from GitHub's user-teams report; users on several teams count toward each of their teams, so team rows do not sum to the scope total.",
+    "AI-assisted lines of code (loc_added_sum) are directional: they measure Copilot-suggested lines accepted or applied, not total output."
+  ],
+  "definitions": {
+    "AI cost": "ai_credits_used x $0.0100 per credit (config pricing.ai_credit_usd)",
+    "active user": "a Copilot-seated user with any interaction, generation, acceptance or agent use on a day",
+    "cost per merged PR": "total cost in scope / merged pull requests in scope",
+    "cycle time": "pull request created -\u003e merged, in hours",
+    "engaged user": "accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day",
+    "seat cost": "seats x $39.00 per month x days/30 (Copilot Enterprise)"
+  }
+}

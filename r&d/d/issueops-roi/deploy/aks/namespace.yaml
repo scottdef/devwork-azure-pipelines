@@ -1,0 +1,14 @@
+# Namespace for IssueOps agent-runner Jobs. Pod Security Admission "restricted"
+# is enforced: the Job template (internal/tmpl/templates/k8s.agent-job.yaml.tmpl)
+# runs non-root, read-only root filesystem, no privilege escalation, all
+# capabilities dropped, RuntimeDefault seccomp.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: issueops-agents
+  labels:
+    app.kubernetes.io/part-of: issueops
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.30
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

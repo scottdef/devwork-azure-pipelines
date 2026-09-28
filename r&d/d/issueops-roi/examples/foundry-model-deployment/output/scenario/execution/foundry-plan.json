@@ -1,0 +1,20 @@
+{
+  "account": "aif-cooleng-dev-eus2",
+  "environment": "dev",
+  "resource_group": "rg-cooleng-ai-dev",
+  "region": "eastus2",
+  "model": "gpt-4.1-mini",
+  "version": "2025-04-14",
+  "format": "OpenAI",
+  "sku": "GlobalStandard",
+  "capacity": 10,
+  "deployment_name": "gpt-4.1-mini-ml-eval",
+  "version_upgrade": "OnceNewDefaultVersionAvailable",
+  "rai_policy": "Microsoft.DefaultV2",
+  "use_case": "Evaluation harness for the feature-store triage agent: an agentic workflow that reads pipeline failures, proposes a fix and opens a draft PR in ml-pipelines. Dev only; synthetic data.",
+  "consumers": "CoolEngOrg/ml-pipelines",
+  "cost_center": "CC-5120-DATA",
+  "review_date": "2026-12-15",
+  "provisioned": false,
+  "request_ref": "CoolEngOrg/issueops#301"
+}

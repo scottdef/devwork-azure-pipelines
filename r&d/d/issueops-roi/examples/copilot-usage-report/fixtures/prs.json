@@ -1,0 +1,586 @@
+[
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1401,
+    "author": "ada-platform",
+    "created_at": "2026-08-15T19:00:00Z",
+    "merged_at": "2026-08-17T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1401"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 641,
+    "author": "max-data",
+    "created_at": "2026-08-15T19:00:00Z",
+    "merged_at": "2026-08-17T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/641"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2211,
+    "author": "gia-pay",
+    "created_at": "2026-08-15T04:00:00Z",
+    "merged_at": "2026-08-17T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2211"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1402,
+    "author": "dev-k8s",
+    "created_at": "2026-08-17T01:00:00Z",
+    "merged_at": "2026-08-18T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1402"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2212,
+    "author": "gia-pay",
+    "created_at": "2026-08-17T10:00:00Z",
+    "merged_at": "2026-08-18T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2212"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1403,
+    "author": "chen-infra",
+    "created_at": "2026-08-18T15:00:00Z",
+    "merged_at": "2026-08-19T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1403"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2213,
+    "author": "gia-pay",
+    "created_at": "2026-08-17T04:00:00Z",
+    "merged_at": "2026-08-19T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2213"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2214,
+    "author": "hal-api",
+    "created_at": "2026-08-19T08:00:00Z",
+    "merged_at": "2026-08-20T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2214"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1405,
+    "author": "dev-k8s",
+    "created_at": "2026-08-19T05:00:00Z",
+    "merged_at": "2026-08-21T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1405"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 642,
+    "author": "lea-ml",
+    "created_at": "2026-08-20T00:00:00Z",
+    "merged_at": "2026-08-21T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/642"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1404,
+    "author": "ada-platform",
+    "created_at": "2026-08-20T19:00:00Z",
+    "merged_at": "2026-08-21T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1404"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2216,
+    "author": "jon-risk",
+    "created_at": "2026-08-22T19:00:00Z",
+    "merged_at": "2026-08-24T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2216"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2215,
+    "author": "ivy-ledger",
+    "created_at": "2026-08-24T01:00:00Z",
+    "merged_at": "2026-08-24T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2215"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 643,
+    "author": "max-data",
+    "created_at": "2026-08-22T06:00:00Z",
+    "merged_at": "2026-08-24T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/643"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 981,
+    "author": "pat-ios",
+    "created_at": "2026-08-22T17:00:00Z",
+    "merged_at": "2026-08-24T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/981"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1407,
+    "author": "dev-k8s",
+    "created_at": "2026-08-22T21:00:00Z",
+    "merged_at": "2026-08-25T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1407"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1406,
+    "author": "ben-sre",
+    "created_at": "2026-08-24T04:00:00Z",
+    "merged_at": "2026-08-25T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1406"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 644,
+    "author": "lea-ml",
+    "created_at": "2026-08-23T17:00:00Z",
+    "merged_at": "2026-08-25T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/644"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 982,
+    "author": "pat-ios",
+    "created_at": "2026-08-22T20:00:00Z",
+    "merged_at": "2026-08-25T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/982"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1408,
+    "author": "ada-platform",
+    "created_at": "2026-08-25T07:00:00Z",
+    "merged_at": "2026-08-26T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1408"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2217,
+    "author": "ivy-ledger",
+    "created_at": "2026-08-25T17:00:00Z",
+    "merged_at": "2026-08-26T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2217"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1409,
+    "author": "dev-k8s",
+    "created_at": "2026-08-25T09:00:00Z",
+    "merged_at": "2026-08-26T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1409"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1412,
+    "author": "dev-k8s",
+    "created_at": "2026-08-25T20:00:00Z",
+    "merged_at": "2026-08-27T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1412"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1410,
+    "author": "ben-sre",
+    "created_at": "2026-08-26T17:00:00Z",
+    "merged_at": "2026-08-27T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1410"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1411,
+    "author": "chen-infra",
+    "created_at": "2026-08-26T23:00:00Z",
+    "merged_at": "2026-08-27T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1411"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2218,
+    "author": "hal-api",
+    "created_at": "2026-08-25T13:00:00Z",
+    "merged_at": "2026-08-27T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2218"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 645,
+    "author": "nia-stats",
+    "created_at": "2026-08-25T20:00:00Z",
+    "merged_at": "2026-08-27T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/645"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2219,
+    "author": "ivy-ledger",
+    "created_at": "2026-08-28T02:00:00Z",
+    "merged_at": "2026-08-28T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2219"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1413,
+    "author": "dev-k8s",
+    "created_at": "2026-08-29T23:00:00Z",
+    "merged_at": "2026-08-31T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1413"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2220,
+    "author": "ivy-ledger",
+    "created_at": "2026-08-29T02:00:00Z",
+    "merged_at": "2026-08-31T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2220"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 646,
+    "author": "max-data",
+    "created_at": "2026-08-30T12:00:00Z",
+    "merged_at": "2026-08-31T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/646"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1414,
+    "author": "chen-infra",
+    "created_at": "2026-08-31T14:00:00Z",
+    "merged_at": "2026-09-01T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1414"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 647,
+    "author": "nia-stats",
+    "created_at": "2026-08-31T06:00:00Z",
+    "merged_at": "2026-09-01T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/647"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 648,
+    "author": "lea-ml",
+    "created_at": "2026-09-01T19:00:00Z",
+    "merged_at": "2026-09-02T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/648"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1415,
+    "author": "ben-sre",
+    "created_at": "2026-09-01T08:00:00Z",
+    "merged_at": "2026-09-02T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1415"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 983,
+    "author": "pat-ios",
+    "created_at": "2026-08-31T23:00:00Z",
+    "merged_at": "2026-09-02T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/983"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1416,
+    "author": "chen-infra",
+    "created_at": "2026-08-31T12:00:00Z",
+    "merged_at": "2026-09-02T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1416"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2221,
+    "author": "gia-pay",
+    "created_at": "2026-09-02T05:00:00Z",
+    "merged_at": "2026-09-02T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2221"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1417,
+    "author": "chen-infra",
+    "created_at": "2026-09-03T00:00:00Z",
+    "merged_at": "2026-09-04T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1417"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1418,
+    "author": "dev-k8s",
+    "created_at": "2026-09-02T13:00:00Z",
+    "merged_at": "2026-09-04T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1418"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 649,
+    "author": "lea-ml",
+    "created_at": "2026-09-03T03:00:00Z",
+    "merged_at": "2026-09-04T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/649"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2222,
+    "author": "ivy-ledger",
+    "created_at": "2026-09-06T06:00:00Z",
+    "merged_at": "2026-09-07T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2222"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2224,
+    "author": "hal-api",
+    "created_at": "2026-09-07T03:00:00Z",
+    "merged_at": "2026-09-08T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2224"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1420,
+    "author": "ben-sre",
+    "created_at": "2026-09-07T11:00:00Z",
+    "merged_at": "2026-09-08T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1420"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1419,
+    "author": "ada-platform",
+    "created_at": "2026-09-07T02:00:00Z",
+    "merged_at": "2026-09-08T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1419"
+  },
+  {
+    "repo": "CoolEngOrg/shared-libs",
+    "number": 311,
+    "author": "kai-fraud",
+    "created_at": "2026-09-06T10:00:00Z",
+    "merged_at": "2026-09-08T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/shared-libs/pull/311"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2223,
+    "author": "gia-pay",
+    "created_at": "2026-09-06T08:00:00Z",
+    "merged_at": "2026-09-08T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2223"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2225,
+    "author": "gia-pay",
+    "created_at": "2026-09-09T05:00:00Z",
+    "merged_at": "2026-09-09T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2225"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1421,
+    "author": "chen-infra",
+    "created_at": "2026-09-09T00:00:00Z",
+    "merged_at": "2026-09-09T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1421"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 650,
+    "author": "lea-ml",
+    "created_at": "2026-09-08T16:00:00Z",
+    "merged_at": "2026-09-09T13:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/650"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2226,
+    "author": "ivy-ledger",
+    "created_at": "2026-09-09T03:00:00Z",
+    "merged_at": "2026-09-09T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2226"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1423,
+    "author": "dev-k8s",
+    "created_at": "2026-09-09T04:00:00Z",
+    "merged_at": "2026-09-10T10:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1423"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1422,
+    "author": "ben-sre",
+    "created_at": "2026-09-10T02:00:00Z",
+    "merged_at": "2026-09-10T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1422"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2227,
+    "author": "hal-api",
+    "created_at": "2026-09-07T23:00:00Z",
+    "merged_at": "2026-09-10T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2227"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2228,
+    "author": "gia-pay",
+    "created_at": "2026-09-08T19:00:00Z",
+    "merged_at": "2026-09-11T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2228"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 652,
+    "author": "max-data",
+    "created_at": "2026-09-14T06:00:00Z",
+    "merged_at": "2026-09-14T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/652"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 651,
+    "author": "lea-ml",
+    "created_at": "2026-09-12T08:00:00Z",
+    "merged_at": "2026-09-14T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/651"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 984,
+    "author": "pat-ios",
+    "created_at": "2026-09-14T03:00:00Z",
+    "merged_at": "2026-09-14T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/984"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2229,
+    "author": "gia-pay",
+    "created_at": "2026-09-12T10:00:00Z",
+    "merged_at": "2026-09-14T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2229"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2230,
+    "author": "hal-api",
+    "created_at": "2026-09-12T14:00:00Z",
+    "merged_at": "2026-09-14T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2230"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1424,
+    "author": "ben-sre",
+    "created_at": "2026-09-13T21:00:00Z",
+    "merged_at": "2026-09-16T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1424"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 653,
+    "author": "lea-ml",
+    "created_at": "2026-09-15T21:00:00Z",
+    "merged_at": "2026-09-16T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/653"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1426,
+    "author": "ben-sre",
+    "created_at": "2026-09-15T21:00:00Z",
+    "merged_at": "2026-09-17T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1426"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1425,
+    "author": "ada-platform",
+    "created_at": "2026-09-15T04:00:00Z",
+    "merged_at": "2026-09-17T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1425"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2233,
+    "author": "ivy-ledger",
+    "created_at": "2026-09-16T07:00:00Z",
+    "merged_at": "2026-09-17T11:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2233"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2231,
+    "author": "gia-pay",
+    "created_at": "2026-09-15T10:00:00Z",
+    "merged_at": "2026-09-17T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2231"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2232,
+    "author": "hal-api",
+    "created_at": "2026-09-16T22:00:00Z",
+    "merged_at": "2026-09-17T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2232"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 985,
+    "author": "pat-ios",
+    "created_at": "2026-09-16T09:00:00Z",
+    "merged_at": "2026-09-17T15:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/985"
+  },
+  {
+    "repo": "CoolEngOrg/ml-pipelines",
+    "number": 654,
+    "author": "nia-stats",
+    "created_at": "2026-09-15T01:00:00Z",
+    "merged_at": "2026-09-17T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/ml-pipelines/pull/654"
+  },
+  {
+    "repo": "CoolEngOrg/mobile-app",
+    "number": 986,
+    "author": "quinn-android",
+    "created_at": "2026-09-16T17:00:00Z",
+    "merged_at": "2026-09-18T09:00:00Z",
+    "url": "https://github.com/CoolEngOrg/mobile-app/pull/986"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2234,
+    "author": "gia-pay",
+    "created_at": "2026-09-17T00:00:00Z",
+    "merged_at": "2026-09-18T12:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2234"
+  },
+  {
+    "repo": "CoolEngOrg/payments-api",
+    "number": 2235,
+    "author": "hal-api",
+    "created_at": "2026-09-16T21:00:00Z",
+    "merged_at": "2026-09-18T14:00:00Z",
+    "url": "https://github.com/CoolEngOrg/payments-api/pull/2235"
+  },
+  {
+    "repo": "CoolEngOrg/platform-infra",
+    "number": 1427,
+    "author": "ada-platform",
+    "created_at": "2026-09-16T12:00:00Z",
+    "merged_at": "2026-09-18T16:00:00Z",
+    "url": "https://github.com/CoolEngOrg/platform-infra/pull/1427"
+  }
+]

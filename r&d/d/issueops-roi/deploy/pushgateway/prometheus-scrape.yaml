@@ -1,0 +1,7 @@
+# Plain Prometheus (no Operator): add this scrape job instead of the ServiceMonitor.
+scrape_configs:
+  - job_name: pushgateway
+    honor_labels: true
+    scrape_interval: 60s
+    static_configs:
+      - targets: ["pushgateway-prometheus-pushgateway.monitoring.svc:9091"]

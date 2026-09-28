@@ -1,0 +1,136 @@
+name: Set up IssueOps
+description: >-
+  Mints a short-lived GitHub App installation token for the IssueOps app,
+  builds the issueops Go CLI from this commit and puts it on PATH.
+inputs:
+  client-id:
+    description: Client ID of the CoolEngOrg IssueOps GitHub App (vars.ISSUEOPS_APP_CLIENT_ID).
+    required: true
+  private-key:
+    description: Private key of the GitHub App (secrets.ISSUEOPS_APP_PRIVATE_KEY).
+    required: true
+  repositories:
+    description: >-
+      Repositories the token can access. Empty = this repository only;
+      "*" = every repository the installation can access (needed to read
+      permissions on agentic-task target repositories); otherwise a
+      comma-separated list.
+    required: false
+    default: ''
+  permission-issues:
+    description: Narrow the token (read/write). Empty inherits the app permission.
+    required: false
+    default: ''
+  permission-contents:
+    required: false
+    default: ''
+  permission-members:
+    required: false
+    default: ''
+  permission-actions:
+    required: false
+    default: ''
+  permission-metadata:
+    required: false
+    default: ''
+  permission-organization-administration:
+    required: false
+    default: ''
+  permission-organization-custom-org-roles:
+    required: false
+    default: ''
+  narrow:
+    description: >-
+      "true" to request only the permission-* inputs above (least privilege).
+      "false" inherits every permission granted to the app (used by the report
+      workflow, which also needs Copilot metrics access).
+    required: false
+    default: 'true'
+outputs:
+  token:
+    description: GitHub App installation token.
+    value: ${{ steps.app.outputs.token }}
+  bot-login:
+    description: Login of the app's bot user, e.g. coolengorg-issueops[bot].
+    value: ${{ steps.bot.outputs.login }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve token scope
+      id: scope
+      shell: bash
+      env:
+        REPOS: ${{ inputs.repositories }}
+        CURRENT: ${{ github.event.repository.name }}
+      run: |
+        case "$REPOS" in
+          '*') echo "repos=" >> "$GITHUB_OUTPUT" ;;
+          '')  echo "repos=$CURRENT" >> "$GITHUB_OUTPUT" ;;
+          *)   echo "repos=$REPOS" >> "$GITHUB_OUTPUT" ;;
+        esac
+
+    - name: Mint GitHub App token (narrowed)
+      if: inputs.narrow == 'true'
+      id: app-narrow
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ github.repository_owner }}
+        repositories: ${{ steps.scope.outputs.repos }}
+        permission-issues: ${{ inputs.permission-issues }}
+        permission-contents: ${{ inputs.permission-contents }}
+        permission-members: ${{ inputs.permission-members }}
+        permission-actions: ${{ inputs.permission-actions }}
+        permission-metadata: ${{ inputs.permission-metadata }}
+        permission-organization-administration: ${{ inputs.permission-organization-administration }}
+        permission-organization-custom-org-roles: ${{ inputs.permission-organization-custom-org-roles }}
+
+    - name: Mint GitHub App token (app permissions)
+      if: inputs.narrow != 'true'
+      id: app-full
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ github.repository_owner }}
+        repositories: ${{ steps.scope.outputs.repos }}
+
+    - name: Select token
+      id: app
+      shell: bash
+      env:
+        NARROW: ${{ steps.app-narrow.outputs.token }}
+        FULL: ${{ steps.app-full.outputs.token }}
+      run: |
+        tok="${NARROW:-$FULL}"
+        echo "::add-mask::$tok"
+        echo "token=$tok" >> "$GITHUB_OUTPUT"
+
+    - name: Bot login
+      id: bot
+      shell: bash
+      env:
+        SLUG: ${{ steps.app-narrow.outputs.app-slug || steps.app-full.outputs.app-slug }}
+      run: |
+        echo "login=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+        echo "ISSUEOPS_BOT_LOGIN=${SLUG}[bot]" >> "$GITHUB_ENV"
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Build issueops CLI
+      shell: bash
+      env:
+        GOTOOLCHAIN: local
+        GOFLAGS: -mod=readonly
+      run: |
+        bin="$RUNNER_TEMP/issueops-bin"
+        mkdir -p "$bin"
+        go build -trimpath -ldflags "-s -w -X main.Version=${GITHUB_SHA::12}" -o "$bin/issueops" ./cmd/issueops
+        echo "$bin" >> "$GITHUB_PATH"
+        echo "ISSUEOPS_CONFIG=$GITHUB_WORKSPACE/config/issueops.json" >> "$GITHUB_ENV"
+        echo "ISSUEOPS_FORMS_DIR=$GITHUB_WORKSPACE/config/forms" >> "$GITHUB_ENV"

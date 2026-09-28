@@ -1,0 +1,130 @@
+{
+  "name": "[IssueOps] Agentic task request",
+  "description": "Run an approved agentic workflow (Copilot cloud agent, an agentic-workflow catalog entry, or the AKS/Foundry agent runner) driven by questions answered in comments.",
+  "title": "[IssueOps] Agentic task",
+  "labels": [
+    "issueops",
+    "issueops:agentic-task"
+  ],
+  "body": [
+    {
+      "type": "markdown",
+      "attributes": {
+        "value": "## Agentic task request\n\nAfter you open this issue, the platform posts **clarifying questions** for the backend you chose.\nAnswer them in a comment that starts with `.answers`:\n\n```text\n.answers\nA1: main\nA2: src/billing/**, docs/billing.md\n```\n\nWhen every required question is answered, review the generated task specification and comment\n`.submit`. Maintainers of the target repository (and, for some backends, the platform AI team) approve\nwith `.approve`. The agent then runs and its results are posted back here.\n"
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "agent_backend",
+      "attributes": {
+        "label": "Agent backend",
+        "description": "copilot-cloud-agent opens a pull request in the target repository. agentic-workflow-catalog dispatches a pre-approved GitHub Agentic Workflow. aks-foundry-agent runs the platform agent runner on AKS against a Foundry model deployment and posts a document back to this issue.",
+        "options": [
+          "copilot-cloud-agent",
+          "agentic-workflow-catalog",
+          "aks-foundry-agent"
+        ]
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "agent_target_repository",
+      "attributes": {
+        "label": "Target repository",
+        "description": "Repository name in CoolEngOrg where the agent works (or whose context the document is about).",
+        "placeholder": "payments-api"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "agent_task_title",
+      "attributes": {
+        "label": "Task title",
+        "placeholder": "Add retry with jitter to the ledger client"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "agent_objective",
+      "attributes": {
+        "label": "Objective",
+        "description": "What the agent should accomplish. Be specific about the outcome, not the steps."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "agent_acceptance_criteria",
+      "attributes": {
+        "label": "Acceptance criteria",
+        "description": "One criterion per line. The agent self-checks against these, and reviewers use them."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "agent_catalog_workflow",
+      "attributes": {
+        "label": "Catalog workflow",
+        "description": "Only for the agentic-workflow-catalog backend.",
+        "options": [
+          "none",
+          "dependency-hygiene",
+          "docs-refresh",
+          "test-gap-analysis"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "agent_data_classification",
+      "attributes": {
+        "label": "Data classification",
+        "description": "Highest classification of code or data the agent will read.",
+        "options": [
+          "public",
+          "internal",
+          "confidential"
+        ],
+        "default": 1
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "agent_acknowledgements",
+      "attributes": {
+        "label": "Acknowledgements",
+        "options": [
+          {
+            "label": "I will review all agent output (pull requests, documents) before it is merged or relied on",
+            "required": true
+          },
+          {
+            "label": "The objective and answers contain no secrets, credentials, or personal data",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

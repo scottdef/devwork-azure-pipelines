@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "accountName": { "value": "aif-cooleng-dev-eus2" },
+    "deploymentName": { "value": "gpt-4.1-mini-ml-eval" },
+    "modelName": { "value": "gpt-4.1-mini" },
+    "modelVersion": { "value": "2025-04-14" },
+    "modelFormat": { "value": "OpenAI" },
+    "skuName": { "value": "GlobalStandard" },
+    "capacity": { "value": 10 },
+    "versionUpgradeOption": { "value": "OnceNewDefaultVersionAvailable" },
+    "raiPolicyName": { "value": "Microsoft.DefaultV2" }
+  }
+}

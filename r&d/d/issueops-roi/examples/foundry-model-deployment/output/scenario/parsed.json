@@ -1,0 +1,29 @@
+{
+  "foundry_account": [
+    "aif-cooleng-dev-eus2"
+  ],
+  "foundry_acknowledgements": {
+    "selected": [
+      "Only data classified Internal or lower will be sent to this deployment unless it is approved for Confidential data",
+      "I understand provisioned (PTU) deployments are billed hourly whether or not they are used"
+    ],
+    "unselected": []
+  },
+  "foundry_capacity": "10",
+  "foundry_consumers": "CoolEngOrg/ml-pipelines",
+  "foundry_cost_center": "CC-5120-DATA",
+  "foundry_deployment_name": "gpt-4.1-mini-ml-eval",
+  "foundry_model": "gpt-4.1-mini",
+  "foundry_model_format": [
+    "OpenAI"
+  ],
+  "foundry_model_version": "2025-04-14",
+  "foundry_review_date": "2026-12-15",
+  "foundry_sku": [
+    "GlobalStandard"
+  ],
+  "foundry_use_case": "Evaluation harness for the feature-store triage agent: an agentic workflow that reads pipeline failures, proposes a fix and opens a draft PR in ml-pipelines. Dev only; synthetic data.",
+  "foundry_version_upgrade": [
+    "OnceNewDefaultVersionAvailable"
+  ]
+}

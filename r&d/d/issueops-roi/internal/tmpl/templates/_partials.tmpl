@@ -1,0 +1,112 @@
+{{- /* Shared partials. Names are stable; override this file to re-brand. */ -}}
+
+{{- define "request-table" -}}
+| Field | Value |
+| ----- | ----- |
+{{- range .Rows }}
+| {{ .Label }} | {{ if .Code }}{{ code .Value }}{{ else }}{{ cell .Value }}{{ end }} |
+{{- end }}
+{{- end -}}
+
+{{- define "messages" -}}
+{{- if .Errors }}
+> [!CAUTION]
+> **The request did not pass validation.** Edit the issue body (keep the `###` headings) to fix:
+{{- range .Errors }}
+> - {{ safe . }}
+{{- end }}
+{{ end -}}
+{{- if .Warnings }}
+> [!WARNING]
+{{- range .Warnings }}
+> - {{ safe . }}
+{{- end }}
+{{ end -}}
+{{- end -}}
+
+{{- define "rules" -}}
+{{- if .AutoApproved }}
+No approval is required by policy{{ if .Plan.AutoApproved }} (auto-approval conditions met){{ end }}. The request executes as soon as you comment `.submit`.
+{{- else }}
+| Approval rule | Needed | Who can approve |
+| ------------- | ------ | --------------- |
+{{- range .Rules }}
+| {{ cell .Name }} | {{ .Min }} | {{ cell .Who }} |
+{{- end }}
+{{- if .Plan.Escalations }}
+
+Policy escalations applied: {{ range $i, $e := .Plan.Escalations }}{{ if $i }}; {{ end }}{{ safe $e }}{{ end }}.
+{{- end }}
+{{- end }}
+{{- if .Plan.Environment }}
+
+Execution runs in the GitHub environment {{ code .Plan.Environment }}{{ if not .AutoApproved }}, which can add a required-reviewer gate{{ end }}.
+{{- end }}
+{{- end -}}
+
+{{- define "approval-progress" -}}
+{{- with .Approval }}
+| Approval rule | Progress | Approved by |
+| ------------- | -------- | ----------- |
+{{- range .Rules }}
+| {{ cell .Name }} | {{ len .Approvers }} / {{ .Min }}{{ if eq .Missing 0 }} ✅{{ end }} | {{ range $i, $a := .Approvers }}{{ if $i }}, {{ end }}{{ safe $a.User }} ({{ cell $a.Reason }}){{ else }}—{{ end }} |
+{{- end }}
+{{- if .Ignored }}
+
+Votes that did not count:
+{{- range .Ignored }}
+- {{ safe .User }}: {{ safe .Reason }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "questions" -}}
+{{- with .QA }}
+| # | Question | Answer | Status |
+| - | -------- | ------ | ------ |
+{{- range .Questions }}
+| {{ .ID }} | {{ cell .Text }}{{ if not .Required }} _(optional)_{{ end }} | {{ if .Answered }}{{ cell (trunc 120 .Answer) }}{{ if .FromDefault }} _(default)_{{ end }}{{ else }}—{{ end }} | {{ if .Error }}⚠️ {{ cell .Error }}{{ else if .Answered }}✅{{ else if .Required }}needed{{ else }}optional{{ end }} |
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "answer-howto" -}}
+Reply with a comment that starts with `.answers` and one `A<number>:` line per answer. Multi-line answers continue on the following lines; later answers replace earlier ones; `skip` leaves an optional question blank.
+
+```text
+.answers
+{{- range .QA.Questions }}
+A{{ slice .ID 1 }}: {{ if .Choices }}<one of: {{ join ", " .Choices }}>{{ else if .Default }}{{ .Default }}{{ else }}...{{ end }}
+{{- end }}
+```
+{{- end -}}
+
+{{- define "spec" -}}
+{{- with .Result }}
+<details><summary>Task specification sent to the agent (digest <code>{{ short .Digest }}</code>)</summary>
+
+**{{ safe .Title }}** in {{ code .TargetRepo }} via {{ code .Backend }}
+
+**Objective**
+
+{{ safe .Objective }}
+
+**Acceptance criteria**
+{{ range .AcceptanceCriteria }}
+- {{ safe . }}
+{{- end }}
+
+**Answers**
+{{ range .SortedAnswerKeys }}
+- {{ code . }}: {{ safe (index $.Result.Answers .) }}
+{{- end }}
+
+</details>
+{{- end }}
+{{- end -}}
+
+{{- define "footer" -}}
+
+<sub>IssueOps · {{ .TypeName }} · digest <code>{{ short .Digest }}</code>{{ if .RunURL }} · [workflow run]({{ .RunURL }}){{ end }} · [docs]({{ .DocsURL }}) · commands: <code>.status</code> <code>.help</code></sub>
+{{- end -}}

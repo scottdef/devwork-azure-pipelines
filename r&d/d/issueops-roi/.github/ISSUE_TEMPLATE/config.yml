@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: IssueOps platform documentation
+    url: https://github.com/CoolEngOrg/issueops/tree/main/docs
+    about: How requests are validated, approved, and executed.
+  - name: Platform engineering support
+    url: https://github.com/orgs/CoolEngOrg/discussions
+    about: Questions that are not self-service requests.

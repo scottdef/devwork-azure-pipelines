@@ -1,0 +1,22 @@
+{
+  "agent_acceptance_criteria": "- Duplicate requests with the same key return the original 201 response\n- Keys expire after 24 hours\n- Unit and integration tests cover duplicate, expired and missing keys\n- OpenAPI spec updated",
+  "agent_acknowledgements": {
+    "selected": [
+      "I will review all agent output (pull requests, documents) before it is merged or relied on",
+      "The objective and answers contain no secrets, credentials, or personal data"
+    ],
+    "unselected": []
+  },
+  "agent_backend": [
+    "copilot-cloud-agent"
+  ],
+  "agent_catalog_workflow": [
+    "none"
+  ],
+  "agent_data_classification": [
+    "internal"
+  ],
+  "agent_objective": "Retries from the mobile app occasionally create duplicate refunds. Add Idempotency-Key header support to POST /v2/refunds, persisting keys for 24 hours and returning the original response for duplicates.",
+  "agent_target_repository": "CoolEngOrg/payments-api",
+  "agent_task_title": "Add idempotency keys to POST /v2/refunds"
+}

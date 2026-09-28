@@ -1,0 +1,45 @@
+{
+  "request_ref": "CoolEngOrg/issueops#403",
+  "request_url": "https://github.com/CoolEngOrg/issueops/issues/403",
+  "requestor": "max-data",
+  "backend": "agentic-workflow-catalog",
+  "org": "CoolEngOrg",
+  "repo": "ml-pipelines",
+  "target_repo": "CoolEngOrg/ml-pipelines",
+  "title": "Monthly dependency hygiene",
+  "objective": "Review outdated Python dependencies in ml-pipelines and open one upgrade pull request with release-note summaries.",
+  "acceptance_criteria": [
+    "One pull request with grouped upgrades",
+    "Each upgrade links its release notes"
+  ],
+  "classification": "internal",
+  "catalog": "dependency-hygiene",
+  "answers": {
+    "ecosystems": "pip",
+    "open_pull_request": "yes"
+  },
+  "questions": [
+    {
+      "id": "Q1",
+      "key": "ecosystems",
+      "text": "Which ecosystems? (comma-separated: npm, gomod, pip, maven, nuget)",
+      "required": true,
+      "pattern": "^[a-z, ]{2,60}$",
+      "answer": "pip",
+      "answered": true
+    },
+    {
+      "id": "Q2",
+      "key": "open_pull_request",
+      "text": "Open a pull request with upgrades? (yes/no)",
+      "required": true,
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "answer": "yes",
+      "answered": true
+    }
+  ],
+  "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92"
+}

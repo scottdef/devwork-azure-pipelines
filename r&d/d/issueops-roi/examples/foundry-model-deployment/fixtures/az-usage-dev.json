@@ -1,0 +1,5 @@
+[
+  { "name": { "value": "OpenAI.GlobalStandard.gpt-4.1-mini", "localizedValue": "Tokens Per Minute (thousands) - gpt-4.1-mini - GlobalStandard" }, "currentValue": 40, "limit": 2000 },
+  { "name": { "value": "OpenAI.GlobalStandard.gpt-4.1", "localizedValue": "Tokens Per Minute (thousands) - gpt-4.1 - GlobalStandard" }, "currentValue": 50, "limit": 1000 },
+  { "name": { "value": "OpenAI.GlobalStandard.o4-mini", "localizedValue": "Tokens Per Minute (thousands) - o4-mini - GlobalStandard" }, "currentValue": 0, "limit": 1000 }
+]

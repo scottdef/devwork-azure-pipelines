@@ -1,0 +1,9 @@
+## ❌ Execution failed
+
+{{ if .Reason }}```text
+{{ trunc 1500 .Reason }}
+```
+{{ end }}
+Nothing further was changed after the failure. Check the [workflow run]({{ .RunURL }}) for details. An eligible approver can comment **`.retry`** to re-run the same approved request, or the requestor can edit the issue and `.submit` again.
+
+{{ template "footer" . }}

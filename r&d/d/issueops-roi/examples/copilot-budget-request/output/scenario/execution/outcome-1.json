@@ -1,0 +1,67 @@
+{
+  "result": {
+    "action": "updated",
+    "before": {
+      "id": "2066deda-923f-43f9-88d2-62395a28c0cd",
+      "budget_type": "BundlePricing",
+      "budget_product_sku": "ai_credits",
+      "budget_scope": "repository",
+      "budget_entity_name": "CoolEngOrg/payments-api",
+      "budget_amount": 800,
+      "prevent_further_usage": true,
+      "budget_alerting": {
+        "will_alert": true,
+        "alert_recipients": [
+          "dana-dev"
+        ]
+      }
+    },
+    "after": {
+      "id": "2066deda-923f-43f9-88d2-62395a28c0cd",
+      "budget_type": "BundlePricing",
+      "budget_product_sku": "ai_credits",
+      "budget_scope": "repository",
+      "budget_entity_name": "CoolEngOrg/payments-api",
+      "budget_amount": 2500,
+      "prevent_further_usage": true,
+      "budget_alerting": {
+        "will_alert": true,
+        "alert_recipients": [
+          "dana-dev",
+          "gia-pay"
+        ]
+      }
+    },
+    "update_payload": {
+      "budget_amount": 2500,
+      "prevent_further_usage": true,
+      "budget_alerting": {
+        "will_alert": true,
+        "alert_recipients": [
+          "dana-dev",
+          "gia-pay"
+        ]
+      }
+    }
+  },
+  "plan": {
+    "owner_kind": "organization",
+    "owner_name": "CoolEngOrg",
+    "form_scope": "repository",
+    "scope": "repository",
+    "entity_name": "CoolEngOrg/payments-api",
+    "sku": "ai_credits",
+    "budget_type": "BundlePricing",
+    "amount": 2500,
+    "prevent_further_usage": true,
+    "alerting": {
+      "will_alert": true,
+      "alert_recipients": [
+        "dana-dev",
+        "gia-pay"
+      ]
+    },
+    "cost_center": "CC-4410-PAYMENTS",
+    "justification": "The payments team moved PCI evidence collection and ledger reconciliation refactors to Copilot agent mode and the cloud agent in August. The repository hit its $800 budget on the 19th and usage was blocked for two days. Q3 forecast from the ROI report: ~$2,100/month."
+  }
+}

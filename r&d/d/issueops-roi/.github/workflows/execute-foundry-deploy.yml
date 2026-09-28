@@ -1,0 +1,195 @@
+# Execute an approved foundry-model-deployment: log in to Azure with OIDC
+# (federated credential bound to the foundry-<env> GitHub environment), run the
+# az pre-flight (model/SKU availability, quota, name collisions), deploy
+# deploy/bicep/model-deployment.bicep and report the endpoint.
+name: IssueOps · execute Foundry deployment
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        type: number
+        required: true
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: IssueOps issue number
+        type: number
+        required: true
+      force:
+        description: Re-run even if a previous run is marked executing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    concurrency:
+      group: issueops-execute-${{ inputs.issue }}
+      cancel-in-progress: false
+    outputs:
+      digest: ${{ steps.gate.outputs.digest }}
+      environment: ${{ steps.gate.outputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: write
+          permission-contents: read
+          permission-members: read
+          permission-organization-custom-org-roles: read
+      - id: gate
+        uses: ./.github/actions/gate
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ inputs.issue }}
+          request-type: foundry-model-deployment
+          force: ${{ inputs.force || false }}
+
+  deploy:
+    name: Deploy model
+    needs: gate
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 45
+    # foundry-dev | foundry-uat | foundry-prod. Each environment holds its own
+    # AZURE_CLIENT_ID variable (Entra app with a federated credential for
+    # repo:CoolEngOrg/issueops:environment:foundry-<env>) and prod can require reviewers.
+    environment: ${{ needs.gate.outputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: read
+          permission-contents: read
+      - name: Plan
+        id: plan
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          ISSUE: ${{ inputs.issue }}
+          DIGEST: ${{ needs.gate.outputs.digest }}
+        run: |
+          issueops foundry plan --issue "$ISSUE" --expect-digest "$DIGEST"
+          jq . "$RUNNER_TEMP/issueops/parameters.json"
+      - name: Azure login (OIDC)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Pre-flight (az)
+        env:
+          ACCOUNT: ${{ steps.plan.outputs.account }}
+          RG: ${{ steps.plan.outputs.resource_group }}
+          REGION: ${{ steps.plan.outputs.region }}
+        run: |
+          out="$RUNNER_TEMP/issueops"
+          az cognitiveservices account list-models -n "$ACCOUNT" -g "$RG" -o json > "$out/models.json"
+          az cognitiveservices usage list -l "$REGION" -o json > "$out/usage.json"
+          az cognitiveservices account deployment list -n "$ACCOUNT" -g "$RG" -o json > "$out/deployments.json"
+          issueops foundry preflight --plan "$out/plan.json" --models "$out/models.json" \
+            --usage "$out/usage.json" --deployments "$out/deployments.json"
+      - name: What-if
+        env:
+          RG: ${{ steps.plan.outputs.resource_group }}
+          PARAMS: ${{ steps.plan.outputs.parameters }}
+        run: |
+          az deployment group what-if -g "$RG" \
+            --template-file deploy/bicep/model-deployment.bicep --parameters "@$PARAMS" --no-pretty-print > "$RUNNER_TEMP/issueops/what-if.json"
+          jq '.changes[] | {changeType, resourceId}' "$RUNNER_TEMP/issueops/what-if.json"
+      - name: Deploy (Bicep)
+        env:
+          RG: ${{ steps.plan.outputs.resource_group }}
+          PARAMS: ${{ steps.plan.outputs.parameters }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          az deployment group create -g "$RG" -n "issueops-${ISSUE}-${GITHUB_RUN_ID}" \
+            --template-file deploy/bicep/model-deployment.bicep --parameters "@$PARAMS" -o none
+      - name: Collect result
+        env:
+          ACCOUNT: ${{ steps.plan.outputs.account }}
+          RG: ${{ steps.plan.outputs.resource_group }}
+          NAME: ${{ steps.plan.outputs.deployment_name }}
+        run: |
+          out="$RUNNER_TEMP/issueops"
+          az cognitiveservices account deployment show -n "$ACCOUNT" -g "$RG" --deployment-name "$NAME" -o json > "$out/deployment.json"
+          az cognitiveservices account show -n "$ACCOUNT" -g "$RG" -o json > "$out/account.json"
+          issueops foundry result --plan "$out/plan.json" --preflight "$out/preflight.json" \
+            --deployment "$out/deployment.json" --account "$out/account.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: |
+            ${{ runner.temp }}/issueops/outcome.json
+            ${{ runner.temp }}/issueops/preflight.json
+            ${{ runner.temp }}/issueops/parameters.json
+            ${{ runner.temp }}/issueops/what-if.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  report:
+    name: Report
+    needs: [gate, deploy]
+    if: always() && needs.gate.result == 'success'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: write
+          permission-contents: read
+          permission-members: read
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: outcome-${{ inputs.issue }}
+          path: ${{ runner.temp }}/outcome
+      - name: Failure summary
+        id: why
+        if: needs.deploy.result != 'success'
+        run: |
+          msg="The deploy job ended with result \"${DEPLOY_RESULT}\"."
+          if [ -f "$RUNNER_TEMP/outcome/preflight.json" ]; then
+            errs=$(jq -r '(.errors // []) | join(" ")' "$RUNNER_TEMP/outcome/preflight.json")
+            [ -n "$errs" ] && msg="pre-flight failed: $errs"
+          fi
+          {
+            echo "error<<ISSUEOPS_EOF_$GITHUB_RUN_ID"
+            echo "$msg"
+            echo "ISSUEOPS_EOF_$GITHUB_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+      - uses: ./.github/actions/finish
+        with:
+          token: ${{ steps.setup.outputs.token }}
+          bot-login: ${{ steps.setup.outputs.bot-login }}
+          issue-number: ${{ inputs.issue }}
+          status: ${{ needs.deploy.result == 'success' && 'completed' || 'failed' }}
+          result: ${{ runner.temp }}/outcome/outcome.json
+          error: ${{ steps.why.outputs.error }}

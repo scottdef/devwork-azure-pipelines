@@ -1,0 +1,3 @@
+team,seats,active_users,engaged_users,ai_credits,ai_cost_usd,seat_cost_usd,total_cost_usd,ai_loc_added,acceptance_rate,merged_prs,median_cycle_hours,reviews,cost_per_merged_pr_usd
+platform-eng,6,5,4,59109.42,591.09,218.40,809.49,11471,0.4072,22,33.0000,15,36.8000
+payments,5,5,4,30153.87,301.54,182.00,483.54,7134,0.3859,22,37.0000,25,21.9800

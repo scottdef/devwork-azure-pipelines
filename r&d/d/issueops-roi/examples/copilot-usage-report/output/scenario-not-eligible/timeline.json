@@ -1,0 +1,93 @@
+[
+  {
+    "issue": {
+      "number": 203,
+      "title": "[IssueOps] Copilot usage report: payments-api",
+      "body": "### Report scope\n\nrepositories\n\n### Teams\n\n_No response_\n\n### Repositories\n\npayments-api\n\n### Reporting period\n\nLast 7 days\n\n### Custom start date\n\n_No response_\n\n### Custom end date\n\n_No response_\n\n### Cost basis\n\nAI credits only\n\n### Outputs\n\n- [X] Interactive HTML report\n- [ ] CSV exports\n- [ ] Publish metrics to Grafana\n\n### Per-user detail\n\n- [ ] Include a per-user breakdown (requires Copilot admin approval)\n\n### Purpose\n\nCurious how much the fraud rules refactor cost in AI credits.\n",
+      "state": "closed",
+      "user": {
+        "login": "kai-fraud",
+        "id": 0,
+        "type": "User"
+      },
+      "labels": [
+        {
+          "name": "issueops"
+        },
+        {
+          "name": "issueops:copilot-report"
+        },
+        {
+          "name": "issueops:cancelled"
+        }
+      ],
+      "html_url": "https://github.com/CoolEngOrg/issueops/issues/203",
+      "created_at": "2026-09-21T14:03:00Z",
+      "updated_at": "2026-09-21T14:03:00Z",
+      "closed_at": "2026-09-21T14:07:00Z",
+      "repository_url": ""
+    },
+    "comments": [
+      {
+        "id": 1001,
+        "body": "\u003c!-- issueops:v1:summary {\"action\":\"opened\",\"digest\":\"sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae\",\"valid\":false} --\u003e\n## ⛔ Copilot usage and ROI report: changes needed\n\nHi @kai-fraud, the request could not be accepted yet.\n\n\u003e [!CAUTION]\n\u003e **The request did not pass validation.** Edit the issue body (keep the `###` headings) to fix:\n\u003e - You are not eligible to request this: requests are limited to @‍CoolEngOrg/engineering-managers or @‍CoolEngOrg/copilot-admins or @‍CoolEngOrg/platform-admins.\n\nEdit this issue to correct the fields above; validation runs again automatically on every edit.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003ea4e0c0243a6b\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:03:00Z",
+        "updated_at": "2026-09-21T14:03:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1002,
+        "body": ".submit",
+        "user": {
+          "login": "kai-fraud",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:04:00Z",
+        "updated_at": "2026-09-21T14:04:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1003,
+        "body": "\u003c!-- issueops:v1:notice {\"actor\":\"kai-fraud\",\"command\":\"submit\",\"digest\":\"sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae\"} --\u003e\n\u003e [!WARNING]\n\u003e `.submit` from kai-fraud was not applied: You are not eligible to request this: requests are limited to @‍CoolEngOrg/engineering-managers or @‍CoolEngOrg/copilot-admins or @‍CoolEngOrg/platform-admins.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003ea4e0c0243a6b\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:04:00Z",
+        "updated_at": "2026-09-21T14:04:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1004,
+        "body": ".cancel I'll ask my manager to request it.",
+        "user": {
+          "login": "kai-fraud",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:07:00Z",
+        "updated_at": "2026-09-21T14:07:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1005,
+        "body": "\u003c!-- issueops:v1:cancelled {\"actor\":\"kai-fraud\",\"digest\":\"sha256:a4e0c0243a6b4484175f604f520ba10ca226c4fe37831f9ff53e4d2a8a71edae\"} --\u003e\n## 🚫 Cancelled\n\n@kai-fraud cancelled this request: I'll ask my manager to request it.. No changes were made.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003ea4e0c0243a6b\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:07:00Z",
+        "updated_at": "2026-09-21T14:07:00Z",
+        "html_url": ""
+      }
+    ]
+  }
+]

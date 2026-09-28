@@ -1,0 +1,13 @@
+## ❓ The agent needs more information
+
+The agent paused because the request is missing information it needs to meet the acceptance criteria.
+
+| # | Follow-up question |
+| - | ------------------ |
+{{- range .Result.questions }}
+| {{ .ID }} | {{ cell .Text }} |
+{{- end }}
+
+{{ mention .Requestor }}, answer with an `.answers` comment (for example `A{{ with index .Result.questions 0 }}{{ slice .ID 1 }}{{ end }}: …`), then comment `.submit` again. Approvers will be asked to re-approve the updated specification.
+
+{{ template "footer" . }}

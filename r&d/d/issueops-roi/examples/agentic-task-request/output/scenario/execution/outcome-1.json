@@ -1,0 +1,21 @@
+{
+  "agent": {
+    "status": "needs_input",
+    "questions": [
+      {
+        "id": "D1",
+        "key": "backup_procedure",
+        "text": "Which backup must be confirmed before the upgrade (tool and schedule name)?",
+        "required": true,
+        "max_length": 500
+      }
+    ],
+    "iterations": 1,
+    "model": "gpt-4.1-agents",
+    "usage": {
+      "prompt_tokens": 5120,
+      "completion_tokens": 410,
+      "requests": 2
+    }
+  }
+}

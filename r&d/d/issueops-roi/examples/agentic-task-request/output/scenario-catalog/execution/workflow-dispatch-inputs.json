@@ -1,0 +1,9 @@
+{
+  "inputs": {
+    "ecosystems": "pip",
+    "issueops_request": "https://github.com/CoolEngOrg/issueops/issues/403",
+    "open_pull_request": "yes"
+  },
+  "ref": "main",
+  "workflow": "dependency-hygiene.lock.yml"
+}

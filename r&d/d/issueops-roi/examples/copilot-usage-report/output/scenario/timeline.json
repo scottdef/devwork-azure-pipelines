@@ -1,0 +1,144 @@
+[
+  {
+    "issue": {
+      "number": 201,
+      "title": "[IssueOps] Copilot usage report: platform-eng + payments, last 28 days",
+      "body": "### Report scope\n\nteams\n\n### Teams\n\nplatform-eng, @CoolEngOrg/payments\n\n### Repositories\n\n_No response_\n\n### Reporting period\n\nLast 28 days\n\n### Custom start date\n\n_No response_\n\n### Custom end date\n\n_No response_\n\n### Cost basis\n\nAI credits and seats\n\n### Outputs\n\n- [X] Interactive HTML report\n- [X] CSV exports\n- [X] Publish metrics to Grafana\n\n### Per-user detail\n\n- [X] Include a per-user breakdown (requires Copilot admin approval)\n\n### Purpose\n\nQuarterly business review: compare AI-credit spend against merged pull requests and review throughput for platform-eng and payments, and identify seats that are not being used before the October true-up.\n",
+      "state": "closed",
+      "user": {
+        "login": "dana-dev",
+        "id": 0,
+        "type": "User"
+      },
+      "labels": [
+        {
+          "name": "issueops"
+        },
+        {
+          "name": "issueops:copilot-report"
+        },
+        {
+          "name": "issueops:escalated"
+        },
+        {
+          "name": "issueops:completed"
+        }
+      ],
+      "html_url": "https://github.com/CoolEngOrg/issueops/issues/201",
+      "created_at": "2026-09-21T14:03:00Z",
+      "updated_at": "2026-09-21T14:03:00Z",
+      "closed_at": "2026-09-21T14:40:00Z",
+      "repository_url": ""
+    },
+    "comments": [
+      {
+        "id": 1001,
+        "body": "\u003c!-- issueops:v1:summary {\"action\":\"opened\",\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\",\"valid\":true} --\u003e\n## ✅ Copilot usage and ROI report: request validated\n\nHi @dana-dev, your request was parsed and passed validation.\n\n| Field | Value |\n| ----- | ----- |\n| Scope | teams: platform-eng, payments |\n| Period | 2026-08-23 to 2026-09-19 (28 days) |\n| Cost basis | AI credits and prorated seats |\n| Outputs | summary comment, HTML report, CSV, Grafana metrics |\n| Per-user detail | yes (needs Copilot admin approval) |\n\n### Approval plan\n\n| Approval rule | Needed | Who can approve |\n| ------------- | ------ | --------------- |\n| Copilot administrators | 1 | @‍CoolEngOrg/copilot-admins |\n\nPolicy escalations applied: Per-user detail requires a Copilot administrator.\n\nExecution runs in the GitHub environment `copilot-reports`, which can add a required-reviewer gate.\n\n### Next step\n\n@dana-dev, review the details above and comment **`.submit`** to confirm the request.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:03:00Z",
+        "updated_at": "2026-09-21T14:03:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1002,
+        "body": ".submit",
+        "user": {
+          "login": "dana-dev",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:05:00Z",
+        "updated_at": "2026-09-21T14:05:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1003,
+        "body": "\u003c!-- issueops:v1:submitted {\"actor\":\"dana-dev\",\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\",\"environment\":\"copilot-reports\",\"escalations\":[\"Per-user detail requires a Copilot administrator\"]} --\u003e\n## 📨 Submitted for approval\n\n@dana-dev submitted this Copilot usage and ROI report (digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e).\n\n| Field | Value |\n| ----- | ----- |\n| Scope | teams: platform-eng, payments |\n| Period | 2026-08-23 to 2026-09-19 (28 days) |\n| Cost basis | AI credits and prorated seats |\n| Outputs | summary comment, HTML report, CSV, Grafana metrics |\n| Per-user detail | yes (needs Copilot admin approval) |\n\n### Approval required\n\n| Approval rule | Needed | Who can approve |\n| ------------- | ------ | --------------- |\n| Copilot administrators | 1 | @‍CoolEngOrg/copilot-admins |\n\nPolicy escalations applied: Per-user detail requires a Copilot administrator.\n\nExecution runs in the GitHub environment `copilot-reports`, which can add a required-reviewer gate.\n\n@CoolEngOrg/copilot-admins please review. Comment **`.approve`** to approve or **`.deny \u003creason\u003e`** to deny. Requestors cannot approve their own requests; each person counts toward one rule.\n\n\u003e [!IMPORTANT]\n\u003e Approvals are bound to this exact request content. Editing the issue body voids them.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:05:00Z",
+        "updated_at": "2026-09-21T14:05:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1004,
+        "body": ".approve",
+        "user": {
+          "login": "mo-manager",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:14:00Z",
+        "updated_at": "2026-09-21T14:14:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1005,
+        "body": "\u003c!-- issueops:v1:notice {\"actor\":\"mo-manager\",\"command\":\"approve\",\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\"} --\u003e\n\u003e [!WARNING]\n\u003e `.approve` from mo-manager was not applied: @‍mo-manager: not an eligible approver for this request. Eligible approvers: @‍CoolEngOrg/copilot-admins.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:14:00Z",
+        "updated_at": "2026-09-21T14:14:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1006,
+        "body": ".approve Per-user detail OK for the QBR; do not forward the CSV outside the leadership group.",
+        "user": {
+          "login": "cara-copilot",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:39:00Z",
+        "updated_at": "2026-09-21T14:39:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1007,
+        "body": "\u003c!-- issueops:v1:approved {\"actor\":\"cara-copilot\",\"approvers\":[\"cara-copilot\"],\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\"} --\u003e\n## 🚀 Approved: execution starting\n\n| Approval rule | Progress | Approved by |\n| ------------- | -------- | ----------- |\n| Copilot administrators | 1 / 1 ✅ | cara-copilot (member of @‍CoolEngOrg/copilot-admins) |\n\nVotes that did not count:\n- mo-manager: not an eligible approver for any required rule\n\nExecution starts in the GitHub environment `copilot-reports`. If that environment has required reviewers, they approve the deployment in the Actions UI before anything changes.\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:39:00Z",
+        "updated_at": "2026-09-21T14:39:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1008,
+        "body": "\u003c!-- issueops:v1:executing {\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\",\"run\":\"https://github.com/CoolEngOrg/issueops/actions/runs/9100020101\"} --\u003e\n## ⚙️ Executing\n\nApproval re-verified for digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e; execution has started in [this workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100020101).\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100020101) · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:40:00Z",
+        "updated_at": "2026-09-21T14:40:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1009,
+        "body": "\u003c!-- issueops:v1:completed {\"digest\":\"sha256:0df9b484bf1f3a4eb252198a58191603703eab3efc1c46786d732037b9c35e53\",\"run\":\"https://github.com/CoolEngOrg/issueops/actions/runs/9100020101\"} --\u003e\n## 📊 Copilot usage and ROI report\n\n**CoolEngOrg** · teams: platform-eng, payments · 2026-08-23 to 2026-09-19 (28 days with data)\n\n| Metric | Value |\n| ------ | ----- |\n| Total cost | **$1,293.03** ($892.63 AI credits + $400.40 seats) |\n| AI credits | 89,263.3 ($892.63) |\n| Active / engaged users | 10 / 8 (80% engaged) |\n| Merged pull requests | 44 |\n| Cost per merged PR | **$29.39** (AI only $20.29) |\n| Median time to merge | 35.0 h |\n| Code acceptance rate | 40% · 18,605 AI-assisted lines added |\n\n### Findings\n\n- 8 of 10 active Copilot users (80%) were engaged: they accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day.\n- 50% of active users used an agentic surface (agent mode, CLI, Copilot app or cloud agent) at least once.\n- Total cost per merged pull request: $29.39 (AI credits alone: $20.29).\n- Lowest cost per merged PR: payments ($21.98); highest: platform-eng ($36.80).\n- AI-credit spend in the second half of the period changed +26% versus the first half.\n\n\u003cdetails\u003e\u003csummary\u003eTeams (2)\u003c/summary\u003e\n\n| Team | Seats | Active | Engaged | Total cost | Merged PRs | Cost / PR | Median cycle |\n| ---- | ----- | ------ | ------- | ---------- | ---------- | --------- | ------------ |\n| platform-eng | 6 | 5 | 4 | $809.49 | 22 | $36.80 | 33.0 h |\n| payments | 5 | 5 | 4 | $483.54 | 22 | $21.98 | 37.0 h |\n\n\u003c/details\u003e\n\n📦 **Artifacts:** [download the report bundle](https://github.com/CoolEngOrg/issueops/actions/runs/9100020101/artifacts/4200000201) (interactive `copilot-roi.html` with table views), CSV exports, `report.json`. Artifacts are retained for 30 days.\n\n📈 Metrics were pushed to the Pushgateway and appear on the **IssueOps / Copilot ROI** Grafana dashboard.\n\n\u003cdetails\u003e\u003csummary\u003eNotes and definitions\u003c/summary\u003e\n\n- Teams with fewer than five Copilot-seated users are omitted from GitHub's user-teams report; users on several teams count toward each of their teams, so team rows do not sum to the scope total.\n- AI-assisted lines of code (loc_added_sum) are directional: they measure Copilot-suggested lines accepted or applied, not total output.\n\n- **AI cost**: ai_credits_used x $0.0100 per credit (config pricing.ai_credit_usd)\n- **active user**: a Copilot-seated user with any interaction, generation, acceptance or agent use on a day\n- **cost per merged PR**: total cost in scope / merged pull requests in scope\n- **cycle time**: pull request created -\u0026gt; merged, in hours\n- **engaged user**: accepted code or used an agentic surface (agent mode, CLI, cloud agent) on the day\n- **seat cost**: seats x $39.00 per month x days/30 (Copilot Enterprise)\n\n\u003c/details\u003e\n\n\u003csub\u003eIssueOps · Copilot usage and ROI report · digest \u003ccode\u003e0df9b484bf1f\u003c/code\u003e · [workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100020101) · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:40:00Z",
+        "updated_at": "2026-09-21T14:40:00Z",
+        "html_url": ""
+      }
+    ]
+  }
+]

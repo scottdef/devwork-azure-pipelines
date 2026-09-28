@@ -1,0 +1,6 @@
+{
+  "name": "coolengorg-issueops-validators",
+  "private": true,
+  "type": "module",
+  "description": "Custom field validators for issue-ops/validator (ESM, Node built-ins only)."
+}

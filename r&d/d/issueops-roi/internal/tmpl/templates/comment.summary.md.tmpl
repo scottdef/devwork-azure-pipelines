@@ -1,0 +1,38 @@
+{{- if and .QA (not .QA.Complete) -}}
+## 📝 {{ .TypeName }}: answers needed
+
+Hi {{ mention .Requestor }}, your request form passed validation. Answer the clarifying questions below to continue.
+{{- else -}}
+## ✅ {{ .TypeName }}: request validated
+
+Hi {{ mention .Requestor }}, your request was parsed and passed validation.
+{{- end }}
+
+{{ template "request-table" . }}
+
+{{ template "messages" . }}
+{{- if .Stale }}
+> [!NOTE]
+> The request changed after it was submitted. Earlier approvals no longer apply; comment `.submit` again when you are ready.
+{{ end }}
+### Approval plan
+
+{{ template "rules" . }}
+
+{{- if and .QA (not .QA.Complete) }}
+
+### Clarifying questions
+
+The agent needs a few answers before this request can be submitted.
+
+{{ template "questions" . }}
+
+{{ template "answer-howto" . }}
+{{- else }}
+
+### Next step
+
+{{ mention .Requestor }}, review the details above and comment **`.submit`** to confirm the request.
+{{- end }}
+
+{{ template "footer" . }}

@@ -1,0 +1,13 @@
+## ⛔ {{ .TypeName }}: changes needed
+
+Hi {{ mention .Requestor }}, the request could not be accepted yet.
+
+{{ template "messages" . }}
+Edit this issue to correct the fields above; validation runs again automatically on every edit.
+{{- if .Stale }}
+
+> [!NOTE]
+> Earlier approvals no longer apply because the request changed.
+{{- end }}
+
+{{ template "footer" . }}

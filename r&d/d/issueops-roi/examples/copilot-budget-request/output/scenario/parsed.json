@@ -1,0 +1,24 @@
+{
+  "budget_acknowledgements": {
+    "selected": [
+      "I understand spend up to this amount is billed to CoolEngEnt and charged back to the cost center above",
+      "My manager is aware of this request"
+    ],
+    "unselected": []
+  },
+  "budget_alert_recipients": "dana-dev, gia-pay",
+  "budget_amount": "2500",
+  "budget_cost_center": "CC-4410-PAYMENTS",
+  "budget_enforcement": [
+    "Stop usage when the budget is reached"
+  ],
+  "budget_expires_on": "",
+  "budget_justification": "The payments team moved PCI evidence collection and ledger reconciliation refactors to Copilot agent mode and the cloud agent in August. The repository hit its $800 budget on the 19th and usage was blocked for two days. Q3 forecast from the ROI report: ~$2,100/month.",
+  "budget_product": [
+    "AI credits"
+  ],
+  "budget_scope": [
+    "repository"
+  ],
+  "budget_target": "payments-api"
+}

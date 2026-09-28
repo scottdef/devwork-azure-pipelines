@@ -1,0 +1,74 @@
+# Continuous integration for the IssueOps platform itself.
+name: IssueOps · CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go build, vet, test
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          out=$(gofmt -l ./cmd ./internal)
+          if [ -n "$out" ]; then echo "::error::gofmt needed:"; echo "$out"; exit 1; fi
+      - name: Dependency policy (standard library + go-echarts only)
+        # Modules of every package compiled into the binaries and tests
+        # (go-echarts' own test dependencies are in the module graph but never built).
+        run: |
+          mods=$(go list -deps -test -f '{{with .Module}}{{.Path}}{{end}}' ./... | sort -u \
+            | grep -v -x -e 'github.com/CoolEngOrg/issueops' -e 'github.com/go-echarts/go-echarts/v2' || true)
+          if [ -n "$mods" ]; then echo "::error::Unapproved modules:"; echo "$mods"; exit 1; fi
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - name: Build binaries
+        run: |
+          go build -trimpath -o bin/issueops ./cmd/issueops
+          CGO_ENABLED=0 go build -trimpath -o bin/agent-runner ./cmd/agent-runner
+      - name: Issue forms are in sync with config/forms
+        run: |
+          scripts/forms-to-json.sh
+          git diff --exit-code -- config/forms || { echo "::error::Run scripts/forms-to-json.sh and commit config/forms"; exit 1; }
+          bin/issueops check-forms
+      - name: Examples are up to date (simulate)
+        run: |
+          make examples ISSUEOPS=bin/issueops
+          git diff --stat --exit-code -- examples || { echo "::error::Run make examples and commit the regenerated transcripts"; exit 1; }
+
+  validators:
+    name: Custom validators (node --test)
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: node --test '.github/validator/tests/*.test.js'
+
+  actionlint:
+    name: actionlint
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint (includes shellcheck)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color

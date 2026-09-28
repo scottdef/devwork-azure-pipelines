@@ -1,0 +1,24 @@
+{
+  "budget_acknowledgements": {
+    "selected": [
+      "I understand spend up to this amount is billed to CoolEngEnt and charged back to the cost center above",
+      "My manager is aware of this request"
+    ],
+    "unselected": []
+  },
+  "budget_alert_recipients": "dana-dev",
+  "budget_amount": "300",
+  "budget_cost_center": "CC-4410-PAYMENTS",
+  "budget_enforcement": [
+    "Stop usage when the budget is reached"
+  ],
+  "budget_expires_on": "2026-12-31",
+  "budget_justification": "Contractor migrating the settlement batch jobs to Java 21 through December; needs agent mode beyond the default per-user allowance.",
+  "budget_product": [
+    "AI credits"
+  ],
+  "budget_scope": [
+    "user"
+  ],
+  "budget_target": "@sam-contract"
+}

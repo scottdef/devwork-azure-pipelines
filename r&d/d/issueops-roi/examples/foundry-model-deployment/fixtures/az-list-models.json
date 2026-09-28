@@ -1,0 +1,12 @@
+[
+  { "name": "gpt-4.1", "format": "OpenAI", "version": "2025-04-14", "lifecycleStatus": "GenerallyAvailable",
+    "skus": [ { "name": "GlobalStandard" }, { "name": "DataZoneStandard" }, { "name": "GlobalProvisionedManaged" }, { "name": "GlobalBatch" } ] },
+  { "name": "gpt-4.1-mini", "format": "OpenAI", "version": "2025-04-14", "lifecycleStatus": "GenerallyAvailable",
+    "skus": [ { "name": "GlobalStandard" }, { "name": "DataZoneStandard" }, { "name": "GlobalBatch" } ] },
+  { "name": "o4-mini", "format": "OpenAI", "version": "2025-04-16", "lifecycleStatus": "GenerallyAvailable",
+    "skus": [ { "name": "GlobalStandard" }, { "name": "DataZoneStandard" } ] },
+  { "name": "text-embedding-3-large", "format": "OpenAI", "version": "1", "lifecycleStatus": "GenerallyAvailable",
+    "skus": [ { "name": "GlobalStandard" }, { "name": "Standard" } ] },
+  { "name": "Phi-4-mini-instruct", "format": "Microsoft", "version": "1", "lifecycleStatus": "GenerallyAvailable",
+    "skus": [ { "name": "GlobalStandard" } ] }
+]

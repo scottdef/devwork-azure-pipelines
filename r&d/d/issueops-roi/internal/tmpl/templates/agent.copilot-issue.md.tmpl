@@ -1,0 +1,30 @@
+{{- /* Body of the issue created in the target repository for the Copilot cloud agent.
+       Only validated form fields and validated answers are included; raw
+       IssueOps comments are never forwarded (prompt-injection boundary). */ -}}
+## Task
+
+{{ safe .Title }}
+
+## Objective
+
+{{ safe .Objective }}
+
+## Acceptance criteria
+{{ range .AcceptanceCriteria }}
+- [ ] {{ safe . }}
+{{- end }}
+
+## Scope
+{{- with index .Answers "in_scope_paths" }}
+
+- **In scope:** {{ code . }}
+{{- end }}
+{{- with index .Answers "out_of_scope" }}
+- **Do not change:** {{ safe . }}
+{{- end }}
+{{- with index .Answers "test_command" }}
+- **Verify with:** {{ code . }}
+{{- end }}
+
+---
+Requested through IssueOps {{ .RequestURL }} by {{ safe .Requestor }} (data classification: `{{ .Classification }}`, spec digest `{{ short .Digest }}`).

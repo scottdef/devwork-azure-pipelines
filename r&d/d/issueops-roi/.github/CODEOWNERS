@@ -1,0 +1,14 @@
+# Changes to policy, workflows and templates change who can approve what and
+# what runs with production credentials. CODEOWNERS requests review from every
+# listed team but is satisfied by ANY one of them: the ruleset on main adds a
+# required-reviewers rule for config/issueops.json so platform-admins,
+# ai-governance AND finops-approvers must each approve policy changes.
+*                                   @CoolEngOrg/platform-admins
+/config/issueops.json               @CoolEngOrg/platform-admins @CoolEngOrg/ai-governance @CoolEngOrg/finops-approvers
+/.github/workflows/                 @CoolEngOrg/platform-admins
+/.github/actions/                   @CoolEngOrg/platform-admins
+/.github/ISSUE_TEMPLATE/            @CoolEngOrg/platform-admins
+/.github/validator/                 @CoolEngOrg/platform-admins
+/internal/tmpl/templates/           @CoolEngOrg/platform-admins
+/deploy/                            @CoolEngOrg/platform-admins @CoolEngOrg/platform-ai
+/cmd/agent-runner/                  @CoolEngOrg/platform-ai

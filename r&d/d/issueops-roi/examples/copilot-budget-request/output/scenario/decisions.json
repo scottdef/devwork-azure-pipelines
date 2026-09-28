@@ -1,0 +1,296 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "dana-dev",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": true,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "dana-dev",
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+          "environment": "copilot-budgets-high",
+          "escalations": [
+            "FinOps sign-off above $1,000 per month"
+          ]
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "dana-dev",
+          "command": "approve",
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": true,
+      "reason": "@dana-dev: requestors cannot approve their own request. Eligible approvers: @CoolEngOrg/copilot-admins; @CoolEngOrg/finops-approvers.",
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 4,
+    "do": "comment",
+    "user": "alex-admin",
+    "kind": "command",
+    "decision": {
+      "action": "approval-recorded",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "approval-status",
+        "data": {
+          "actor": "alex-admin",
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c"
+        },
+        "template": "comment.approval-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:approval-status"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "comment",
+    "user": "fran-finops",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": true,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "fran-finops",
+          "approvers": [
+            "alex-admin",
+            "fran-finops"
+          ],
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c"
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-budgets-high",
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:approved",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": true,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100010101"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-budgets-high",
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": true,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100010101"
+        },
+        "template": "comment.completed.copilot-budget-request.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "close": "completed",
+      "rejected": false,
+      "allowlist": "CoolEngOrg/copilot-admins,CoolEngOrg/finops-approvers",
+      "digest": "sha256:c83acaa082a3436bd1a73488336f8030a37576da8546c7b9c912dd5d7e93790c",
+      "labels_add": [
+        "issueops:completed",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

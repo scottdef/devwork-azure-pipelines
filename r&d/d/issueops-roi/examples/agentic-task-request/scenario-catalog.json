@@ -1,0 +1,95 @@
+{
+  "name": "Agentic workflow catalog: dependency hygiene for ml-pipelines",
+  "description": "The catalog backend dispatches a pre-approved GitHub Agentic Workflow in the target repository. The question set comes from the catalog entry, and answers are mapped to workflow_dispatch inputs by question id.",
+  "type": "agentic-task-request",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": {
+    "number": 403,
+    "title": "[IssueOps] Agentic task: dependency hygiene for ml-pipelines",
+    "requestor": "max-data"
+  },
+  "values": {
+    "agent_backend": [
+      "agentic-workflow-catalog"
+    ],
+    "agent_target_repository": "ml-pipelines",
+    "agent_task_title": "Monthly dependency hygiene",
+    "agent_objective": "Review outdated Python dependencies in ml-pipelines and open one upgrade pull request with release-note summaries.",
+    "agent_acceptance_criteria": "- One pull request with grouped upgrades\n- Each upgrade links its release notes",
+    "agent_catalog_workflow": [
+      "dependency-hygiene"
+    ],
+    "agent_data_classification": [
+      "internal"
+    ],
+    "agent_acknowledgements": {
+      "selected": [
+        "I will review all agent output (pull requests, documents) before it is merged or relied on",
+        "The objective and answers contain no secrets, credentials, or personal data"
+      ]
+    }
+  },
+  "directory": {
+    "repo_permissions": {
+      "ml-pipelines": {
+        "max-data": "write",
+        "nia-stats": "admin"
+      }
+    }
+  },
+  "steps": [
+    {
+      "do": "open",
+      "expect": {
+        "action": "summary",
+        "phase": "awaiting-answers"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "max-data",
+      "body": ".answers\nA1: pip\nA2: maybe",
+      "after": "4m",
+      "expect": {
+        "action": "answers",
+        "phase": "awaiting-answers"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "max-data",
+      "body": ".answers\nA2: yes",
+      "after": "1m",
+      "expect": {
+        "action": "answers",
+        "phase": "validated"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "max-data",
+      "body": ".submit",
+      "after": "1m",
+      "expect": {
+        "action": "submitted"
+      }
+    },
+    {
+      "do": "comment",
+      "user": "nia-stats",
+      "body": ".approve",
+      "after": "30m",
+      "expect": {
+        "action": "approved",
+        "environment": "agentic-catalog"
+      }
+    },
+    {
+      "do": "execute",
+      "after": "1m",
+      "expect": {
+        "action": "completed"
+      }
+    }
+  ]
+}

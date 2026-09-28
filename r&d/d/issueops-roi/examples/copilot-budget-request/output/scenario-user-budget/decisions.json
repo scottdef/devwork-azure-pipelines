@@ -1,0 +1,507 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "dana-dev",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "invalid",
+      "escalated": true,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:f5497fe36b2fe0ed18efc36d528cef3633a45e604ccfbcbb03e9b9585db5fffa",
+          "valid": false
+        },
+        "template": "comment.invalid.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:f5497fe36b2fe0ed18efc36d528cef3633a45e604ccfbcbb03e9b9585db5fffa",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:invalid"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "invalid",
+      "escalated": true,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "dana-dev",
+          "command": "submit",
+          "digest": "sha256:f5497fe36b2fe0ed18efc36d528cef3633a45e604ccfbcbb03e9b9585db5fffa"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": true,
+      "reason": "The request is not valid yet. Fix the errors listed in the summary comment by editing the issue.",
+      "allowlist": "false",
+      "digest": "sha256:f5497fe36b2fe0ed18efc36d528cef3633a45e604ccfbcbb03e9b9585db5fffa",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:invalid"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "edit",
+    "user": "dana-dev",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": true,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "edited",
+          "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 4,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "dana-dev",
+          "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c",
+          "environment": "copilot-budgets",
+          "escalations": [
+            "Budget for a named user: the user confirms"
+          ]
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "comment",
+    "user": "cara-copilot",
+    "kind": "command",
+    "decision": {
+      "action": "approval-recorded",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "approval-status",
+        "data": {
+          "actor": "cara-copilot",
+          "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c"
+        },
+        "template": "comment.approval-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:approval-status"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:8d5f10ab19ed8ce8610a8b6f8b4d09ffcc50f9236988fdb7977232dc0de1452c",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "edit",
+    "user": "dana-dev",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "validated",
+      "escalated": true,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "edited",
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 7,
+    "do": "comment",
+    "user": "sam-contract",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "validated",
+      "escalated": true,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "sam-contract",
+          "command": "approve",
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": true,
+      "reason": "The request changed after it was submitted, so earlier approvals no longer apply. The requestor must comment `.submit` again.",
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 8,
+    "do": "comment",
+    "user": "dana-dev",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "dana-dev",
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+          "environment": "copilot-budgets",
+          "escalations": [
+            "Budget for a named user: the user confirms"
+          ]
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 9,
+    "do": "comment",
+    "user": "sam-contract",
+    "kind": "command",
+    "decision": {
+      "action": "approval-recorded",
+      "phase": "submitted",
+      "escalated": true,
+      "comment": {
+        "event": "approval-status",
+        "data": {
+          "actor": "sam-contract",
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd"
+        },
+        "template": "comment.approval-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:approval-status"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 10,
+    "do": "comment",
+    "user": "cara-copilot",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": true,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "cara-copilot",
+          "approvers": [
+            "cara-copilot",
+            "sam-contract"
+          ],
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd"
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-budgets",
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:approved",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 11,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": true,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100010201"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "copilot-budgets",
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:escalated",
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 11,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": true,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100010201"
+        },
+        "template": "comment.completed.copilot-budget-request.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-copilot-budget.yml",
+      "request_type": "copilot-budget-request",
+      "close": "completed",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:020130726b733418c90484abbfbe79b7896dde2e1a9e3a07d5600880cca96ecd",
+      "labels_add": [
+        "issueops:completed",
+        "issueops:escalated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

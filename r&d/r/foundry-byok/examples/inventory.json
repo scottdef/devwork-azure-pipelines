@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "defaults": {
+    "auth": "api-key",
+    "enterprise_url_style": "v1",
+    "runs_on": "self-hosted, linux, x64"
+  },
+  "resources": [
+    {
+      "name": "fdy-myass-dev-eus2",
+      "settings": {
+        "environment": "dev",
+        "api_key_secret": "FOUNDRY_DEV_API_KEY"
+      },
+      "deployments": [
+        { "model": "gpt-5.4", "model_version": "2026-03-05", "deployment": "gpt-5.4" },
+        { "model": "gpt-4.1", "model_version": "2025-04-14", "deployment": "gpt-41-dev" },
+        { "model": "gpt-oss-120b", "deployment": "gpt-oss-120b" }
+      ]
+    },
+    {
+      "name": "fdy-myass-uat-eus2",
+      "settings": {
+        "environment": "uat",
+        "api_key_secret": "FOUNDRY_UAT_API_KEY"
+      },
+      "deployments": [
+        { "model": "gpt-5.4", "model_version": "2026-03-05", "deployment": "gpt-5.4" },
+        { "model": "o4-mini", "model_version": "2025-04-16", "deployment": "o4-mini-aw" },
+        { "model": "claude-opus-4-5", "deployment": "claude-opus-4-5" }
+      ]
+    },
+    {
+      "name": "fdy-myass-prod-eus2",
+      "settings": {
+        "environment": "prod",
+        "auth": "entra",
+        "tenant_id": "11111111-2222-3333-4444-555555555555",
+        "client_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "disable_model_fallback": true
+      },
+      "deployments": [
+        { "model": "gpt-5.4", "model_version": "2026-03-05", "deployment": "gpt-5.4-prod" },
+        {
+          "model": "gpt-5.4", "model_version": "2026-03-05", "deployment": "gpt-5.4-chat",
+          "auth": "api-key", "api_key_secret": "FOUNDRY_PROD_API_KEY"
+        }
+      ]
+    }
+  ]
+}

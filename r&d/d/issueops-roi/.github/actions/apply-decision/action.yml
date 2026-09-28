@@ -1,0 +1,84 @@
+name: Apply IssueOps decision
+description: >-
+  Applies a decision produced by the issueops CLI: projects the state label
+  (issue-ops/labeler), creates or updates the bot comment
+  (peter-evans/find-comment + create-or-update-comment) and closes the issue.
+  The CLI never mutates GitHub itself.
+inputs:
+  token:
+    description: GitHub App installation token.
+    required: true
+  bot-login:
+    description: Bot login used to find updatable comments.
+    required: true
+  issue-number:
+    required: true
+  labels-add:
+    required: false
+    default: ''
+  labels-remove:
+    required: false
+    default: ''
+  comment-path:
+    description: Rendered comment (Markdown file) to post.
+    required: false
+    default: ''
+  comment-update-prefix:
+    description: Marker prefix of a comment to update in place instead of posting a new one.
+    required: false
+    default: ''
+  close:
+    description: completed | not_planned | empty
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Remove stale state labels
+      if: inputs.labels-remove != ''
+      uses: issue-ops/labeler@9210b145e254445abdbfd33099941e7637d56d4e # v4.0.0
+      with:
+        action: remove
+        labels: ${{ inputs.labels-remove }}
+        issue_number: ${{ inputs.issue-number }}
+        github_token: ${{ inputs.token }}
+
+    - name: Add state labels
+      if: inputs.labels-add != ''
+      uses: issue-ops/labeler@9210b145e254445abdbfd33099941e7637d56d4e # v4.0.0
+      with:
+        action: add
+        create: 'true'
+        labels: ${{ inputs.labels-add }}
+        issue_number: ${{ inputs.issue-number }}
+        github_token: ${{ inputs.token }}
+
+    - name: Find comment to update
+      if: inputs.comment-path != '' && inputs.comment-update-prefix != ''
+      id: find
+      uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
+      with:
+        token: ${{ inputs.token }}
+        issue-number: ${{ inputs.issue-number }}
+        comment-author: ${{ inputs.bot-login }}
+        body-includes: ${{ inputs.comment-update-prefix }}
+        direction: last
+
+    - name: Create or update comment
+      if: inputs.comment-path != ''
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+      with:
+        token: ${{ inputs.token }}
+        issue-number: ${{ inputs.issue-number }}
+        comment-id: ${{ steps.find.outputs.comment-id }}
+        body-path: ${{ inputs.comment-path }}
+        edit-mode: replace
+
+    - name: Close issue
+      if: inputs.close != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE: ${{ inputs.issue-number }}
+        REASON: ${{ inputs.close }}
+      run: issueops issue close --issue "$ISSUE" --reason "$REASON"

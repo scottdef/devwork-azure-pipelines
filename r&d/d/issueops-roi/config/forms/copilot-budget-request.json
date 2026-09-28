@@ -1,0 +1,155 @@
+{
+  "name": "[IssueOps] Copilot AI budget request",
+  "description": "Create or raise a GitHub Copilot AI-credit budget for CoolEngOrg (organization, repository, user, or all users).",
+  "title": "[IssueOps] Copilot AI budget request",
+  "labels": [
+    "issueops",
+    "issueops:copilot-budget"
+  ],
+  "body": [
+    {
+      "type": "markdown",
+      "attributes": {
+        "value": "## Copilot AI budget request\n\nCopilot plans are billed on **usage-based AI Credits** (June 2026 onward). Budgets cap or alert on\nmetered AI-credit spend; they do **not** change seat licences.\n\n**What happens next**\n1. The request is parsed and validated automatically, and a summary comment is posted.\n2. You comment `.submit` to confirm the request.\n3. Approvers from `@CoolEngOrg/copilot-admins` comment `.approve` (amounts above the escalation\n   threshold also need `@CoolEngOrg/finops-approvers`).\n4. The budget is created or updated through the GitHub billing REST API and the issue is closed.\n\nDo not edit the section headings below. Editing the issue body after `.submit` resets all approvals.\n"
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "budget_scope",
+      "attributes": {
+        "label": "Budget scope",
+        "description": "What the budget applies to. `all-users` creates a universal per-user cap for every Copilot user in CoolEngOrg. `cost-center` targets an enterprise cost center (CoolEngEnt) and must be enabled by the platform team.",
+        "options": [
+          "organization",
+          "repository",
+          "user",
+          "all-users",
+          "cost-center"
+        ]
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "budget_target",
+      "attributes": {
+        "label": "Scope target",
+        "description": "Repository name (repository scope), GitHub username (user scope), or cost center name (cost-center scope). Leave blank for organization and all-users.",
+        "placeholder": "payments-api"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "budget_product",
+      "attributes": {
+        "label": "Metered product",
+        "description": "AI credits is the current Copilot billing unit. Premium requests is kept for legacy budgets only.",
+        "options": [
+          "AI credits",
+          "Premium requests (legacy)"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "budget_amount",
+      "attributes": {
+        "label": "Requested monthly budget (USD)",
+        "description": "Whole US dollars. This becomes the new budget amount (not an increment).",
+        "placeholder": "500"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "budget_enforcement",
+      "attributes": {
+        "label": "Enforcement",
+        "description": "User and all-users budgets must stop usage at the limit.",
+        "options": [
+          "Stop usage when the budget is reached",
+          "Alert only"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "budget_alert_recipients",
+      "attributes": {
+        "label": "Alert recipients",
+        "description": "Comma-separated GitHub usernames who receive 75/90/100% alerts (organization and repository scopes only).",
+        "placeholder": "alice, bob"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "input",
+      "id": "budget_expires_on",
+      "attributes": {
+        "label": "Budget expiry date",
+        "description": "Optional YYYY-MM-DD. Only supported for user-scope budgets (useful for temporary increases).",
+        "placeholder": "2026-12-31"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "input",
+      "id": "budget_cost_center",
+      "attributes": {
+        "label": "Chargeback cost center",
+        "description": "Internal cost center code for chargeback reporting.",
+        "placeholder": "CC-4410"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "budget_justification",
+      "attributes": {
+        "label": "Business justification",
+        "description": "Why is the budget needed, and what outcome will it support? Link to evidence (usage report issue, project plan)."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "budget_acknowledgements",
+      "attributes": {
+        "label": "Acknowledgements",
+        "options": [
+          {
+            "label": "I understand spend up to this amount is billed to CoolEngEnt and charged back to the cost center above",
+            "required": true
+          },
+          {
+            "label": "My manager is aware of this request",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

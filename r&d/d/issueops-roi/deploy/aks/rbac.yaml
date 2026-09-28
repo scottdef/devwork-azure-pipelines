@@ -1,0 +1,50 @@
+# Least-privilege Kubernetes RBAC for the GitHub Actions deployer identity
+# (Entra app "issueops-gh-agentic-aks", federated to the agentic-aks GitHub
+# environment). It can only manage agent Jobs and their spec ConfigMaps in this
+# namespace and read pod logs.
+#
+# Clusters using Azure RBAC for Kubernetes Authorization can instead assign the
+# built-in "Azure Kubernetes Service RBAC Writer" role scoped to
+# <cluster-id>/namespaces/issueops-agents (setup-oidc.sh does that) - this Role
+# is the tighter alternative for clusters with Kubernetes RBAC + Entra ID.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: issueops-agent-deployer
+  namespace: issueops-agents
+  labels:
+    app.kubernetes.io/part-of: issueops
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: issueops-agent-deployer
+  namespace: issueops-agents
+  labels:
+    app.kubernetes.io/part-of: issueops
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: issueops-agent-deployer
+subjects:
+  # With kubelogin, a service principal authenticates as a User whose name is
+  # its Entra object ID (not the client ID).
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: "00000000-0000-0000-0000-000000000000" # REPLACE: service principal object ID

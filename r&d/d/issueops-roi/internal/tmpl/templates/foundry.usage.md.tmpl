@@ -1,0 +1,9 @@
+{{- define "foundry-usage" -}}
+### Using the deployment
+
+Callers authenticate with Microsoft Entra ID (keyless). Grant the caller's managed identity or service principal **Cognitive Services OpenAI User** on the resource, then call the deployment:
+
+{{ fence "bash" (printf "TOKEN=$(az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv)\ncurl -sS %sopenai/deployments/%s/chat/completions?api-version=2024-10-21 \\\n  -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' \\\n  -d '{\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":16}'" (default "https://<resource>.openai.azure.com/" .endpoint) .plan.DeploymentName) }}
+
+For **Foundry Agent Service** agents, set `MODEL_DEPLOYMENT_NAME={{ .plan.DeploymentName }}` and use the project endpoint of the Foundry project connected to {{ code .plan.Account }}. For the IssueOps AKS agent runner, ask platform-ai to add {{ code .plan.DeploymentName }} to `allowed_deployments`.
+{{- end -}}

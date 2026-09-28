@@ -1,0 +1,39 @@
+# Publishes IssueOps operational metrics (request volume by type and phase,
+# lead time, approval latency, escalations, oldest open request) to the
+# Prometheus Pushgateway scraped by the AKS Prometheus that backs Grafana OSS 12.
+name: IssueOps · ops metrics
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    # Must reach the Pushgateway (internal ingress): self-hosted runner in the VNet.
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_AKS_RUNS_ON || vars.ISSUEOPS_RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-issueops
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: read
+      - name: Export and push
+        env:
+          GH_TOKEN: ${{ steps.setup.outputs.token }}
+          PUSHGATEWAY_URL: ${{ vars.PUSHGATEWAY_URL }}
+          PUSHGATEWAY_AUTH: ${{ secrets.PUSHGATEWAY_AUTH }}
+        run: issueops ops-metrics --days 90 --deep --push
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ops-metrics
+          path: ${{ runner.temp }}/issueops/ops.prom
+          retention-days: 7

@@ -1,0 +1,47 @@
+{
+  "name": "Production PTU deployment with three-way approval, quota failure and .retry",
+  "description": "A 100-PTU GlobalProvisionedManaged gpt-4.1 deployment on the production Foundry resource. Policy adds the AI-governance and FinOps escalations on top of the platform-ai base rule. The first execution fails the pre-flight quota check; after the platform team raises PTU quota, an approver comments `.retry`, the gate re-verifies approvals for the unchanged digest, and the deployment succeeds.",
+  "type": "foundry-model-deployment",
+  "start": "2026-09-21T14:00:00Z",
+  "issue": { "number": 302, "title": "[IssueOps] Foundry deployment: gpt-4.1 PTU for agents (prod)", "requestor": "lea-ml" },
+  "values": {
+    "foundry_account": ["aif-cooleng-prod-eus2"],
+    "foundry_model": "gpt-4.1",
+    "foundry_model_version": "2025-04-14",
+    "foundry_model_format": ["OpenAI"],
+    "foundry_sku": ["GlobalProvisionedManaged"],
+    "foundry_capacity": "100",
+    "foundry_deployment_name": "gpt-4.1-agents",
+    "foundry_version_upgrade": ["NoAutoUpgrade"],
+    "foundry_use_case": "Production backing model for the AKS agent runner (agentic-task-request, aks-foundry-agent backend) and the incident-summary agent. Predictable latency is required during incident response, so provisioned throughput is requested.",
+    "foundry_consumers": "CoolEngOrg/issueops (agent runner), CoolEngOrg/incident-bot",
+    "foundry_cost_center": "CC-3000-PLATFORM",
+    "foundry_review_date": "2027-03-31",
+    "foundry_acknowledgements": { "selected": [
+      "Only data classified Internal or lower will be sent to this deployment unless it is approved for Confidential data",
+      "I understand provisioned (PTU) deployments are billed hourly whether or not they are used" ] }
+  },
+  "directory": {
+    "teams": { "platform-ai": ["priya-ai", "tom-ai", "lea-ml"], "ai-governance": ["gwen-gov"], "finops-approvers": ["fran-finops"] },
+    "custom_roles": { "security_manager": ["sec-sofia"] }
+  },
+  "steps": [
+    { "do": "open", "expect": { "action": "summary", "phase": "validated", "escalated": true, "contains": ["Provisioned (PTU) deployments are billed hourly"] } },
+    { "do": "comment", "user": "lea-ml", "body": ".submit", "after": "3m", "expect": { "action": "submitted", "contains": ["@CoolEngOrg/platform-ai", "@CoolEngOrg/ai-governance", "@CoolEngOrg/finops-approvers"] } },
+    { "do": "comment", "user": "priya-ai", "body": ".approve", "after": "30m", "expect": { "action": "approval-recorded" } },
+    { "do": "comment", "user": "lea-ml", "body": ".status", "after": "2h", "expect": { "action": "status" } },
+    { "do": "comment", "user": "sec-sofia", "body": ".approve Internal data only until the DPIA is signed.", "after": "40m", "note": "sec-sofia holds the security_manager organization role, which satisfies the AI-governance rule.",
+      "expect": { "action": "approval-recorded" } },
+    { "do": "comment", "user": "fran-finops", "body": ".approve", "after": "1h", "expect": { "action": "approved", "execute": true, "environment": "foundry-prod" } },
+    { "do": "execute", "after": "1m",
+      "execution": { "azure": { "models": "fixtures/az-list-models.json", "usage": "fixtures/az-usage-prod-before.json", "deployments": "fixtures/az-deployments-prod.json" } },
+      "expect": { "action": "failed", "phase": "failed", "contains": ["Insufficient quota"] } },
+    { "do": "comment", "user": "lea-ml", "body": ".retry", "after": "20h", "note": "The requestor cannot retry: `.retry` is an approver command.", "expect": { "action": "rejected" } },
+    { "do": "comment", "user": "tom-ai", "body": ".retry PTU quota raised to 500 in eastus2 (support case 2609210040).", "after": "10m",
+      "expect": { "action": "approved", "execute": true, "environment": "foundry-prod" } },
+    { "do": "execute", "after": "1m",
+      "execution": { "azure": { "models": "fixtures/az-list-models.json", "usage": "fixtures/az-usage-prod-after.json", "deployments": "fixtures/az-deployments-prod.json",
+        "endpoint": "https://aif-cooleng-prod-eus2.openai.azure.com/" } },
+      "expect": { "action": "completed", "close": "completed" } }
+  ]
+}

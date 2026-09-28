@@ -1,0 +1,292 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "max-data",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "awaiting-answers",
+      "escalated": false,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:f123db1f9761fcbbb35954f4d2e3637b245feb532b2fbf36fdf96f0f572f0a28",
+          "qa_complete": false,
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:f123db1f9761fcbbb35954f4d2e3637b245feb532b2fbf36fdf96f0f572f0a28",
+      "labels_add": [
+        "issueops:awaiting-answers"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "max-data",
+    "kind": "command",
+    "decision": {
+      "action": "answers",
+      "phase": "awaiting-answers",
+      "escalated": false,
+      "comment": {
+        "event": "qa-status",
+        "data": {
+          "complete": false,
+          "digest": "sha256:b78522514483d6eac37461a3832b32965c4fd1cd4164781dea92d9d882b608c3"
+        },
+        "template": "comment.qa-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:qa-status"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:b78522514483d6eac37461a3832b32965c4fd1cd4164781dea92d9d882b608c3",
+      "labels_add": [
+        "issueops:awaiting-answers"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "comment",
+    "user": "max-data",
+    "kind": "command",
+    "decision": {
+      "action": "answers",
+      "phase": "validated",
+      "escalated": false,
+      "comment": {
+        "event": "qa-status",
+        "data": {
+          "complete": true,
+          "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92"
+        },
+        "template": "comment.qa-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:qa-status"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+      "labels_add": [
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 4,
+    "do": "comment",
+    "user": "max-data",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": false,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "max-data",
+          "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+          "environment": "agentic-catalog",
+          "escalations": null
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+      "labels_add": [
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "comment",
+    "user": "nia-stats",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": false,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "nia-stats",
+          "approvers": [
+            "nia-stats"
+          ],
+          "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92"
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "agentic-catalog",
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+      "labels_add": [
+        "issueops:approved"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": false,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100040301"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "agentic-catalog",
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+      "labels_add": [
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": false,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100040301"
+        },
+        "template": "comment.completed.agentic-task-request.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:bef171fede2a1371a3c9d510f36ad11e084661d1de3e179341e6513a43784f92",
+      "labels_add": [
+        "issueops:completed"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

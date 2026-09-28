@@ -1,0 +1,140 @@
+# GitOps for Foundry -> Copilot BYOK configuration.
+#
+#   pull_request : validate the inventory and fail on drift, so the generated
+#                  gh-aw workflows / runbook in git always match inventory.json.
+#   dispatch     : verify one environment against the live Azure resources.
+#   schedule     : weekly verify of dev, to catch deleted or renamed deployments.
+#
+# Copy this file plus your inventory into the repository that owns the
+# agentic workflows (for example CoolGitOrg/central-control).
+name: foundry-byok-configs
+
+on:
+  pull_request:
+    paths:
+      - "foundry/inventory.json"
+      - "foundry/generated/**"
+      - ".github/workflows/smoke-foundry-*.md"
+      - ".github/workflows/foundry-byok-configs.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to verify"
+        type: choice
+        options: [dev, uat, prod]
+        default: dev
+      probe:
+        description: "Send one small billable request per deployment"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC
+
+permissions:
+  contents: read
+
+env:
+  INVENTORY: foundry/inventory.json
+  GENERATED: foundry/generated
+  FOUNDRY_BYOK_VERSION: v1.0.0          # release tag of the tool to install
+  GOTOOLCHAIN: local
+
+jobs:
+  drift:
+    if: github.event_name == 'pull_request'
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.21.x", cache: false }
+
+      - name: Install foundry-byok
+        run: go install github.com/CoolGitOrg/foundry-byok/cmd/foundry-byok@${FOUNDRY_BYOK_VERSION}
+
+      - name: Validate inventory
+        run: foundry-byok validate --inventory "$INVENTORY"
+
+      - name: Fail on drift (exit 3)
+        run: |
+          foundry-byok generate --inventory "$INVENTORY" --out "$GENERATED" \
+            --workflows-dir .github/workflows --check
+
+      # Optional but recommended: prove the generated smoke workflows compile.
+      # Needs the gh-aw extension and `github/gh-aw@*` allow-listed.
+      - name: Compile agentic workflows
+        if: hashFiles('.github/workflows/smoke-foundry-*.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh extension install github/gh-aw || gh extension upgrade gh-aw
+          gh aw compile --strict
+          # A lock file that changes here means someone forgot to commit it.
+          git diff --exit-code -- '.github/workflows/*.lock.yml'
+
+  verify:
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 15
+    # GitHub Environment protection rules gate prod exactly like a deployment.
+    environment: ${{ inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write          # only used when the environment verifies with Entra ID
+    env:
+      TARGET_ENV: ${{ inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.21.x", cache: false }
+
+      - name: Install foundry-byok
+        run: go install github.com/CoolGitOrg/foundry-byok/cmd/foundry-byok@${FOUNDRY_BYOK_VERSION}
+
+      # Entra path: set the environment *variables* AZURE_CLIENT_ID,
+      # AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID on the GitHub Environment.
+      - name: Azure login (OIDC)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Acquire bearer token
+        if: vars.AZURE_CLIENT_ID != ''
+        run: |
+          token="$(az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv)"
+          echo "::add-mask::${token}"
+          echo "AZURE_FOUNDRY_BEARER_TOKEN=${token}" >> "$GITHUB_ENV"
+
+      - name: Verify deployments
+        env:
+          # API-key path. Expose every key secret named in the inventory; an
+          # unset secret is simply an empty variable. Scope each secret to its
+          # GitHub Environment so a dev run can never read the prod key.
+          FOUNDRY_DEV_API_KEY: ${{ secrets.FOUNDRY_DEV_API_KEY }}
+          FOUNDRY_UAT_API_KEY: ${{ secrets.FOUNDRY_UAT_API_KEY }}
+          FOUNDRY_PROD_API_KEY: ${{ secrets.FOUNDRY_PROD_API_KEY }}
+          PROBE: ${{ inputs.probe && '--probe' || '' }}
+        run: |
+          # -M: keep jq free of ANSI colour when the summary is rendered.
+          set -o pipefail
+          foundry-byok verify --inventory "$INVENTORY" --only-env "$TARGET_ENV" $PROBE --json \
+            | tee verify.json | jq -M -r '
+                .[] | .deployment as $d | .findings[]
+                | "| \($d) | \(.check) | \(.status) | \((.detail + " " + (.hint // "")) | gsub("\\|"; "/")) |"' > rows.md || rc=$?
+          {
+            echo "### Foundry verify: ${TARGET_ENV}"
+            echo "| Deployment | Check | Status | Detail |"
+            echo "|---|---|---|---|"
+            cat rows.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "${rc:-0}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundry-verify-${{ env.TARGET_ENV }}
+          path: verify.json
+          retention-days: 14

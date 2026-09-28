@@ -1,0 +1,23 @@
+# Task specification ({{ .RequestRef }})
+
+Title: {{ .Title }}
+Target repository (context only): {{ .TargetRepo }}
+
+## Objective
+{{ .Objective }}
+
+## Acceptance criteria
+{{ range $i, $c := .AcceptanceCriteria }}{{ add $i 1 }}. {{ $c }}
+{{ end }}
+## Context from the requestor
+{{ index .Answers "context" }}
+{{- with index .Answers "constraints" }}
+
+## Hard constraints
+{{ . }}
+{{- end }}
+{{- range .Questions }}{{ if .Dynamic }}
+
+## Follow-up: {{ .Text }}
+{{ .Answer }}
+{{- end }}{{ end }}

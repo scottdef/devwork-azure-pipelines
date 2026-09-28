@@ -1,0 +1,93 @@
+[
+  {
+    "issue": {
+      "number": 301,
+      "title": "[IssueOps] Foundry deployment: gpt-4.1-mini on dev",
+      "body": "### Foundry resource\n\naif-cooleng-dev-eus2\n\n### Model name\n\ngpt-4.1-mini\n\n### Model version\n\n2025-04-14\n\n### Model format (publisher)\n\nOpenAI\n\n### Deployment type (SKU)\n\nGlobalStandard\n\n### Capacity\n\n10\n\n### Deployment name\n\ngpt-4.1-mini-ml-eval\n\n### Version upgrade option\n\nOnceNewDefaultVersionAvailable\n\n### Intended agentic use\n\nEvaluation harness for the feature-store triage agent: an agentic workflow that reads pipeline failures, proposes a fix and opens a draft PR in ml-pipelines. Dev only; synthetic data.\n\n### Consuming repositories or services\n\nCoolEngOrg/ml-pipelines\n\n### Chargeback cost center\n\nCC-5120-DATA\n\n### Review date\n\n2026-12-15\n\n### Acknowledgements\n\n- [X] Only data classified Internal or lower will be sent to this deployment unless it is approved for Confidential data\n- [X] I understand provisioned (PTU) deployments are billed hourly whether or not they are used\n",
+      "state": "closed",
+      "user": {
+        "login": "lea-ml",
+        "id": 0,
+        "type": "User"
+      },
+      "labels": [
+        {
+          "name": "issueops"
+        },
+        {
+          "name": "issueops:foundry-deploy"
+        },
+        {
+          "name": "issueops:completed"
+        }
+      ],
+      "html_url": "https://github.com/CoolEngOrg/issueops/issues/301",
+      "created_at": "2026-09-21T14:03:00Z",
+      "updated_at": "2026-09-21T14:03:00Z",
+      "closed_at": "2026-09-21T14:06:00Z",
+      "repository_url": ""
+    },
+    "comments": [
+      {
+        "id": 1001,
+        "body": "\u003c!-- issueops:v1:summary {\"action\":\"opened\",\"digest\":\"sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799\",\"valid\":true} --\u003e\n## ✅ Microsoft Foundry model deployment: request validated\n\nHi @lea-ml, your request was parsed and passed validation.\n\n| Field | Value |\n| ----- | ----- |\n| Foundry resource | `aif-cooleng-dev-eus2` (dev, eastus2, `rg-cooleng-ai-dev`) |\n| Model | `gpt-4.1-mini` version `2025-04-14` (OpenAI) |\n| Deployment | `gpt-4.1-mini-ml-eval` · GlobalStandard · 10k TPM |\n| Upgrade policy | OnceNewDefaultVersionAvailable |\n| Content filter | `Microsoft.DefaultV2` |\n| Review date | 2026-12-15 |\n| Cost center | `CC-5120-DATA` |\n\n### Approval plan\n\nNo approval is required by policy (auto-approval conditions met). The request executes as soon as you comment `.submit`.\n\nExecution runs in the GitHub environment `foundry-dev`.\n\n### Next step\n\n@lea-ml, review the details above and comment **`.submit`** to confirm the request.\n\n\u003csub\u003eIssueOps · Microsoft Foundry model deployment · digest \u003ccode\u003e106a0bedcc61\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:03:00Z",
+        "updated_at": "2026-09-21T14:03:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1002,
+        "body": ".submit",
+        "user": {
+          "login": "lea-ml",
+          "id": 0,
+          "type": "User"
+        },
+        "created_at": "2026-09-21T14:05:00Z",
+        "updated_at": "2026-09-21T14:05:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1003,
+        "body": "\u003c!-- issueops:v1:approved {\"actor\":\"lea-ml\",\"auto\":true,\"digest\":\"sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799\",\"environment\":\"foundry-dev\",\"escalations\":null} --\u003e\n## 🚀 Approved: execution starting\n\nNo approval was required by policy; @lea-ml submitted the request.\n\nExecution starts in the GitHub environment `foundry-dev`. If that environment has required reviewers, they approve the deployment in the Actions UI before anything changes.\n\n\u003csub\u003eIssueOps · Microsoft Foundry model deployment · digest \u003ccode\u003e106a0bedcc61\u003c/code\u003e · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:05:00Z",
+        "updated_at": "2026-09-21T14:05:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1004,
+        "body": "\u003c!-- issueops:v1:executing {\"digest\":\"sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799\",\"run\":\"https://github.com/CoolEngOrg/issueops/actions/runs/9100030101\"} --\u003e\n## ⚙️ Executing\n\nApproval re-verified for digest \u003ccode\u003e106a0bedcc61\u003c/code\u003e; execution has started in [this workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100030101).\n\n\u003csub\u003eIssueOps · Microsoft Foundry model deployment · digest \u003ccode\u003e106a0bedcc61\u003c/code\u003e · [workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100030101) · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:06:00Z",
+        "updated_at": "2026-09-21T14:06:00Z",
+        "html_url": ""
+      },
+      {
+        "id": 1005,
+        "body": "\u003c!-- issueops:v1:completed {\"digest\":\"sha256:106a0bedcc61cf34b3d65812365976d01d74aea6f901afb42bd5671d0539c799\",\"run\":\"https://github.com/CoolEngOrg/issueops/actions/runs/9100030101\"} --\u003e\n## ✅ Foundry model deployment created\n\n| Field | Value |\n| ----- | ----- |\n| Resource | `aif-cooleng-dev-eus2` (dev, eastus2) |\n| Deployment | `gpt-4.1-mini-ml-eval` |\n| Model | `gpt-4.1-mini` `2025-04-14` (OpenAI) |\n| SKU / capacity | GlobalStandard · 10k TPM |\n| Provisioning state | `Succeeded` |\n| Endpoint | `https://aif-cooleng-dev-eus2.openai.azure.com/` |\n| Quota (`OpenAI.GlobalStandard.gpt-4.1-mini`) | 40 used of 2,000 before this change |\n| Review by | 2026-12-15 |\n\n### Using the deployment\n\nCallers authenticate with Microsoft Entra ID (keyless). Grant the caller's managed identity or service principal **Cognitive Services OpenAI User** on the resource, then call the deployment:\n\n```bash\nTOKEN=$(az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv)\ncurl -sS https://aif-cooleng-dev-eus2.openai.azure.com/openai/deployments/gpt-4.1-mini-ml-eval/chat/completions?api-version=2024-10-21 \\\n  -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' \\\n  -d '{\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":16}'\n```\n\nFor **Foundry Agent Service** agents, set `MODEL_DEPLOYMENT_NAME=gpt-4.1-mini-ml-eval` and use the project endpoint of the Foundry project connected to `aif-cooleng-dev-eus2`. For the IssueOps AKS agent runner, ask platform-ai to add `gpt-4.1-mini-ml-eval` to `allowed_deployments`.\n\n\u003csub\u003eIssueOps · Microsoft Foundry model deployment · digest \u003ccode\u003e106a0bedcc61\u003c/code\u003e · [workflow run](https://github.com/CoolEngOrg/issueops/actions/runs/9100030101) · [docs](https://github.com/CoolEngOrg/issueops/tree/main/docs) · commands: \u003ccode\u003e.status\u003c/code\u003e \u003ccode\u003e.help\u003c/code\u003e\u003c/sub\u003e\n",
+        "user": {
+          "login": "coolengorg-issueops[bot]",
+          "id": 0,
+          "type": "Bot"
+        },
+        "created_at": "2026-09-21T14:06:00Z",
+        "updated_at": "2026-09-21T14:06:00Z",
+        "html_url": ""
+      }
+    ]
+  }
+]

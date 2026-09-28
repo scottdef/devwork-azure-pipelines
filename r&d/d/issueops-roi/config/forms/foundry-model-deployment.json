@@ -1,0 +1,197 @@
+{
+  "name": "[IssueOps] Microsoft Foundry model deployment",
+  "description": "Deploy (or resize) a model on an approved Microsoft Foundry resource for use in agentic workflows.",
+  "title": "[IssueOps] Foundry model deployment",
+  "labels": [
+    "issueops",
+    "issueops:foundry-deploy"
+  ],
+  "body": [
+    {
+      "type": "markdown",
+      "attributes": {
+        "value": "## Microsoft Foundry model deployment\n\nDeployments are created with Bicep through GitHub Actions using OIDC federation. No Azure secret is\nstored in GitHub. Only **approved Foundry resources, models, versions, and SKUs** can be requested;\nsee `config/issueops.json` for the current allow-list.\n\nCapacity is in units of **1,000 tokens per minute** for Standard, Global, and Data Zone SKUs, and in\n**PTUs** for provisioned SKUs.\n"
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "foundry_account",
+      "attributes": {
+        "label": "Foundry resource",
+        "description": "The approved Foundry (Azure AI Services) resource. The environment, region, and resource group come from the platform registry.",
+        "options": [
+          "aif-cooleng-dev-eus2",
+          "aif-cooleng-uat-eus2",
+          "aif-cooleng-prod-eus2"
+        ]
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_model",
+      "attributes": {
+        "label": "Model name",
+        "placeholder": "gpt-4.1-mini"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_model_version",
+      "attributes": {
+        "label": "Model version",
+        "placeholder": "2025-04-14"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "foundry_model_format",
+      "attributes": {
+        "label": "Model format (publisher)",
+        "options": [
+          "OpenAI",
+          "Microsoft",
+          "Meta",
+          "Mistral AI",
+          "DeepSeek",
+          "Cohere"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "foundry_sku",
+      "attributes": {
+        "label": "Deployment type (SKU)",
+        "options": [
+          "GlobalStandard",
+          "DataZoneStandard",
+          "Standard",
+          "GlobalProvisionedManaged",
+          "DataZoneProvisionedManaged",
+          "ProvisionedManaged",
+          "GlobalBatch",
+          "DataZoneBatch"
+        ],
+        "default": 0
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_capacity",
+      "attributes": {
+        "label": "Capacity",
+        "description": "Integer. 1 = 1,000 TPM for Standard, Global, and Data Zone SKUs; PTUs for provisioned SKUs.",
+        "placeholder": "10"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_deployment_name",
+      "attributes": {
+        "label": "Deployment name",
+        "description": "Optional. Defaults to `<model>-<environment>`. Letters, digits, `.`, `_`, `-`; 2 to 64 characters.",
+        "placeholder": "gpt-4.1-mini-agents"
+      },
+      "validations": {
+        "required": false
+      }
+    },
+    {
+      "type": "dropdown",
+      "id": "foundry_version_upgrade",
+      "attributes": {
+        "label": "Version upgrade option",
+        "options": [
+          "OnceNewDefaultVersionAvailable",
+          "OnceCurrentVersionExpired",
+          "NoAutoUpgrade"
+        ],
+        "default": 1
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "foundry_use_case",
+      "attributes": {
+        "label": "Intended agentic use",
+        "description": "Which agent or workflow will call this deployment, and what data it will see."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_consumers",
+      "attributes": {
+        "label": "Consuming repositories or services",
+        "placeholder": "CoolEngOrg/support-agent, CoolEngOrg/issueops"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_cost_center",
+      "attributes": {
+        "label": "Chargeback cost center",
+        "placeholder": "CC-4410"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "foundry_review_date",
+      "attributes": {
+        "label": "Review date",
+        "description": "YYYY-MM-DD. The deployment owner re-certifies or removes the deployment by this date.",
+        "placeholder": "2027-03-31"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "foundry_acknowledgements",
+      "attributes": {
+        "label": "Acknowledgements",
+        "options": [
+          {
+            "label": "Only data classified Internal or lower will be sent to this deployment unless it is approved for Confidential data",
+            "required": true
+          },
+          {
+            "label": "I understand provisioned (PTU) deployments are billed hourly whether or not they are used",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

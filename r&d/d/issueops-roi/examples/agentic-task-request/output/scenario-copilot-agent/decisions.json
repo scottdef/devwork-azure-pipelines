@@ -1,0 +1,335 @@
+[
+  {
+    "step": 1,
+    "do": "open",
+    "user": "gia-pay",
+    "kind": "intake",
+    "decision": {
+      "action": "summary",
+      "phase": "awaiting-answers",
+      "escalated": false,
+      "comment": {
+        "event": "summary",
+        "data": {
+          "action": "opened",
+          "digest": "sha256:41f970345ebd06067e7362e898c6638f6db7bfef16fdf409650e10ea8dfb0a52",
+          "qa_complete": false,
+          "valid": true
+        },
+        "template": "comment.summary.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:summary"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:41f970345ebd06067e7362e898c6638f6db7bfef16fdf409650e10ea8dfb0a52",
+      "labels_add": [
+        "issueops:awaiting-answers"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 2,
+    "do": "comment",
+    "user": "ivy-ledger",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "awaiting-answers",
+      "escalated": false,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "ivy-ledger",
+          "command": "answers",
+          "digest": "sha256:41f970345ebd06067e7362e898c6638f6db7bfef16fdf409650e10ea8dfb0a52"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": true,
+      "reason": "Only the requestor can answer clarifying questions.",
+      "allowlist": "false",
+      "digest": "sha256:41f970345ebd06067e7362e898c6638f6db7bfef16fdf409650e10ea8dfb0a52",
+      "labels_add": [
+        "issueops:awaiting-answers"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 3,
+    "do": "comment",
+    "user": "gia-pay",
+    "kind": "command",
+    "decision": {
+      "action": "answers",
+      "phase": "validated",
+      "escalated": false,
+      "comment": {
+        "event": "qa-status",
+        "data": {
+          "complete": true,
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d"
+        },
+        "template": "comment.qa-status.md.tmpl",
+        "update_prefix": "\u003c!-- issueops:v1:qa-status"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:validated"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted"
+      ]
+    }
+  },
+  {
+    "step": 4,
+    "do": "comment",
+    "user": "gia-pay",
+    "kind": "command",
+    "decision": {
+      "action": "submitted",
+      "phase": "submitted",
+      "escalated": false,
+      "comment": {
+        "event": "submitted",
+        "data": {
+          "actor": "gia-pay",
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+          "environment": "agentic-copilot",
+          "escalations": null
+        },
+        "template": "comment.submitted.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 5,
+    "do": "comment",
+    "user": "ivy-ledger",
+    "kind": "command",
+    "decision": {
+      "action": "rejected",
+      "phase": "submitted",
+      "escalated": false,
+      "comment": {
+        "event": "notice",
+        "data": {
+          "actor": "ivy-ledger",
+          "command": "approve",
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d"
+        },
+        "template": "comment.rejected.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": true,
+      "reason": "@ivy-ledger: not an eligible approver for this request. Eligible approvers: `maintain`/`admin` on the target repository.",
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:submitted"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 6,
+    "do": "comment",
+    "user": "hal-api",
+    "kind": "command",
+    "decision": {
+      "action": "approved",
+      "phase": "approved",
+      "escalated": false,
+      "comment": {
+        "event": "approved",
+        "data": {
+          "actor": "hal-api",
+          "approvers": [
+            "hal-api"
+          ],
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d"
+        },
+        "template": "comment.approved.md.tmpl"
+      },
+      "execute": true,
+      "environment": "agentic-copilot",
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:approved"
+      ],
+      "labels_remove": [
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 7,
+    "do": "execute",
+    "kind": "gate",
+    "decision": {
+      "action": "executing",
+      "phase": "executing",
+      "escalated": false,
+      "comment": {
+        "event": "executing",
+        "data": {
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100040201"
+        },
+        "template": "comment.executing.md.tmpl"
+      },
+      "execute": true,
+      "environment": "agentic-copilot",
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:executing"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:completed",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  },
+  {
+    "step": 7,
+    "do": "execute",
+    "kind": "finish",
+    "decision": {
+      "action": "completed",
+      "phase": "completed",
+      "escalated": false,
+      "comment": {
+        "event": "completed",
+        "data": {
+          "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+          "run": "https://github.com/CoolEngOrg/issueops/actions/runs/9100040201"
+        },
+        "template": "comment.completed.agentic-task-request.md.tmpl"
+      },
+      "execute": false,
+      "workflow": "execute-agentic-task.yml",
+      "request_type": "agentic-task-request",
+      "rejected": false,
+      "allowlist": "false",
+      "digest": "sha256:e1519e9b8f4880888166eb54c098e1165ff5f389a28193c3aca101f0ec98776d",
+      "labels_add": [
+        "issueops:completed"
+      ],
+      "labels_remove": [
+        "issueops:approved",
+        "issueops:awaiting-answers",
+        "issueops:cancelled",
+        "issueops:denied",
+        "issueops:escalated",
+        "issueops:executing",
+        "issueops:failed",
+        "issueops:invalid",
+        "issueops:submitted",
+        "issueops:validated"
+      ]
+    }
+  }
+]

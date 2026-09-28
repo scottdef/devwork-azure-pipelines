@@ -1,0 +1,4 @@
+[
+  { "name": { "value": "OpenAI.GlobalProvisionedManaged", "localizedValue": "Global Provisioned Managed Throughput Unit" }, "currentValue": 250, "limit": 500 },
+  { "name": { "value": "OpenAI.GlobalStandard.gpt-4.1", "localizedValue": "Tokens Per Minute (thousands) - gpt-4.1 - GlobalStandard" }, "currentValue": 300, "limit": 1000 }
+]
