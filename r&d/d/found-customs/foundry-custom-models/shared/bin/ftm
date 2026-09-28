@@ -1,0 +1,337 @@
+#!/usr/bin/env bash
+# ftm: fetch, fine-tune, register, deploy, test and connect one custom-weight
+# model on Azure ML managed online endpoints, then expose it to Foundry.
+#
+#   ftm plan     EX   render and print what would happen (offline)
+#   ftm resolve  EX   print the Hugging Face commit for HF_REVISION
+#   ftm infra    EX   create the Azure ML environments (content-versioned)
+#   ftm fetch    EX   download the base weights inside Azure ML and register them
+#   ftm train    EX   LoRA fine-tune and register the result (when TRAIN_ENABLED)
+#   ftm deploy   EX   endpoint + a new deployment at 0% traffic
+#   ftm smoke    EX   test the new deployment directly (azureml-model-deployment header)
+#   ftm promote  EX   100% traffic to the new deployment; keep one previous for rollback
+#   ftm rollback EX   100% traffic back to the previous deployment
+#   ftm connect  EX   create or update the Foundry ModelGateway connection
+#   ftm info     EX   JSON: base URL, client model, deployment, connection
+#   ftm record   EX   write records/EX/<time>-<request>.json
+#   ftm destroy  EX   delete the connection and the endpoint
+#   ftm all      EX   infra fetch train deploy smoke promote connect
+#
+# EX is one of: gemma4 qwen38 muse wham  (see shared/tools/ftmcfg.py)
+# FTM_DRY_RUN=1 prints every mutating az command instead of running it.
+# FTM_SET_<KEY> overrides HF_REPO HF_REVISION INSTANCE_TYPE INSTANCE_COUNT TRAIN_ENABLED EPOCHS.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+TOOLS="$ROOT/shared/tools"
+PY=${PYTHON:-python3}
+CONN_API=2025-04-01-preview
+JOB_TIMEOUT_MIN=${FTM_JOB_TIMEOUT_MIN:-330}
+
+log() { printf 'ftm: %s\n' "$*" >&2; }
+die() { log "error: $*"; exit 1; }
+gh_out() { if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf '%s=%s\n' "$1" "$2" >>"$GITHUB_OUTPUT"; fi; }
+mask() { if [[ -n "${GITHUB_ACTIONS:-}" ]]; then echo "::add-mask::$1"; fi; }
+
+# run: mutating commands go through here so FTM_DRY_RUN can show them.
+run() {
+  printf '+' >&2
+  printf ' %q' "$@" >&2
+  printf '\n' >&2
+  if [[ "${FTM_DRY_RUN:-0}" == 1 ]]; then return 0; fi
+  "$@"
+}
+
+load() {
+  local ex=$1 line k
+  [[ -n "$ex" ]] || die "example required: $("$PY" "$TOOLS/ftmcfg.py" examples | tr '\n' ' ')"
+  local cfg
+  cfg=$("$PY" "$TOOLS/ftmcfg.py" env "$ex") || exit 1
+  while IFS= read -r line; do
+    k=${line%%=*}
+    [[ "$k" =~ ^[A-Z][A-Z0-9_]*$ ]] || die "bad key from ftmcfg: $k"
+    printf -v "$k" '%s' "${line#*=}"
+    export "${k?}"
+  done <<<"$cfg"
+  OUT="$ROOT/.ftm/$EXAMPLE"
+  "$PY" "$TOOLS/ftmcfg.py" render "$EXAMPLE" "$OUT" >/dev/null
+  AML=(-g "$AZURE_RESOURCE_GROUP" -w "$AML_WORKSPACE")
+}
+
+need_resolved() {
+  [[ "$RESOLVED" == true ]] || die "HF_REVISION is 'main'; run: export FTM_SET_HF_REVISION=\$(ftm resolve $EXAMPLE)"
+}
+
+# wait_job: poll an Azure ML job to a terminal state.
+wait_job() {
+  local job=$1 status deadline=$((SECONDS + JOB_TIMEOUT_MIN * 60))
+  [[ "${FTM_DRY_RUN:-0}" == 1 ]] && return 0
+  log "waiting for job $job (az ml job stream -n $job ${AML[*]} to follow logs)"
+  while ((SECONDS < deadline)); do
+    status=$(az ml job show -n "$job" "${AML[@]}" --query status -o tsv)
+    case "$status" in
+      Completed) log "job $job completed"; return 0 ;;
+      Failed | Canceled | NotResponding) die "job $job ended $status" ;;
+    esac
+    sleep 60
+  done
+  die "job $job still running after $JOB_TIMEOUT_MIN minutes; it continues in Azure ML"
+}
+
+model_exists() { az ml model show -n "$1" -v "$2" "${AML[@]}" -o none 2>/dev/null; }
+
+scoring_base() {
+  local uri
+  uri=$(az ml online-endpoint show -n "$ENDPOINT_NAME" "${AML[@]}" --query scoring_uri -o tsv)
+  printf '%s\n' "${uri%/score}"
+}
+
+score_key() {
+  local key
+  key=$(az ml online-endpoint get-credentials -n "$ENDPOINT_NAME" "${AML[@]}" --query primaryKey -o tsv)
+  mask "$key"
+  printf '%s\n' "$key"
+}
+
+cmd_plan() {
+  "$PY" - "$OUT/config.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+rows = [
+    ("Example", f"{c['EXAMPLE']}: {c['EXAMPLE_TITLE']}"),
+    ("Weights", f"{c['HF_REPO']} @ {c['HF_REVISION']}"),
+    ("Base model", f"{c['BASE_MODEL_NAME']}:{c['BASE_MODEL_VERSION']}"),
+    ("Fine-tune", f"{c['TRAIN_MODE']} on {c['TRAIN_DATA_PATH']} ({c['TRAIN_COMPUTE']})" if c['TRAIN_ENABLED'] == 'true' else "no"),
+    ("Served model", f"{c['SERVE_MODEL_NAME']}:{c['SERVE_MODEL_VERSION']}"),
+    ("Endpoint / deployment", f"{c['ENDPOINT_NAME']} / {c['DEPLOYMENT_NAME']}"),
+    ("Compute", f"{c['INSTANCE_COUNT']} x {c['INSTANCE_TYPE']}"),
+    ("Container", f"{c['SERVE_ENV']}:{c['SERVE_ENV_VERSION_USED']}"),
+    ("vLLM flags", c['VLLM_ARGS'] or "(none)"),
+    ("Clients send model", c['CLIENT_MODEL']),
+    ("Foundry", f"{c['FOUNDRY_ACCOUNT']}/{c['FOUNDRY_PROJECT']} connection {c['CONNECTION_NAME']} -> agents use {c['CONNECTION_NAME']}/{c['CLIENT_MODEL']}"),
+    ("Smoke test", c['SMOKE_KIND']),
+]
+print("| | |\n|---|---|")
+for k, v in rows:
+    print(f"| {k} | `{v}` |")
+if c.get("LICENSE_NOTE"):
+    print(f"\n> License: {c['LICENSE_NOTE']}")
+if c["RESOLVED"] != "true":
+    print("\n> HF_REVISION is `main`: versions are shown as `unresolved` until it is pinned to a commit.")
+PY
+  gh_out endpoint "$ENDPOINT_NAME"
+  gh_out deployment "$DEPLOYMENT_NAME"
+  gh_out client_model "$CLIENT_MODEL"
+  gh_out connection "$CONNECTION_NAME"
+}
+
+cmd_resolve() {
+  local url="https://huggingface.co/api/models/$HF_REPO/revision/$HF_REVISION" auth=() sha
+  if [[ -n "${HF_TOKEN:-}" ]]; then auth=(-H "Authorization: Bearer $HF_TOKEN"); fi
+  sha=$(curl -fsS --retry 3 --max-time 30 "${auth[@]}" "$url" | "$PY" -c 'import json,sys; print(json.load(sys.stdin)["sha"])') ||
+    die "cannot resolve $HF_REPO@$HF_REVISION (private or gated? set HF_TOKEN)"
+  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "unexpected revision: $sha"
+  printf '%s\n' "$sha"
+  gh_out hf_revision "$sha"
+}
+
+cmd_infra() {
+  local env ver file
+  for env in ftm-train "$SERVE_ENV"; do
+    case "$env" in
+      ftm-train) ver=$TRAIN_ENV_VERSION file=environment-train.yml ;;
+      ftm-serve) ver=$SERVE_ENV_VERSION file=environment-serve.yml ;;
+      ftm-wham) ver=$WHAM_ENV_VERSION file=environment-wham.yml ;;
+    esac
+    if az ml environment show -n "$env" -v "$ver" "${AML[@]}" -o none 2>/dev/null; then
+      log "environment $env:$ver exists"
+    else
+      run az ml environment create -f "$OUT/$file" "${AML[@]}" -o none
+    fi
+  done
+}
+
+cmd_fetch() {
+  need_resolved
+  if model_exists "$BASE_MODEL_NAME" "$BASE_MODEL_VERSION"; then
+    log "base model $BASE_MODEL_NAME:$BASE_MODEL_VERSION exists; skipping download"
+    return 0
+  fi
+  local job=dry-run
+  if [[ "${FTM_DRY_RUN:-0}" == 1 ]]; then
+    run az ml job create -f "$OUT/fetch-job.yml" "${AML[@]}"
+  else
+    job=$(az ml job create -f "$OUT/fetch-job.yml" "${AML[@]}" --query name -o tsv)
+  fi
+  wait_job "$job"
+  run az ml model create -n "$BASE_MODEL_NAME" -v "$BASE_MODEL_VERSION" --type custom_model \
+    --path "azureml://jobs/$job/outputs/weights" "${AML[@]}" \
+    --tags "hf_repo=$HF_REPO" "hf_revision=$HF_REVISION" "fetch_job=$job" -o none
+  gh_out fetch_job "$job"
+}
+
+cmd_train() {
+  need_resolved
+  if [[ "$TRAIN_ENABLED" != true ]]; then
+    log "TRAIN_ENABLED=false; serving the base weights"
+    return 0
+  fi
+  if model_exists "$SERVE_MODEL_NAME" "$SERVE_MODEL_VERSION"; then
+    log "model $SERVE_MODEL_NAME:$SERVE_MODEL_VERSION exists; inputs unchanged, skipping training"
+    return 0
+  fi
+  local job=dry-run
+  if [[ "${FTM_DRY_RUN:-0}" == 1 ]]; then
+    run az ml job create -f "$OUT/train-job.yml" "${AML[@]}"
+  else
+    job=$(az ml job create -f "$OUT/train-job.yml" "${AML[@]}" --query name -o tsv)
+  fi
+  wait_job "$job"
+  run az ml model create -n "$SERVE_MODEL_NAME" -v "$SERVE_MODEL_VERSION" --type custom_model \
+    --path "azureml://jobs/$job/outputs/model" "${AML[@]}" \
+    --tags "base=$BASE_MODEL_NAME:$BASE_MODEL_VERSION" "mode=$TRAIN_MODE" "train_job=$job" "git_sha=${GITHUB_SHA:-local}" -o none
+  gh_out train_job "$job"
+}
+
+cmd_deploy() {
+  need_resolved
+  local first=()
+  if ! az ml online-endpoint show -n "$ENDPOINT_NAME" "${AML[@]}" -o none 2>/dev/null; then
+    run az ml online-endpoint create -f "$OUT/endpoint.yml" "${AML[@]}" -o none
+    first=(--all-traffic)
+  fi
+  if az ml online-deployment show -n "$DEPLOYMENT_NAME" -e "$ENDPOINT_NAME" "${AML[@]}" -o none 2>/dev/null; then
+    log "deployment $DEPLOYMENT_NAME exists; nothing to deploy"
+  else
+    # New deployments take 0% traffic unless the endpoint had none.
+    run az ml online-deployment create -f "$OUT/deployment.yml" "${AML[@]}" "${first[@]}" -o none
+  fi
+  gh_out deployment "$DEPLOYMENT_NAME"
+}
+
+cmd_smoke() {
+  [[ "${FTM_DRY_RUN:-0}" == 1 ]] && { log "dry run: smoke test skipped"; return 0; }
+  local base
+  base=$(scoring_base)
+  SCORE_KEY=$(score_key) "$PY" "$TOOLS/smoke_test.py" --base-url "$base" \
+    --deployment "$DEPLOYMENT_NAME" --model "$CLIENT_MODEL" --kind "$SMOKE_KIND" --path "${SMOKE_PATH:-/}"
+}
+
+cmd_promote() {
+  need_resolved
+  local current others d prev keep="${FTM_KEEP_PREVIOUS:-1}"
+  current=$(az ml online-endpoint show -n "$ENDPOINT_NAME" "${AML[@]}" --query traffic -o json)
+  run az ml online-endpoint update -n "$ENDPOINT_NAME" "${AML[@]}" --traffic "$DEPLOYMENT_NAME=100" -o none
+  # The deployment that had the most traffic before becomes the rollback target.
+  prev=$("$PY" -c 'import json,sys; t=json.loads(sys.argv[1] or "{}"); t.pop(sys.argv[2], None); print(max(t, key=t.get) if t else "")' "$current" "$DEPLOYMENT_NAME")
+  others=$(az ml online-deployment list -e "$ENDPOINT_NAME" "${AML[@]}" --query '[].name' -o tsv)
+  for d in $others; do
+    [[ "$d" == "$DEPLOYMENT_NAME" ]] && continue
+    if [[ "$keep" == 1 && "$d" == "$prev" ]]; then
+      log "keeping $d at 0% for rollback"
+      continue
+    fi
+    run az ml online-deployment delete -n "$d" -e "$ENDPOINT_NAME" "${AML[@]}" --yes --no-wait
+  done
+  gh_out previous "$prev"
+}
+
+cmd_rollback() {
+  local to
+  to=$(az ml online-deployment list -e "$ENDPOINT_NAME" "${AML[@]}" --query '[].name' -o tsv | grep -vx "$DEPLOYMENT_NAME" | head -1 || true)
+  [[ -n "$to" ]] || die "no previous deployment on $ENDPOINT_NAME"
+  run az ml online-endpoint update -n "$ENDPOINT_NAME" "${AML[@]}" --traffic "$to=100" -o none
+}
+
+conn_url() {
+  local sub
+  sub=$(az account show --query id -o tsv)
+  printf 'https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.CognitiveServices/accounts/%s/projects/%s/connections/%s?api-version=%s\n' \
+    "$sub" "$AZURE_RESOURCE_GROUP" "$FOUNDRY_ACCOUNT" "$FOUNDRY_PROJECT" "$CONNECTION_NAME" "$CONN_API"
+}
+
+cmd_connect() {
+  if [[ "$SMOKE_KIND" == http ]]; then
+    log "$EXAMPLE is not an OpenAI-compatible model; no Foundry connection"
+    return 0
+  fi
+  local base body models=("$CLIENT_MODEL")
+  [[ "$CLIENT_MODEL" != "$SERVED_NAME" ]] && models+=("$SERVED_NAME")
+  if [[ "${FTM_DRY_RUN:-0}" == 1 ]]; then
+    log "dry run: would PUT ModelGateway connection $CONNECTION_NAME for ${models[*]}"
+    return 0
+  fi
+  base=$(scoring_base)
+  body=$(umask 077 && mktemp)
+  trap 'rm -f "$body"' RETURN
+  local margs=()
+  for m in "${models[@]}"; do margs+=(--model "$m"); done
+  SCORE_KEY=$(score_key) "$PY" "$TOOLS/connection_body.py" --target "$base/v1" "${margs[@]}" >"$body"
+  az rest --method put --url "$(conn_url)" --body "@$body" -o none
+  log "connection $CONNECTION_NAME -> $base/v1; agents use model $CONNECTION_NAME/$CLIENT_MODEL"
+}
+
+cmd_info() {
+  local base=""
+  base=$(scoring_base 2>/dev/null || true)
+  "$PY" -c 'import json,sys; k=["example","endpoint","deployment","base_url","client_model","served_name","connection","agent_model"]; print(json.dumps(dict(zip(k, sys.argv[1:]))))' \
+    "$EXAMPLE" "$ENDPOINT_NAME" "$DEPLOYMENT_NAME" "$base" "$CLIENT_MODEL" "$SERVED_NAME" "$CONNECTION_NAME" "$CONNECTION_NAME/$CLIENT_MODEL"
+  gh_out base_url "$base"
+}
+
+cmd_record() {
+  local dir="$ROOT/records/$EXAMPLE" ts file
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  mkdir -p "$dir"
+  file="$dir/$ts-${FTM_REQUEST_ID:-local}.json"
+  "$PY" - "$OUT/config.json" "$file" <<'PY'
+import json, os, sys
+c = json.load(open(sys.argv[1]))
+keep = ["EXAMPLE", "HF_REPO", "HF_REVISION", "BASE_MODEL_NAME", "BASE_MODEL_VERSION", "TRAIN_ENABLED",
+        "TRAIN_MODE", "SERVE_MODEL_NAME", "SERVE_MODEL_VERSION", "ENDPOINT_NAME", "DEPLOYMENT_NAME",
+        "INSTANCE_TYPE", "INSTANCE_COUNT", "SERVE_ENV", "SERVE_ENV_VERSION_USED", "VLLM_ARGS",
+        "CLIENT_MODEL", "CONNECTION_NAME", "FOUNDRY_ACCOUNT", "FOUNDRY_PROJECT"]
+rec = {k.lower(): c[k] for k in keep}
+rec.update({
+    "request_id": os.environ.get("FTM_REQUEST_ID", "local"),
+    "reason": os.environ.get("FTM_REASON", ""),
+    "actor": os.environ.get("GITHUB_TRIGGERING_ACTOR", os.environ.get("USER", "")),
+    "git_sha": os.environ.get("GITHUB_SHA", ""),
+    "run_url": (f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+                if os.environ.get("GITHUB_RUN_ID") else ""),
+})
+json.dump(rec, open(sys.argv[2], "w"), indent=2, sort_keys=True)
+open(sys.argv[2], "a").write("\n")
+PY
+  printf '%s\n' "$file"
+  gh_out record "${file#"$ROOT"/}"
+}
+
+cmd_destroy() {
+  if [[ "$SMOKE_KIND" != http ]]; then
+    if [[ "${FTM_DRY_RUN:-0}" == 1 ]]; then
+      log "dry run: would DELETE connection $CONNECTION_NAME"
+    else
+      az rest --method delete --url "$(conn_url)" -o none || log "connection $CONNECTION_NAME not found"
+    fi
+  fi
+  run az ml online-endpoint delete -n "$ENDPOINT_NAME" "${AML[@]}" --yes
+}
+
+main() {
+  local cmd=${1:-help} ex=${2:-}
+  case "$cmd" in
+    -h | --help | help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; return 0 ;;
+    plan | resolve | infra | fetch | train | deploy | smoke | promote | rollback | connect | info | record | destroy) ;;
+    all) ;;
+    *) die "unknown command '$cmd' (ftm help)" ;;
+  esac
+  load "$ex"
+  if [[ "$cmd" == all ]]; then
+    for c in infra fetch train deploy smoke promote connect; do "cmd_$c"; done
+  else
+    "cmd_$cmd"
+  fi
+}
+
+main "$@"

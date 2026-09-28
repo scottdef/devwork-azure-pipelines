@@ -1,0 +1,218 @@
+# ftm-pipeline: the one reusable workflow every trigger calls.
+#
+# plan   (always, no Azure)  validate inputs, pin the Hugging Face revision,
+#                            render every Azure ML YAML, write the plan to the summary
+# apply  (unless plan)       OIDC to Azure, then ftm infra/fetch/train/deploy/smoke/
+#                            promote/connect, record the result and commit it
+#
+# dry_run=true runs apply in the foundry-plan environment with FTM_DRY_RUN=1:
+# every mutating az command is printed, none is run.
+name: ftm-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      example: {type: string, required: true}
+      action: {type: string, required: true}           # plan | deploy | destroy | rollback
+      hf_repo: {type: string, default: ""}
+      hf_revision: {type: string, default: main}
+      train: {type: string, default: default}          # default | true | false
+      instance_type: {type: string, default: default}
+      instance_count: {type: string, default: "1"}
+      dry_run: {type: boolean, default: true}
+      request_id: {type: string, default: ""}
+      reason: {type: string, required: true}
+    outputs:
+      endpoint: {value: "${{ jobs.plan.outputs.endpoint }}"}
+      deployment: {value: "${{ jobs.plan.outputs.deployment }}"}
+      client_model: {value: "${{ jobs.plan.outputs.client_model }}"}
+      connection: {value: "${{ jobs.plan.outputs.connection }}"}
+      hf_revision: {value: "${{ jobs.plan.outputs.hf_revision }}"}
+      base_url: {value: "${{ jobs.apply.outputs.base_url }}"}
+      record: {value: "${{ jobs.apply.outputs.record }}"}
+
+permissions:
+  contents: read
+
+env:
+  # Inputs reach bash through the environment only; there is no ${{ }} inside run:.
+  EX: ${{ inputs.example }}
+  IN_ACTION: ${{ inputs.action }}
+  IN_HF_REPO: ${{ inputs.hf_repo }}
+  IN_HF_REVISION: ${{ inputs.hf_revision }}
+  IN_TRAIN: ${{ inputs.train }}
+  IN_INSTANCE_TYPE: ${{ inputs.instance_type }}
+  IN_INSTANCE_COUNT: ${{ inputs.instance_count }}
+  FTM_REASON: ${{ inputs.reason }}
+  FTM_REQUEST_ID: ${{ inputs.request_id || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  # Site settings: repository variables override shared/config/site.env.
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+  AML_WORKSPACE: ${{ vars.AML_WORKSPACE }}
+  FOUNDRY_ACCOUNT: ${{ vars.FOUNDRY_ACCOUNT }}
+  FOUNDRY_PROJECT: ${{ vars.FOUNDRY_PROJECT }}
+  KEY_VAULT_URL: ${{ vars.KEY_VAULT_URL }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      endpoint: ${{ steps.plan.outputs.endpoint }}
+      deployment: ${{ steps.plan.outputs.deployment }}
+      client_model: ${{ steps.plan.outputs.client_model }}
+      connection: ${{ steps.plan.outputs.connection }}
+      hf_revision: ${{ steps.pin.outputs.hf_revision }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$EX" =~ ^(gemma4|qwen38|muse|wham)$ ]] || fail "example is not valid"
+          [[ "$IN_ACTION" =~ ^(plan|deploy|destroy|rollback)$ ]] || fail "action is not valid"
+          [[ -z "$IN_HF_REPO" || "$IN_HF_REPO" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,95}/[A-Za-z0-9][A-Za-z0-9._-]{0,95}$ ]] || fail "hf_repo is not valid"
+          [[ "$IN_HF_REVISION" =~ ^([0-9a-f]{40}|main)$ ]] || fail "hf_revision must be main or a 40-hex commit"
+          [[ "$IN_TRAIN" =~ ^(default|true|false)$ ]] || fail "train is not valid"
+          [[ "$IN_INSTANCE_COUNT" =~ ^[1-4]$ ]] || fail "instance_count must be 1-4"
+          [[ "$FTM_REQUEST_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail "request_id is not valid"
+          (( ${#FTM_REASON} >= 8 && ${#FTM_REASON} <= 200 )) || fail "reason must be 8-200 characters"
+          # Overrides become FTM_SET_*; ftmcfg validates each against the same rules again.
+          {
+            [[ -n "$IN_HF_REPO" ]] && echo "FTM_SET_HF_REPO=$IN_HF_REPO"
+            [[ "$IN_TRAIN" != default ]] && echo "FTM_SET_TRAIN_ENABLED=$IN_TRAIN"
+            [[ "$IN_INSTANCE_TYPE" != default ]] && echo "FTM_SET_INSTANCE_TYPE=$IN_INSTANCE_TYPE"
+            echo "FTM_SET_INSTANCE_COUNT=$IN_INSTANCE_COUNT"
+            echo "FTM_SET_HF_REVISION=$IN_HF_REVISION"
+          } >> "$GITHUB_ENV"
+
+      - name: Pin the Hugging Face revision
+        id: pin
+        env:
+          # Anyone can open a model-request issue, so an issue-triggered plan resolves
+          # anonymously; the token is used only for dispatches and approved applies.
+          HF_TOKEN: ${{ (github.event_name == 'workflow_dispatch' || inputs.action != 'plan') && secrets.HF_TOKEN || '' }}
+        run: |
+          set -euo pipefail
+          sha=$(shared/bin/ftm resolve "$EX" | tail -1)
+          echo "FTM_SET_HF_REVISION=$sha" >> "$GITHUB_ENV"
+          echo "hf_revision=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Plan
+        id: plan
+        run: |
+          set -euo pipefail
+          {
+            echo "### ftm $IN_ACTION \`$EX\` (\`$FTM_REQUEST_ID\`)"
+            echo
+            echo "Reason: $FTM_REASON"
+            echo
+            shared/bin/ftm plan "$EX"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ftm-plan-${{ inputs.example }}-${{ github.run_attempt }}
+          path: .ftm/${{ inputs.example }}/
+          include-hidden-files: true
+          retention-days: 30
+
+  apply:
+    needs: plan
+    if: inputs.action != 'plan'
+    runs-on: ubuntu-latest
+    # Real changes wait for reviewers on ftm-prod; dry runs flow through ftm-plan.
+    environment: ${{ inputs.dry_run && 'ftm-plan' || 'ftm-prod' }}
+    # GitHub-hosted jobs stop at 6 h; long fine-tunes keep running in Azure ML
+    # and a re-run picks the registered model up (versions are content hashes).
+    timeout-minutes: 350
+    permissions:
+      contents: write   # commit records/
+      id-token: write   # OIDC to Azure
+    concurrency:
+      group: ftm-${{ inputs.example }}
+      cancel-in-progress: false
+    outputs:
+      base_url: ${{ steps.info.outputs.base_url }}
+      record: ${{ steps.record.outputs.record }}
+    env:
+      FTM_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+      FTM_SET_HF_REVISION: ${{ needs.plan.outputs.hf_revision }}
+    steps:
+      - name: App token (optional)
+        id: app
+        if: vars.AUTOADMIN_APP_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.AUTOADMIN_APP_ID }}
+          private-key: ${{ secrets.AUTOADMIN_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+
+      - name: Overrides
+        run: |
+          set -euo pipefail
+          {
+            [[ -n "$IN_HF_REPO" ]] && echo "FTM_SET_HF_REPO=$IN_HF_REPO"
+            [[ "$IN_TRAIN" != default ]] && echo "FTM_SET_TRAIN_ENABLED=$IN_TRAIN"
+            [[ "$IN_INSTANCE_TYPE" != default ]] && echo "FTM_SET_INSTANCE_TYPE=$IN_INSTANCE_TYPE"
+            echo "FTM_SET_INSTANCE_COUNT=$IN_INSTANCE_COUNT"
+          } >> "$GITHUB_ENV"
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure ML CLI
+        run: |
+          set -euo pipefail
+          az extension add --name ml --upgrade --yes --only-show-errors
+          az version --query '{cli:"azure-cli", ml:extensions.ml}' -o tsv
+
+      - name: Deploy
+        if: inputs.action == 'deploy'
+        run: |
+          set -euo pipefail
+          for step in infra fetch train deploy smoke promote connect; do
+            echo "::group::ftm $step $EX"
+            shared/bin/ftm "$step" "$EX"
+            echo "::endgroup::"
+          done
+
+      - name: Roll back
+        if: inputs.action == 'rollback'
+        run: shared/bin/ftm rollback "$EX"
+
+      - name: Destroy
+        if: inputs.action == 'destroy'
+        run: shared/bin/ftm destroy "$EX"
+
+      - name: Info
+        id: info
+        if: inputs.action == 'deploy' && !inputs.dry_run
+        run: shared/bin/ftm info "$EX" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Record
+        id: record
+        if: ${{ !inputs.dry_run }}
+        env:
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          set -euo pipefail
+          file=$(shared/bin/ftm record "$EX")
+          git config user.name "ftm-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -s -m "ftm: $IN_ACTION $EX [$FTM_REQUEST_ID]" -m "$FTM_REASON"
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "push rejected (attempt $attempt); rebasing"
+            git pull --rebase
+          done
+          echo "::error::could not push $file"
+          exit 1

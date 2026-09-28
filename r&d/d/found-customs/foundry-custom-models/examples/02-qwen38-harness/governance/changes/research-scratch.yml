@@ -1,0 +1,6 @@
+repo: research-scratch
+visibility: internal
+teams:
+  research: admin
+rulesets: []
+codeowners: []

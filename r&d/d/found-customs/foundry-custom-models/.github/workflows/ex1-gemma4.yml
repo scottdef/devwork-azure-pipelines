@@ -1,0 +1,108 @@
+# Example 1: Gemma 4, LoRA-merged, served on Azure ML, used by a Foundry prompt agent.
+# Manual trigger: every input is a typed workflow_dispatch field.
+name: ex1-gemma4
+run-name: "ex1 gemma4 ${{ inputs.action }}${{ inputs.dry_run && ' (dry run)' || '' }}: ${{ inputs.reason }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: plan (no Azure), deploy, rollback or destroy
+        type: choice
+        options: [plan, deploy, rollback, destroy]
+        default: plan
+      dry_run:
+        description: print every Azure change instead of making it
+        type: boolean
+        default: true
+      reason:
+        description: why (8-200 characters; goes into the record and the commit)
+        type: string
+        required: true
+      hf_revision:
+        description: Hugging Face commit (40 hex) or main (pinned at plan time)
+        type: string
+        default: main
+      train:
+        description: fine-tune before deploying (default = the example's model.env)
+        type: choice
+        options: [default, "true", "false"]
+        default: default
+      instance_type:
+        description: GPU SKU for the endpoint (default = model.env)
+        type: choice
+        default: default
+        options:
+          - default
+          - Standard_NC24ads_A100_v4
+          - Standard_NC48ads_A100_v4
+          - Standard_NC96ads_A100_v4
+          - Standard_ND96amsr_A100_v4
+          - Standard_NC40ads_H100_v5
+          - Standard_NC80adis_H100_v5
+          - Standard_ND96isr_H100_v5
+      instance_count:
+        type: choice
+        options: ["1", "2", "3", "4"]
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/ftm-pipeline.yml
+    permissions:
+      contents: write
+      id-token: write
+    secrets: inherit
+    with:
+      example: gemma4
+      action: ${{ inputs.action }}
+      dry_run: ${{ inputs.dry_run }}
+      reason: ${{ inputs.reason }}
+      hf_revision: ${{ inputs.hf_revision }}
+      train: ${{ inputs.train }}
+      instance_type: ${{ inputs.instance_type }}
+      instance_count: ${{ inputs.instance_count }}
+
+  agent:
+    # Publish a new version of the Foundry agent on the new model, then ask it
+    # a question end to end: Foundry -> connection -> endpoint -> vLLM.
+    needs: pipeline
+    if: inputs.action == 'deploy' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    # Verification jobs read and test; no reviewer gate (see scripts/bootstrap-azure.sh).
+    environment: ftm-verify
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FOUNDRY_ACCOUNT: ${{ vars.FOUNDRY_ACCOUNT || 'ais-coolgit-copilot-prod' }}
+      FOUNDRY_PROJECT: ${{ vars.FOUNDRY_PROJECT || 'proj-coolgit-agents' }}
+      AGENT_MODEL: ${{ needs.pipeline.outputs.connection }}/${{ needs.pipeline.outputs.client_model }}
+      MODEL_VERSION: ${{ needs.pipeline.outputs.deployment }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Install
+        run: python -m pip install --quiet -r examples/01-gemma4-agent/agent/requirements.txt
+      - name: Create agent version
+        working-directory: examples/01-gemma4-agent/agent
+        run: |
+          set -euo pipefail
+          python create_agent.py --model "$AGENT_MODEL" --model-version "$MODEL_VERSION" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Ask the agent
+        working-directory: examples/01-gemma4-agent/agent
+        run: |
+          set -euo pipefail
+          python ask.py --expect Summary --expect Rollback \
+            "Runbook: rotate the issueops-autoadmin-app private key." | tee -a "$GITHUB_STEP_SUMMARY"

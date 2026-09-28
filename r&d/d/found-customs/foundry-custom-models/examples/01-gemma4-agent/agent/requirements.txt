@@ -1,0 +1,5 @@
+# Foundry Agent Service client (prompt agents, BYOM via connection) and a plain
+# OpenAI client for talking to the endpoint directly. Pinned 2026-09-28.
+azure-ai-projects==2.7.0
+azure-identity==1.25.3
+openai==3.20.0

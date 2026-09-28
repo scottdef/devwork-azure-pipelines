@@ -1,0 +1,110 @@
+# Example 2: Qwen3.8-27B + coolgit-ops LoRA adapter, evaluated by an Agent
+# Framework harness. Manual trigger; the same pipeline also runs from IssueOps.
+name: ex2-qwen38
+run-name: "ex2 qwen38 ${{ inputs.action }}${{ inputs.dry_run && ' (dry run)' || '' }}: ${{ inputs.reason }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: plan (no Azure), deploy, rollback or destroy
+        type: choice
+        options: [plan, deploy, rollback, destroy]
+        default: plan
+      dry_run:
+        description: print every Azure change instead of making it
+        type: boolean
+        default: true
+      reason:
+        description: why (8-200 characters; goes into the record and the commit)
+        type: string
+        required: true
+      hf_revision:
+        description: Hugging Face commit (40 hex) or main (pinned at plan time)
+        type: string
+        default: main
+      train:
+        description: fine-tune before deploying (default = the example's model.env)
+        type: choice
+        options: [default, "true", "false"]
+        default: default
+      instance_type:
+        description: GPU SKU for the endpoint (default = model.env)
+        type: choice
+        default: default
+        options:
+          - default
+          - Standard_NC24ads_A100_v4
+          - Standard_NC48ads_A100_v4
+          - Standard_NC96ads_A100_v4
+          - Standard_ND96amsr_A100_v4
+          - Standard_NC40ads_H100_v5
+          - Standard_NC80adis_H100_v5
+          - Standard_ND96isr_H100_v5
+      instance_count:
+        type: choice
+        options: ["1", "2", "3", "4"]
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/ftm-pipeline.yml
+    permissions:
+      contents: write
+      id-token: write
+    secrets: inherit
+    with:
+      example: qwen38
+      action: ${{ inputs.action }}
+      dry_run: ${{ inputs.dry_run }}
+      reason: ${{ inputs.reason }}
+      hf_revision: ${{ inputs.hf_revision }}
+      train: ${{ inputs.train }}
+      instance_type: ${{ inputs.instance_type }}
+      instance_count: ${{ inputs.instance_count }}
+
+  harness:
+    # The eval gates nothing by itself (traffic has moved); a red run here is
+    # the signal to `ftm rollback qwen38` or dispatch action=rollback.
+    needs: pipeline
+    if: inputs.action == 'deploy' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    # Verification jobs read and test; no reviewer gate (see scripts/bootstrap-azure.sh).
+    environment: ftm-verify
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FTM_BASE_URL: ${{ needs.pipeline.outputs.base_url }}
+      FTM_ADAPTER_MODEL: ${{ needs.pipeline.outputs.client_model }}
+      FTM_BASE_MODEL: qwen38-27b
+      ENDPOINT: ${{ needs.pipeline.outputs.endpoint }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-coolgit-copilot' }}
+      AML_WORKSPACE: ${{ vars.AML_WORKSPACE || 'mlw-coolgit-foundry' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Endpoint key
+        run: |
+          set -euo pipefail
+          az extension add --name ml --upgrade --yes --only-show-errors
+          key=$(az ml online-endpoint get-credentials -n "$ENDPOINT" -g "$AZURE_RESOURCE_GROUP" -w "$AML_WORKSPACE" --query primaryKey -o tsv)
+          echo "::add-mask::$key"
+          echo "FTM_KEY=$key" >> "$GITHUB_ENV"
+      - name: Install
+        run: python -m pip install --quiet -r examples/02-qwen38-harness/harness/requirements.txt
+      - name: Eval (adapter as reviewer)
+        run: python examples/02-qwen38-harness/harness/run.py eval | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Workflow (base investigates with tools, adapter decides)
+        run: python examples/02-qwen38-harness/harness/run.py workflow research-scratch.yml | tee -a "$GITHUB_STEP_SUMMARY"

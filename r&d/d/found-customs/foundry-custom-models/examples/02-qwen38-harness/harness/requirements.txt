@@ -1,0 +1,4 @@
+# Microsoft Agent Framework: core (agents, tools, workflows) + OpenAI-compatible clients.
+# Pinned 2026-09-28. agent-framework (the meta package) would pull every provider.
+agent-framework-core==1.19.0
+agent-framework-openai==1.14.4

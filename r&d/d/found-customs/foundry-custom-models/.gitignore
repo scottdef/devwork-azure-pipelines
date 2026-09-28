@@ -1,0 +1,8 @@
+/.ftm/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+/foundry-custom-models.zip
+.env
+*.pem

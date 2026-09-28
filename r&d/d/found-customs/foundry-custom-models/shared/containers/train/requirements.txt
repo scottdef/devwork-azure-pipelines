@@ -1,0 +1,7 @@
+# Pinned 2026-09-28. transformers comes from the vLLM base image (>=5.10.4),
+# which already satisfies Gemma 4's >=5.5 requirement.
+peft==0.21.0
+accelerate==1.15.0
+datasets==5.0.1
+azure-identity==1.25.3
+azure-keyvault-secrets==4.11.2

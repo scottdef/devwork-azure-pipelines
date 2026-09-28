@@ -1,0 +1,7 @@
+repo: analytics-dash
+visibility: internal
+teams:
+  analytics: push
+  platform-admins: admin
+rulesets: [default-branch]
+codeowners: ['@CoolGitOrg/analytics']

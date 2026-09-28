@@ -1,0 +1,7 @@
+repo: billing-service
+visibility: private
+teams:
+  billing: push
+  platform-admins: admin
+rulesets: [default-branch, signed-commits]
+codeowners: ['@CoolGitOrg/billing']

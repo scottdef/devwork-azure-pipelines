@@ -1,0 +1,117 @@
+# Example 3: Muse. variant=muse deploys Meta Muse Glimmer 30B from a Hugging
+# Face repository you choose (your fine-tune) and probes it with Copilot CLI
+# in BYOK mode; variant=wham deploys Microsoft Muse (WHAM), research use only.
+name: ex3-muse
+run-name: "ex3 ${{ inputs.variant }} ${{ inputs.action }}${{ inputs.dry_run && ' (dry run)' || '' }}: ${{ inputs.reason }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: muse = Muse Glimmer 30B (chat, tools, vision); wham = Microsoft Muse world model
+        type: choice
+        options: [muse, wham]
+        default: muse
+      hf_repo:
+        description: your weights, e.g. CoolGitOrg/muse-glimmer-30b-coolgit (empty = model.env)
+        type: string
+        default: ""
+      action:
+        description: plan (no Azure), deploy, rollback or destroy
+        type: choice
+        options: [plan, deploy, rollback, destroy]
+        default: plan
+      dry_run:
+        description: print every Azure change instead of making it
+        type: boolean
+        default: true
+      reason:
+        description: why (8-200 characters; goes into the record and the commit)
+        type: string
+        required: true
+      hf_revision:
+        description: Hugging Face commit (40 hex) or main (pinned at plan time)
+        type: string
+        default: main
+      train:
+        description: fine-tune before deploying (default = the example's model.env)
+        type: choice
+        options: [default, "true", "false"]
+        default: default
+      instance_type:
+        description: GPU SKU for the endpoint (default = model.env)
+        type: choice
+        default: default
+        options:
+          - default
+          - Standard_NC24ads_A100_v4
+          - Standard_NC48ads_A100_v4
+          - Standard_NC96ads_A100_v4
+          - Standard_ND96amsr_A100_v4
+          - Standard_NC40ads_H100_v5
+          - Standard_NC80adis_H100_v5
+          - Standard_ND96isr_H100_v5
+      instance_count:
+        type: choice
+        options: ["1", "2", "3", "4"]
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/ftm-pipeline.yml
+    permissions:
+      contents: write
+      id-token: write
+    secrets: inherit
+    with:
+      example: ${{ inputs.variant }}
+      action: ${{ inputs.action }}
+      dry_run: ${{ inputs.dry_run }}
+      reason: ${{ inputs.reason }}
+      hf_repo: ${{ inputs.hf_repo }}
+      hf_revision: ${{ inputs.hf_revision }}
+      train: ${{ inputs.train }}
+      instance_type: ${{ inputs.instance_type }}
+      instance_count: ${{ inputs.instance_count }}
+
+  copilot:
+    # Copilot CLI with the endpoint as its only model provider.
+    needs: pipeline
+    if: inputs.variant == 'muse' && inputs.action == 'deploy' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    # Verification jobs read and test; no reviewer gate (see scripts/bootstrap-azure.sh).
+    environment: ftm-verify
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FTM_BASE_URL: ${{ needs.pipeline.outputs.base_url }}
+      FTM_MODEL: ${{ needs.pipeline.outputs.client_model }}
+      ENDPOINT: ${{ needs.pipeline.outputs.endpoint }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-coolgit-copilot' }}
+      AML_WORKSPACE: ${{ vars.AML_WORKSPACE || 'mlw-coolgit-foundry' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Endpoint key
+        run: |
+          set -euo pipefail
+          az extension add --name ml --upgrade --yes --only-show-errors
+          key=$(az ml online-endpoint get-credentials -n "$ENDPOINT" -g "$AZURE_RESOURCE_GROUP" -w "$AML_WORKSPACE" --query primaryKey -o tsv)
+          echo "::add-mask::$key"
+          echo "FTM_KEY=$key" >> "$GITHUB_ENV"
+      - name: Install Copilot CLI
+        run: npm install --global --no-fund --no-audit @github/copilot
+      - name: Probe
+        run: examples/03-muse-glimmer/harness/copilot-byok.sh probe | tee -a "$GITHUB_STEP_SUMMARY"

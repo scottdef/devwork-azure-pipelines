@@ -1,0 +1,6 @@
+repo: growth-experiments
+visibility: public
+teams:
+  growth: push
+rulesets: [default-branch]
+codeowners: ['@CoolGitOrg/growth']

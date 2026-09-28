@@ -1,0 +1,19 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+# Download @{HF_REPO}@@{HF_REVISION} inside Azure; the runner never holds the weights.
+type: command
+display_name: fetch @{EXAMPLE} @{BASE_MODEL_VERSION}
+experiment_name: ftm-@{EXAMPLE}
+compute: azureml:@{FETCH_COMPUTE}
+environment: azureml:ftm-train:@{TRAIN_ENV_VERSION}
+code: @{CODE_DIR}
+command: >-
+  python fetch.py --repo @{HF_REPO} --revision @{HF_REVISION}
+  --out ${{outputs.weights}} @{FETCH_INCLUDE_ARGS}
+environment_variables: @{HF_TOKEN_ENV}
+outputs:
+  weights:
+    type: uri_folder
+    mode: upload
+tags:
+  hf_repo: '@{HF_REPO}'
+  hf_revision: '@{HF_REVISION}'

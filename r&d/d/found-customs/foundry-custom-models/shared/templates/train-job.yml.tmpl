@@ -1,0 +1,30 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+# LoRA SFT of @{BASE_MODEL_NAME}:@{BASE_MODEL_VERSION} -> @{SERVE_MODEL_NAME}:@{SERVE_MODEL_VERSION} (@{TRAIN_MODE}).
+type: command
+display_name: train @{EXAMPLE} @{SERVE_MODEL_VERSION}
+experiment_name: ftm-@{EXAMPLE}
+compute: azureml:@{TRAIN_COMPUTE}
+environment: azureml:ftm-train:@{TRAIN_ENV_VERSION}
+code: @{CODE_DIR}
+command: >-
+  python sft_lora.py --base ${{inputs.base}} --data ${{inputs.data}}
+  --out ${{outputs.model}} --mode @{TRAIN_MODE} --adapter-name '@{ADAPTER_NAME}'
+  --epochs @{EPOCHS} --lora-r @{LORA_R} --max-seq-len @{MAX_SEQ_LEN}
+inputs:
+  base:
+    type: custom_model
+    path: azureml:@{BASE_MODEL_NAME}:@{BASE_MODEL_VERSION}
+    mode: ro_mount
+  data:
+    type: uri_file
+    path: @{TRAIN_DATA_REL}
+outputs:
+  model:
+    type: uri_folder
+    mode: upload
+environment_variables:
+  GIT_SHA: '@{GIT_SHA}'
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+tags:
+  base: '@{BASE_MODEL_NAME}:@{BASE_MODEL_VERSION}'
+  mode: '@{TRAIN_MODE}'

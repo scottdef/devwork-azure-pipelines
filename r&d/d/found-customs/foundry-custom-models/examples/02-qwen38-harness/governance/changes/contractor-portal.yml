@@ -1,0 +1,6 @@
+repo: contractor-portal
+visibility: private
+outside_collaborators:
+  contractor-jane: push
+rulesets: [default-branch]
+codeowners: ['@CoolGitOrg/portal']

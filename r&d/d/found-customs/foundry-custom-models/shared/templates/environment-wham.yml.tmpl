@@ -1,0 +1,18 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: ftm-wham
+version: '@{WHAM_ENV_VERSION}'
+description: Microsoft Muse (WHAM) research server behind a health shim (shared/containers/wham)
+build:
+  path: @{WHAM_CONTEXT}
+# WHAM's Flask server has no health route and may bind 127.0.0.1 only. The shim
+# on 0.0.0.0:8080 answers /health and forwards everything else to 127.0.0.1:5000.
+inference_config:
+  liveness_route:
+    port: 8080
+    path: /health
+  readiness_route:
+    port: 8080
+    path: /health
+  scoring_route:
+    port: 8080
+    path: /

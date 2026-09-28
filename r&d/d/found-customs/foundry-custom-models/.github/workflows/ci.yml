@@ -1,0 +1,36 @@
+# ci: everything that can be checked without Azure or a GPU.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Tools
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet -r requirements-dev.txt -r examples/02-qwen38-harness/harness/requirements.txt
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          sudo mv actionlint /usr/local/bin/
+      - name: make check
+        run: make check
+      - name: Plans for every example (offline, pinned revision)
+        env:
+          FTM_SET_HF_REVISION: "0000000000000000000000000000000000000000"
+        run: |
+          set -euo pipefail
+          for ex in $(python3 shared/tools/ftmcfg.py examples); do
+            shared/bin/ftm plan "$ex" >> "$GITHUB_STEP_SUMMARY"
+          done

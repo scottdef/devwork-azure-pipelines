@@ -1,0 +1,18 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: ftm-serve
+version: '@{SERVE_ENV_VERSION}'
+description: vLLM OpenAI-compatible server with model and LoRA discovery (shared/containers/serve)
+build:
+  path: @{SERVE_CONTEXT}
+# vLLM answers /health and serves the OpenAI API under /v1. The scoring route
+# is the root, so https://<endpoint>/v1/chat/completions reaches vLLM unchanged.
+inference_config:
+  liveness_route:
+    port: 8000
+    path: /health
+  readiness_route:
+    port: 8000
+    path: /health
+  scoring_route:
+    port: 8000
+    path: /

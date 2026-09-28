@@ -1,0 +1,82 @@
+# IssueOps: request a custom-weight model deployment. Labels in this form are
+# parsed by shared/tools/issueform.py; keep them in step with its LABELS table.
+name: Model deployment request
+description: Deploy, or remove, one of the custom-weight Foundry models
+title: "[model] "
+labels: [model-request]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Opening or editing this issue posts a **plan** (nothing changes in Azure).
+        A maintainer other than you comments **/approve** to apply it, **/plan** to re-plan, **/cancel** to close.
+  - type: dropdown
+    id: example
+    attributes:
+      label: Example
+      options:
+        - gemma4 — Gemma 4 E4B, LoRA merged, Foundry prompt agent
+        - qwen38 — Qwen3.8-27B + coolgit-ops adapter, Agent Framework harness
+        - muse — Muse Glimmer 30B from your Hugging Face repo, Copilot CLI
+        - wham — Microsoft Muse (WHAM) research server
+    validations:
+      required: true
+  - type: dropdown
+    id: action
+    attributes:
+      label: Action
+      options:
+        - deploy
+        - destroy
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: hf_repo
+    attributes:
+      label: Hugging Face repository override
+      description: Optional, e.g. CoolGitOrg/muse-glimmer-30b-coolgit. Empty uses the example's model.env.
+  - type: input
+    id: hf_revision
+    attributes:
+      label: Hugging Face revision
+      description: A 40-hex commit, or main (the plan pins main to the current commit).
+      value: main
+    validations:
+      required: true
+  - type: dropdown
+    id: train
+    attributes:
+      label: Fine-tune
+      options:
+        - default
+        - "yes"
+        - "no"
+      default: 0
+  - type: dropdown
+    id: instance_type
+    attributes:
+      label: Instance type
+      options:
+        - default
+        - Standard_NC24ads_A100_v4
+        - Standard_NC48ads_A100_v4
+        - Standard_NC96ads_A100_v4
+        - Standard_ND96amsr_A100_v4
+        - Standard_NC40ads_H100_v5
+        - Standard_NC80adis_H100_v5
+        - Standard_ND96isr_H100_v5
+      default: 0
+  - type: dropdown
+    id: instance_count
+    attributes:
+      label: Instance count
+      options: ["1", "2", "3", "4"]
+      default: 0
+  - type: input
+    id: reason
+    attributes:
+      label: Reason
+      description: One line, 8 to 200 characters. It goes into the record and the commit message.
+    validations:
+      required: true

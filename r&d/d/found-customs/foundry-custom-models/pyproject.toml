@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "S"]
+# S101 assert (tests), S603/S607 subprocess with fixed argv, S310 urlopen of an https base the caller validates,
+# S104 binding 0.0.0.0 is the point of the WHAM shim, B905 zip() strictness where lengths are equal by construction.
+ignore = ["S101", "S603", "S607", "S310", "S104", "B905", "E731"]
+
+[tool.ruff.lint.per-file-ignores]
+# Seed datasets are tables of literal strings; wrapping them hurts more than it helps.
+"examples/*/data/build.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ftmcfg", "issueform", "connection_body", "smoke_test", "sftdata", "ftmlib", "fakes", "conftest", "tools", "run", "create_agent", "shim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

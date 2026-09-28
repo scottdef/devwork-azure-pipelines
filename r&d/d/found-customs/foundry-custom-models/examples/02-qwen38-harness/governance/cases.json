@@ -1,0 +1,10 @@
+{
+  "min_accuracy": 0.8,
+  "cases": [
+    {"file": "analytics-dash.yml", "expected": "approve"},
+    {"file": "growth-experiments.yml", "expected": "changes"},
+    {"file": "research-scratch.yml", "expected": "reject"},
+    {"file": "contractor-portal.yml", "expected": "changes"},
+    {"file": "billing-service.yml", "expected": "approve"}
+  ]
+}

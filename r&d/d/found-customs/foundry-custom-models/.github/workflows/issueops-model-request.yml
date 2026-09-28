@@ -1,0 +1,192 @@
+# IssueOps for custom-weight models.
+#
+#   issue opened/edited (label model-request)  -> parse, validate, plan, comment
+#   comment /plan                              -> plan again
+#   comment /approve  (admin or maintain, not the author)  -> apply via ftm-pipeline
+#   comment /cancel   (author or maintainer)   -> close
+#
+# The issue body and comments are untrusted: they reach bash only through env,
+# and every value is validated by shared/tools/issueform.py before use.
+name: issueops-model-request
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issueops-model-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  parse:
+    if: ${{ !github.event.issue.pull_request && contains(github.event.issue.labels.*.name, 'model-request') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      command: ${{ steps.cmd.outputs.command }}
+      ok: ${{ steps.form.outputs.ok }}
+      example: ${{ steps.form.outputs.example }}
+      action: ${{ steps.form.outputs.action }}
+      hf_repo: ${{ steps.form.outputs.hf_repo }}
+      hf_revision: ${{ steps.form.outputs.hf_revision }}
+      train: ${{ steps.form.outputs.train }}
+      instance_type: ${{ steps.form.outputs.instance_type }}
+      instance_count: ${{ steps.form.outputs.instance_count }}
+      reason: ${{ steps.form.outputs.reason }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+      AUTHOR: ${{ github.event.issue.user.login }}
+      ACTOR: ${{ github.event.comment.user.login || github.actor }}
+      EVENT: ${{ github.event_name }}
+      COMMENT: ${{ github.event.comment.body }}
+      BODY: ${{ github.event.issue.body }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Command
+        id: cmd
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == issues ]]; then
+            command=plan
+          else
+            command=$(python3 shared/tools/issueform.py --command "$COMMENT")
+          fi
+          echo "command=$command" >> "$GITHUB_OUTPUT"
+          echo "command: $command"
+
+      - name: Parse and validate the form
+        id: form
+        if: steps.cmd.outputs.command != 'none'
+        run: |
+          set -euo pipefail
+          status=0
+          printf '%s' "$BODY" | python3 shared/tools/issueform.py > form.json || status=$?
+          python3 - form.json <<'PY' >> "$GITHUB_OUTPUT"
+          import json, sys
+          f = json.load(open(sys.argv[1]))
+          train = {"yes": "true", "no": "false"}.get(f.get("train", "default"), "default")
+          out = {"ok": "true" if f["ok"] else "false", "train": train}
+          for k in ("example", "action", "hf_repo", "hf_revision", "instance_type", "instance_count", "reason"):
+              out.setdefault(k, f.get(k, ""))
+          for k, v in out.items():
+              print(f"{k}={v}")  # validated: no newlines or shell metacharacters survive issueform.py
+          PY
+          if (( status != 0 )); then
+            {
+              echo "**This request cannot be planned.** Edit the issue to fix:"
+              python3 -c 'import json,sys; [print(f"- {e}") for e in json.load(open(sys.argv[1]))["errors"]]' form.json
+            } > comment.md
+            gh issue comment "$ISSUE" --repo "$REPO" --body-file comment.md
+            gh issue edit "$ISSUE" --repo "$REPO" --add-label needs-changes || true
+          fi
+
+      - name: Authorize /approve and /cancel
+        if: steps.cmd.outputs.command == 'approve' || steps.cmd.outputs.command == 'cancel'
+        env:
+          COMMAND: ${{ steps.cmd.outputs.command }}
+        run: |
+          set -euo pipefail
+          perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission)
+          deny() { gh issue comment "$ISSUE" --repo "$REPO" --body "@$ACTOR $1"; echo "::error::$1"; exit 1; }
+          if [[ "$COMMAND" == approve ]]; then
+            [[ "$perm" == admin || "$perm" == maintain ]] || deny "/approve needs admin or maintain on this repository (you have $perm)."
+            [[ "$ACTOR" != "$AUTHOR" ]] || deny "the requester cannot approve their own request."
+          else
+            [[ "$ACTOR" == "$AUTHOR" || "$perm" == admin || "$perm" == maintain ]] || deny "only the requester or a maintainer can cancel."
+          fi
+
+      - name: Cancel
+        if: steps.cmd.outputs.command == 'cancel'
+        run: gh issue close "$ISSUE" --repo "$REPO" --reason "not planned" --comment "Cancelled by @$ACTOR."
+
+  pipeline:
+    needs: parse
+    if: needs.parse.outputs.ok == 'true' && (needs.parse.outputs.command == 'plan' || needs.parse.outputs.command == 'approve')
+    uses: ./.github/workflows/ftm-pipeline.yml
+    permissions:
+      contents: write
+      id-token: write
+    secrets: inherit
+    with:
+      example: ${{ needs.parse.outputs.example }}
+      # /plan (and opening the issue) only ever plans; /approve applies what the form says.
+      action: ${{ needs.parse.outputs.command == 'approve' && needs.parse.outputs.action || 'plan' }}
+      dry_run: false
+      reason: ${{ needs.parse.outputs.reason }}
+      request_id: issue-${{ github.event.issue.number }}-${{ github.run_id }}
+      hf_repo: ${{ needs.parse.outputs.hf_repo }}
+      hf_revision: ${{ needs.parse.outputs.hf_revision }}
+      train: ${{ needs.parse.outputs.train }}
+      instance_type: ${{ needs.parse.outputs.instance_type }}
+      instance_count: ${{ needs.parse.outputs.instance_count }}
+
+  report:
+    needs: [parse, pipeline]
+    if: always() && needs.parse.outputs.ok == 'true' && (needs.parse.outputs.command == 'plan' || needs.parse.outputs.command == 'approve')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+      COMMAND: ${{ needs.parse.outputs.command }}
+      RESULT: ${{ needs.pipeline.result }}
+      EX: ${{ needs.parse.outputs.example }}
+      ACTION: ${{ needs.parse.outputs.action }}
+      ENDPOINT: ${{ needs.pipeline.outputs.endpoint }}
+      DEPLOYMENT: ${{ needs.pipeline.outputs.deployment }}
+      CLIENT_MODEL: ${{ needs.pipeline.outputs.client_model }}
+      CONNECTION: ${{ needs.pipeline.outputs.connection }}
+      HF_REVISION: ${{ needs.pipeline.outputs.hf_revision }}
+      RECORD: ${{ needs.pipeline.outputs.record }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Comment
+        run: |
+          set -euo pipefail
+          {
+            if [[ "$COMMAND" == plan ]]; then
+              echo "### Plan: $ACTION \`$EX\` ($RESULT)"
+              echo
+              echo "| | |"
+              echo "|---|---|"
+              echo "| Pinned revision | \`$HF_REVISION\` |"
+              echo "| Endpoint / deployment | \`$ENDPOINT\` / \`$DEPLOYMENT\` |"
+              echo "| Clients send model | \`$CLIENT_MODEL\` |"
+              echo "| Foundry agent model | \`$CONNECTION/$CLIENT_MODEL\` |"
+              echo
+              echo "Full plan and rendered Azure ML YAML: $RUN_URL"
+              echo
+              echo "A maintainer other than the requester comments \`/approve\` to apply."
+            else
+              echo "### $ACTION \`$EX\`: $RESULT"
+              echo
+              [[ -n "$RECORD" ]] && echo "Record: \`$RECORD\`"
+              echo "Run: $RUN_URL"
+            fi
+          } > comment.md
+          gh issue comment "$ISSUE" --repo "$REPO" --body-file comment.md
+
+      - name: Label and close
+        if: needs.parse.outputs.command == 'approve'
+        run: |
+          set -euo pipefail
+          if [[ "$RESULT" == success ]]; then
+            gh issue edit "$ISSUE" --repo "$REPO" --add-label applied --remove-label needs-changes || true
+            gh issue close "$ISSUE" --repo "$REPO" --reason completed
+          else
+            gh issue edit "$ISSUE" --repo "$REPO" --add-label apply-failed || true
+          fi

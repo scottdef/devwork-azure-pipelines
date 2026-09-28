@@ -1,0 +1,6 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: ftm-train
+version: '@{TRAIN_ENV_VERSION}'
+description: Hub fetch and LoRA fine-tuning, same vLLM base as serving (shared/containers/train)
+build:
+  path: @{TRAIN_CONTEXT}
