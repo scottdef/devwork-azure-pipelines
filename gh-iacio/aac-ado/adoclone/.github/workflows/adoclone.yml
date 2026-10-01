@@ -1,0 +1,81 @@
+name: adoclone
+on:
+  workflow_dispatch:
+    inputs:
+      source: {description: "Source project", required: true, type: string}
+      target: {description: "Target project", required: true, type: string}
+      components: {description: "Components (comma-separated) or all", required: false, type: string, default: "all"}
+      skip: {description: "Components to leave out", required: false, type: string, default: ""}
+      dry_run: {description: "Log writes instead of sending them", required: true, type: boolean, default: true}
+concurrency: {group: "adoclone-${{ inputs.target }}", cancel-in-progress: false}
+permissions: {contents: read}
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # hosted-runner limit; rerun the workflow to resume, or use the AKS Job
+    env:
+      ADO_PAT: "${{ secrets.ADO_PAT }}"
+      ADO_ORG: CoolADO
+      # Inputs reach the shell only through env, never pasted into scripts.
+      SRC: "${{ inputs.source }}"
+      TGT: "${{ inputs.target }}"
+      COMPONENTS: "${{ inputs.components }}"
+      SKIP: "${{ inputs.skip }}"
+      DRY_RUN: "${{ inputs.dry_run }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: "1.21"}
+      - name: Restore checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            state.json
+            state.json.journal
+            todo.json
+          key: "adoclone-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}"
+          restore-keys: "adoclone-${{ inputs.target }}-"
+      - name: Test and build
+        run: |
+          go vet ./...
+          go test ./...
+          go build -ldflags "-X main.version=${GITHUB_SHA::7}" -o bin/adoclone ./cmd/adoclone
+      - name: Preflight
+        run: bash scripts/preflight.sh
+      - name: Plan
+        run: ./bin/adoclone plan -source "$SRC" > plan.json
+      - name: Clone
+        run: ./bin/adoclone clone -source "$SRC" -target "$TGT" -components "$COMPONENTS" -skip "$SKIP" -dry-run="$DRY_RUN"
+        # Secret values for copied variable groups: add one line per secret, e.g.
+        # env: {SECRET_APP_SETTINGS_DB_PASSWORD: "${{ secrets.APP_DB_PASSWORD }}"}
+      - name: Verify
+        if: ${{ !inputs.dry_run }}
+        continue-on-error: true
+        run: ./bin/adoclone verify -source "$SRC" -target "$TGT" > verify.json
+      - name: Report
+        if: always()
+        run: ./bin/adoclone report -source "$SRC" -target "$TGT" -out report.html > /dev/null
+      - name: Save checkpoint
+        # A new key per attempt: "Re-run jobs" keeps run_id and cache entries
+        # can't be overwritten, so a fixed key would drop the rerun's progress.
+        if: always() && !inputs.dry_run
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            state.json
+            state.json.journal
+            todo.json
+          key: "adoclone-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "adoclone-${{ inputs.target }}-${{ github.run_number }}"
+          path: |
+            plan.json
+            verify.json
+            report.html
+            state.json
+            todo.json
+            todo-dryrun.json
+          if-no-files-found: warn

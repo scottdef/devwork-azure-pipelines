@@ -1,0 +1,112 @@
+# State volume and the adoclone Job. kubectl 1.30 (batch/v1, podFailurePolicy).
+#
+# Exit codes: 1 = component error, retried by the Job (each retry resumes from
+#   /state/state.json); 2 = bad settings, 3 = finished with item failures
+#   (see /state/todo.json), 4 = verify mismatch. 2-4 fail the Job at once.
+# Node drains and evictions don't count against backoffLimit.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: adoclone-state
+  namespace: adoclone
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 50Gi # checkpoint plus scratch space for repo mirrors and large attachments
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adoclone-run
+  namespace: adoclone
+  labels:
+    app.kubernetes.io/name: adoclone
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 259200 # 72h
+  ttlSecondsAfterFinished: 604800
+  podFailurePolicy:
+    rules:
+      - action: FailJob
+        onExitCodes:
+          containerName: adoclone
+          operator: In
+          values: [2, 3, 4]
+      - action: Ignore
+        onPodConditions:
+          - type: DisruptionTarget
+            status: "True"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adoclone
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: adoclone
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: adoclone
+          image: <acr>.azurecr.io/adoclone:1.1.0
+          args:
+            - clone
+            - -source=$(SOURCE)
+            - -target=$(TARGET)
+            - -components=$(COMPONENTS)
+            - -dry-run=$(DRY_RUN)
+            - -state=/state/state.json
+            - -work-dir=/state/work
+            - -metrics-addr=:9090
+            - -metrics-hold=2m
+          env:
+            - name: ADO_PAT_FILE
+              value: /mnt/secrets/ado-pat
+          envFrom:
+            - configMapRef:
+                name: adoclone-config
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+              ephemeral-storage: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: state
+              mountPath: /state
+            - name: tmp
+              mountPath: /tmp
+            - name: kv
+              mountPath: /mnt/secrets
+              readOnly: true
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: adoclone-state
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: kv
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: adoclone-kv

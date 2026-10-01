@@ -1,0 +1,56 @@
+# Azure Pipelines equivalent of .github/workflows/adoclone.yml.
+# Hosted agents don't keep files between runs, so for long migrations use a
+# self-hosted agent (state.json stays in $(Pipeline.Workspace)/adoclone) or the AKS Job.
+trigger: none
+parameters:
+  - {name: source, type: string}
+  - {name: target, type: string}
+  - {name: components, type: string, default: all}
+  - {name: skip, type: string, default: ' '}
+  - {name: dryRun, type: boolean, default: true}
+pool: {vmImage: ubuntu-latest}
+variables:
+  - group: adoclone-secrets # ADO_PAT (secret), plus any SECRET_<GROUP>_<VAR> values
+  - name: STATE_DIR
+    value: $(Pipeline.Workspace)/adoclone
+  # Parameters reach scripts only through env, never pasted into script text.
+  - {name: SRC, value: '${{ parameters.source }}'}
+  - {name: TGT, value: '${{ parameters.target }}'}
+  - {name: COMPONENTS, value: '${{ parameters.components }}'}
+  - {name: SKIP, value: '${{ trim(parameters.skip) }}'}
+  - {name: DRY_RUN, value: '${{ parameters.dryRun }}'}
+steps:
+  - task: GoTool@0
+    inputs: {version: '1.21'}
+  - script: |
+      go vet ./... && go test ./...
+      go build -ldflags "-X main.version=$(Build.SourceVersion)" -o bin/adoclone ./cmd/adoclone
+      mkdir -p "$STATE_DIR"
+    displayName: Test and build
+  - script: bash scripts/preflight.sh
+    displayName: Preflight
+    env: {ADO_PAT: $(ADO_PAT), ADO_ORG: CoolADO, STATE: '$(STATE_DIR)/state.json'}
+  - script: ./bin/adoclone plan -source "$SRC" > "$STATE_DIR/plan.json"
+    displayName: Plan
+    env: {ADO_PAT: $(ADO_PAT), ADO_ORG: CoolADO}
+  - script: >
+      ./bin/adoclone clone -source "$SRC" -target "$TGT"
+      -components "$COMPONENTS" -skip "$SKIP"
+      -dry-run="$DRY_RUN" -state "$STATE_DIR/state.json"
+    displayName: Clone
+    # Secret variables from a variable group aren't passed to scripts unless
+    # mapped here. Add one line per copied variable-group secret, e.g.
+    #   SECRET_APP_SETTINGS_DB_PASSWORD: $(SECRET_APP_SETTINGS_DB_PASSWORD)
+    env: {ADO_PAT: $(ADO_PAT), ADO_ORG: CoolADO}
+  - ${{ if eq(parameters.dryRun, false) }}:
+    - script: ./bin/adoclone verify -source "$SRC" -target "$TGT" -state "$STATE_DIR/state.json" > "$STATE_DIR/verify.json"
+      displayName: Verify
+      continueOnError: true
+      env: {ADO_PAT: $(ADO_PAT), ADO_ORG: CoolADO}
+  - script: ./bin/adoclone report -source "$SRC" -target "$TGT" -state "$STATE_DIR/state.json" -out "$STATE_DIR/report.html" > /dev/null
+    displayName: Report
+    condition: always()
+    env: {ADO_PAT: $(ADO_PAT), ADO_ORG: CoolADO}
+  - publish: $(STATE_DIR)
+    artifact: adoclone-$(Build.BuildNumber)
+    condition: always()

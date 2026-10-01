@@ -1,0 +1,15 @@
+# Scrapes the Job's /metrics with Azure Monitor managed service for Prometheus.
+# With kube-prometheus-stack instead, change apiVersion to monitoring.coreos.com/v1
+# and add the label your Prometheus selects on (e.g. release: kube-prometheus-stack).
+apiVersion: azmonitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: adoclone
+  namespace: adoclone
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: adoclone
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s

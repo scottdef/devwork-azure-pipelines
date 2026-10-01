@@ -1,0 +1,11 @@
+bin/
+build/
+state.json
+state.json.journal
+state.json.tmp
+todo.json
+todo.json.tmp
+*.deleted-*
+plan.json
+verify.json
+report.html
