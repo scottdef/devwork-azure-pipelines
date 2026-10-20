@@ -1,0 +1,16 @@
+stateDiagram-v2
+    direction LR
+    [*] --> Available: library-publish (phase 1..3)
+    Available --> Borrowed: library-borrow\nitem exists, not borrowed,\nborrower holds < 3, phase < 3
+    Borrowed --> Available: library-return (by borrower)
+    Borrowed --> Superseded: library-publish phase N+1\nby borrower (loan closed)
+    Borrowed --> Overdue: now > due (daily sweep)\nwarn on borrow issue once
+    Overdue --> Available: return by borrower
+    Overdue --> Superseded: borrower publishes next phase
+    Overdue --> Available: now > due + 7d grace\nauto-return, close borrow issue
+    Superseded --> [*]
+    note right of Borrowed
+        Items stay readable by everyone in every state.
+        A loan reserves only the right to publish
+        the next phase of that source + template.
+    end note

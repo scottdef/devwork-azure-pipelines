@@ -1,0 +1,23 @@
+# edge-proxy: GitHub Actions workflow, phase 1 of edge-proxy/workflow/43
+# Rendered with double-square-bracket delimiters, so GitHub expressions pass through untouched.
+name: edge-proxy
+on:
+  push:
+    branches: ["main","release/*"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ vars.GO_VERSION || '1.24.x' }}"
+      - run: "go vet ./..."
+      - run: "go test -race ./..."

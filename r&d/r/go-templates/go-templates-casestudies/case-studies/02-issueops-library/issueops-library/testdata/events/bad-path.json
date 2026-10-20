@@ -1,0 +1,20 @@
+{
+  "action": "library-return",
+  "branch": "main",
+  "client_payload": {
+    "item_id": "../../etc/passwd",
+    "issue": 53,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "mallory"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

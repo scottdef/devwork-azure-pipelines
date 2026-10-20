@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>Generate</h1>
+<div class="cols">
+<form hx-post="/new/issueops" hx-target="#files">
+<fieldset>
+<legend>IssueOps kit</legend>
+<label>Name <input name="name" value="repo-request" pattern="[a-z0-9][a-z0-9-]*" required></label>
+<label>Fields <input name="fields" value="repo_name:string!,visibility:dropdown=internal|private,reason:text" size="48"></label>
+<p class="hint">id:type, comma separated; types {{range $i, $t := .FieldTypes}}{{if $i}}, {{end}}<code>{{$t}}</code>{{end}}; <code>dropdown=a|b</code>; trailing <code>!</code> = required.
+Writes an issue form, a parse workflow (repository_dispatch via the GitHub App) and a stdlib Go parser.</p>
+<button type="submit">generate</button>
+</fieldset>
+</form>
+<form hx-post="/new/cicd" hx-target="#files">
+<fieldset>
+<legend>CI/CD workflow</legend>
+<label>Kind <select name="kind">{{range .Kinds}}<option>{{.}}</option>{{end}}</select></label>
+<label>Name <input name="name" placeholder="(kind)"></label>
+<label>Binary <input name="binary" value="tmplforge"></label>
+<label>Inputs <input name="inputs" value="environment:choice=beta|prod,dry_run:boolean" size="48"></label>
+<label>Event types <input name="types" placeholder="repository_dispatch only"></label>
+<p class="hint">Inputs become workflow_dispatch inputs (max 25) or client_payload keys; types {{range $i, $t := .InputTypes}}{{if $i}}, {{end}}<code>{{$t}}</code>{{end}}. Values reach shell only through <code>env:</code>.</p>
+<button type="submit">generate</button>
+</fieldset>
+</form>
+</div>
+<div id="files" aria-live="polite"></div>
+{{end}}

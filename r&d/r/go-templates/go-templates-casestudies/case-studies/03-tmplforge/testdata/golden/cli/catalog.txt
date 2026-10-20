@@ -1,0 +1,25 @@
+CHANGELOG.md             md    -      Keep-a-Changelog CHANGELOG from a list of releases and typed changes.
+Caddyfile                txt   -      Caddy v2 Caddyfile: one block per site with optional file server and reverse proxies.
+Corefile                 txt   [[,]]  CoreDNS Corefile with a template plugin block; [[ ]] delimiters leave CoreDNS's own {{ }} alone.
+Dockerfile               txt   -      Two-stage Go Dockerfile: golang builder to scratch, non-root, labels.
+Makefile                 txt   -      POSIX make Makefile with a cross-compile target per GOOS/GOARCH (tabs preserved).
+README.md                md    -      Project README with badges, install steps and a generated command table.
+config.json              json  -      Application JSON config assembled with dict/list and printed with toPrettyJSON.
+config.yml               yaml  -      YAML config: hand-written header, then toYAML of a nested fixture section.
+dispatch.yml             yaml  [[,]]  workflow_dispatch workflow with typed inputs passed through env, never run interpolation.
+email.html               html  -      HTML email rendered with html/template: hostile fixture strings are escaped.
+email.txt                txt   -      Plain-text email twin of email.html, wrapped at 72 columns.
+hello.c                  txt   -      Plan 9 C program (u.h, libc.h, ARGBEGIN) printing a configurable greeting.
+hello.go                 txt   -      Go command with flag package and single-dash flags; output is gofmt-clean.
+htmx-partial.html        html  -      htmx partial: rows that swap themselves, escaped by html/template.
+issue-form.yml           yaml  -      GitHub issue form (ISSUE_TEMPLATE) with typed fields and dropdowns.
+job.nomad.hcl            txt   [[,]]  Nomad service job; [[ ]] delimiters keep consul-template {{ }} blocks intact.
+main.tf                  txt   -      Terraform (integrations/github ~> 6.13): repositories with topics and a branch ruleset.
+mkfile                   txt   -      Plan 9 mkfile for a C program (mkone), the native build of the Thompson-Pike world.
+motd.txt                 txt   -      Message of the day with aligned columns, indent and plural.
+prometheus-rules.yml     yaml  [[,]]  Prometheus alerting rules; [[ ]] delimiters preserve {{ $labels }} annotations.
+release.yml              yaml  [[,]]  Tag-triggered release workflow: static binaries, SHA256SUMS, gh release create.
+repository-dispatch.yml  yaml  [[,]]  repository_dispatch receiver; client_payload flows through env only.
+sparkline.svg            html  -      Inline SVG sparkline computed in-template from a list of points.
+sql-migration.sql        txt   -      SQL migration (up/down) from a table spec, with index creation.
+workflow.yml             yaml  [[,]]  GitHub Actions CI workflow: Go matrix build with pinned action majors.

@@ -1,0 +1,7 @@
+resource "local_file" "motd" {
+  filename = "motd.txt"
+  content  = templatefile("motd.tpl", {
+    name  = "web"
+    ports = [80, 443]
+  })
+}

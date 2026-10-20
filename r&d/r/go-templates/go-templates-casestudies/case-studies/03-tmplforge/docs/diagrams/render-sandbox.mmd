@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser (htmx)
+    participant S as serve (parent)
+    participant C as render -sandbox (child)
+    B->>S: POST /render (HX-Request, form: template, fixture, vars)
+    S->>S: auth, rate limit, same-origin, body cap 256 KiB
+    S->>S: template <= 64 KiB, fixture -> map[string]any -> JSON
+    S->>S: acquire semaphore slot (-j N) or 503
+    S->>S: write fixture to temp file
+    S->>C: exec os.Executable() render -sandbox -t - -d FILE<br/>env: TMPLFORGE_SANDBOX=1 GOMEMLIMIT=128MiB GOMAXPROCS=2
+    S-->>C: template on stdin
+    activate C
+    C->>C: SetMaxStack(32 MiB), timer(timeout) -> exit 3
+    C->>C: parse with funcs.Safe() (no env, no file)
+    C->>C: Execute into LimitWriter(1 MiB)
+    alt ok
+        C-->>S: stdout: output, exit 0
+    else template error
+        C-->>S: stderr "sandbox:render: template: x:3: ...", exit 1
+    else output cap
+        C-->>S: stderr "sandbox:limit: ...", exit 4
+    else child deadline
+        C-->>S: stderr "sandbox:timeout: ...", exit 3
+    else runtime fatal (stack overflow, OOM)
+        C-->>S: untagged stderr, exit 2 / signal
+    end
+    deactivate C
+    Note over S,C: parent kills at timeout + 500 ms grace (exec.CommandContext + WaitDelay)<br/>parent keeps <= max+1 stdout bytes, <= 64 KiB stderr
+    S->>S: classify by stderr tag, record latency in histogram + ring buffer
+    S-->>B: 200 <pre> fragment (html/template-escaped), error line highlighted

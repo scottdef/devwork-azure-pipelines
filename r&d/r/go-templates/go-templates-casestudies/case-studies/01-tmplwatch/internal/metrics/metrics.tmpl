@@ -1,0 +1,10 @@
+{{- /*
+  Prometheus text exposition format 0.0.4: every line ends in "\n".
+  A sample whose Labels begins with "_" is a name suffix (_sum, _count)
+  rather than a label set; summaries need both.
+*/ -}}
+{{ range . -}}
+# HELP {{ .Name }} {{ .Help }}
+# TYPE {{ .Name }} {{ .Type }}
+{{ $name := .Name }}{{ range .Samples }}{{ $name }}{{ .Labels }} {{ .Value }}
+{{ end }}{{ end }}

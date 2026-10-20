@@ -1,0 +1,32 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+      - name: build
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$TAG" -o dist/tmplforge-linux-amd64 ./cmd/tmplforge
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=$TAG" -o dist/tmplforge-linux-arm64 ./cmd/tmplforge
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=$TAG" -o dist/tmplforge-darwin-arm64 ./cmd/tmplforge
+          CGO_ENABLED=0 GOOS=plan9 GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$TAG" -o dist/tmplforge-plan9-amd64 ./cmd/tmplforge
+          cd dist && sha256sum * > SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --verify-tag --generate-notes

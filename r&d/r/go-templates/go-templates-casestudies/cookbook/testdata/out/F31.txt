@@ -1,0 +1,5 @@
+SELECT "id", "name"
+FROM "users"
+WHERE "name" = $1;
+-- args: ["Robert'); DROP TABLE students;--"]
+-- rejected: template: sql:2:8: executing "sql" at <ident .Table>: error calling ident: ident: "users; DROP TABLE users" is not in the allowlist

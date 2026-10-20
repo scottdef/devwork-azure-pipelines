@@ -1,0 +1,22 @@
+{
+  "name": "deploy",
+  "run": "./scripts/deploy.sh \"$INPUT_ENVIRONMENT\" \"$INPUT_DRY_RUN\"",
+  "inputs": [
+    {
+      "id": "environment",
+      "description": "Target environment",
+      "type": "choice",
+      "required": true,
+      "options": [
+        "beta",
+        "prod"
+      ]
+    },
+    {
+      "id": "dry_run",
+      "description": "Plan only",
+      "type": "boolean",
+      "required": false
+    }
+  ]
+}

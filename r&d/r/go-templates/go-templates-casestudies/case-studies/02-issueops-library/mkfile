@@ -1,0 +1,14 @@
+# Case study 02 (Plan 9 mk): drives both repositories.
+REPOS=issueops-intake issueops-library
+
+all build test vet lint cross release clean:V:
+	for r in $REPOS; do echo "== $r: $target"; (cd $r && mk $target) || exit 1; done
+
+preflight:V:
+	for r in $REPOS; do (cd $r && scripts/preflight.sh) || exit 1; done
+
+site-sample:V:
+	cd issueops-library && mk site-sample
+
+loadtest:V:
+	scripts/loadtest.sh

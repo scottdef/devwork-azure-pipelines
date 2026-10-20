@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>infra-net/terraform-module/45 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>infra-net</code> / terraform-module / #45</p>
+<h1><code>infra-net</code> &middot; terraform-module</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge out" title="due 2026-10-29">borrowed</span>
+Next phase reserved by <strong>carol</strong> until 2026-10-29
+(<a href="https://github.com/CoolGitOrg/issueops-intake/issues/56">#56</a>).
+<a class="button ghost" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=return.yml&amp;title=%5Breturn%5D%20infra-net/terraform-module/45&amp;item-id=infra-net/terraform-module/45">Return (borrower)</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>infra-net/terraform-module/45</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 11:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/45">https://github.com/CoolGitOrg/issueops-intake/issues/45</a></dd>
+<dt>Requested by</dt><dd>alice</dd>
+<dt>Payload sha256</dt><dd><code class="hash">080e05c06b1c3fd8f5dc4d947884421d7c84e617a098dcd4f099fc4b48281a05</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">88ac40ec640f7db4ec9d0e1763020edacec197c4017f7845cf6878f8cf6a51d6</code></dd>
+</dl>
+<p><a class="button" href="artifact.tf" download>Download artifact.tf</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">312 B</td><td><code class="hash">0a583b23ff1845eab06bc779b2c6d7afd79029e80a63821c32d041515962ac8d</code></td></tr>
+<tr class="odd"><td><a href="artifact.tf">artifact.tf</a></td><td class="num">562 B</td><td><code class="hash">073cd67fe1882737b0e184242cc49601816f597d2efdd7bfc39ea9b9cc95e004</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">1020 B</td><td><code class="hash">383deaff32a1d523952c4fad164ca5a9422717c15210f5c57327622bd3b27d84</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">655 B</td><td><code class="hash">73c418e0e0d33a15f8f806bccfb6af403eef4b7e9e68433b5d816f0bc9548af8</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">835 B</td><td><code class="hash">bb7a5881199490d14028ddfd28bb58a6c86985763abff3c1de344764fc12dd9e</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/infra-net/terraform-module/45/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.tf"># infra-net: Terraform module, phase 1 of infra-net/terraform-module/45
+terraform {
+  required_version = &#34;&gt;= 1.6&#34;
+}
+
+variable &#34;name&#34; {
+  type    = string
+  default = &#34;infra-net&#34;
+}
+
+variable &#34;cidr&#34; {
+  type    = string
+  default = &#34;10.20.0.0/16&#34;
+}
+
+variable &#34;tags&#34; {
+  type = map(string)
+  default = {
+    &#34;source&#34;  = &#34;infra-net&#34;
+    &#34;library&#34; = &#34;infra-net/terraform-module/45&#34;
+    &#34;team&#34; = &#34;platform&#34;
+  }
+}
+
+locals {
+  subnets = [cidrsubnet(var.cidr, 8, 1), cidrsubnet(var.cidr, 8, 2), cidrsubnet(var.cidr, 8, 3)]
+}
+
+output &#34;subnets&#34; {
+  value = local.subnets
+}
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for infra-net/terraform-module/45
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow infra-net/terraform-module/45, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id infra-net, template terraform-module,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;infra-net/terraform-module/45&#34;,
+  &#34;cidr&#34;: {{if hasKey . &#34;cidr&#34;}}{{toJSON (index . &#34;cidr&#34;)}}{{else}}{{&#34;\&#34;10.20.0.0/16\&#34;&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;infra-net\&#34;&#34;}}{{end}},
+  &#34;subnets&#34;: {{if hasKey . &#34;subnets&#34;}}{{toJSON (index . &#34;subnets&#34;)}}{{else}}{{&#34;[1,2,3]&#34;}}{{end}},
+  &#34;tags&#34;: {{if hasKey . &#34;tags&#34;}}{{toJSON (index . &#34;tags&#34;)}}{{else}}{{&#34;{\&#34;team\&#34;:\&#34;platform\&#34;}&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

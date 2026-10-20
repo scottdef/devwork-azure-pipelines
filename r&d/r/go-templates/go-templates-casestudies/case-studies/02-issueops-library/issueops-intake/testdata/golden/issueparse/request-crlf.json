@@ -1,0 +1,7 @@
+{
+  "notes": "Written on Windows.",
+  "payload": "{\"name\":\"edge-proxy\",\"on\":[\"push\"],\"go\":\"1.24.x\"}",
+  "phase": "3",
+  "source-id": "edge-proxy",
+  "template-id": "workflow"
+}

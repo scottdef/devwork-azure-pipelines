@@ -1,0 +1,7 @@
+{
+  "phase_of": "payments-api/caddyfile/42",
+  "domain": "pay.coolgit.org",
+  "name": "payments-api",
+  "port": 9443,
+  "routes": ["/pay","/refund","/status"]
+}

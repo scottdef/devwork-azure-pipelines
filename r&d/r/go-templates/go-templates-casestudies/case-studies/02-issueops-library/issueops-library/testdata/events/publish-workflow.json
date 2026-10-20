@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "edge-proxy",
+    "template_id": "workflow",
+    "phase": "1",
+    "issue": 43,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "bob",
+    "payload": "{\"name\":\"edge-proxy\",\"branches\":[\"main\",\"release/*\"],\"go\":\"1.24.x\",\"run\":[\"go vet ./...\",\"go test -race ./...\"]}",
+    "sha256": "9c6dd975ff523e7f051d90fcfb3ccf9765aad51967c0945fa987a870e206a444"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

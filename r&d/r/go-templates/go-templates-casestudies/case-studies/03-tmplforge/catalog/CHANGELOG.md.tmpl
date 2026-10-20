@@ -1,0 +1,18 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+{{ range .releases }}
+## [{{ .version }}] - {{ dateFmt "2006-01-02" .date }}
+{{- $changes := .changes }}
+{{- range $kind := sortedKeys $changes }}
+
+### {{ $kind }}
+{{ range index $changes $kind }}
+- {{ . }}
+{{- end }}
+{{- end }}
+{{ end }}
+{{- range .releases }}
+[{{ .version }}]: {{ $.repo }}/releases/tag/v{{ .version }}
+{{- end }}

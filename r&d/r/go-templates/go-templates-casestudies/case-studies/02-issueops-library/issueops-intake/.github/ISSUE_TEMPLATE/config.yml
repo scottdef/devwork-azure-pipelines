@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Library catalog
+    url: https://coolgitorg.github.io/issueops-library/
+    about: Browse published items before requesting a new one.

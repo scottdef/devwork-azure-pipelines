@@ -1,0 +1,14 @@
+{
+  "zone": "lab.coolgitorg.example",
+  "ttl": 60,
+  "hosts": [
+    {
+      "ip": "10.0.0.10",
+      "name": "forge.lab.coolgitorg.example"
+    }
+  ],
+  "upstreams": [
+    "9.9.9.9",
+    "1.1.1.1"
+  ]
+}

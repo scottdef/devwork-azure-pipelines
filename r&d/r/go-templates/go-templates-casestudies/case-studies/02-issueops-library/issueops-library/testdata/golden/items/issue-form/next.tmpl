@@ -1,0 +1,14 @@
+{{- /*
+  next.tmpl for access-request/issue-form/46
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow access-request/issue-form/46, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id access-request, template issue-form,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "access-request/issue-form/46",
+  "fields": {{if hasKey . "fields"}}{{toJSON (index . "fields")}}{{else}}{{"[{\"id\":\"system\",\"label\":\"System\",\"options\":[\"vault\",\"nomad\"],\"required\":true,\"type\":\"dropdown\"},{\"id\":\"why\",\"label\":\"Why\",\"type\":\"textarea\"}]"}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"Access request\""}}{{end}}
+}

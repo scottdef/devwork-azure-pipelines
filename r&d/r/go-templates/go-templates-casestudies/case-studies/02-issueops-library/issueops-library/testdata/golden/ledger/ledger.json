@@ -1,0 +1,20 @@
+[
+  {
+    "item": "payments-api/caddyfile/42",
+    "borrower": "bob",
+    "borrow_issue": 50,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-15T09:00:00Z",
+    "returned_at": null,
+    "reason": "phase 2 rollout"
+  },
+  {
+    "item": "infra-net/terraform-module/45",
+    "borrower": "carol",
+    "borrow_issue": 55,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-08T09:00:00Z",
+    "returned_at": "2026-10-03T09:00:00Z",
+    "returned_by": "carol"
+  }
+]

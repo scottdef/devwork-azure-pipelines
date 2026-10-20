@@ -1,0 +1,26 @@
+{
+  "client_payload": {
+    "issue": 42,
+    "payload": "{\"name\":\"payments-api\",\"domain\":\"pay.coolgit.org\",\"port\":8443,\"routes\":[\"/pay\",\"/refund\"]}",
+    "phase": "1",
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "alice",
+    "sha256": "a696a2834d3ebfb35453652f13154128e629d5097639c12528b7b2a56aeef858",
+    "source_id": "payments-api",
+    "template_id": "caddyfile"
+  },
+  "event_type": "library-publish",
+  "receipt": {
+    "event": "library-publish",
+    "repo": "CoolGitOrg/issueops-library",
+    "issue": 42,
+    "source_id": "payments-api",
+    "template_id": "caddyfile",
+    "phase": "1",
+    "item_id": "payments-api/caddyfile/42",
+    "item_url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/",
+    "sha256": "a696a2834d3ebfb35453652f13154128e629d5097639c12528b7b2a56aeef858",
+    "keys": 8,
+    "dry_run": true
+  }
+}

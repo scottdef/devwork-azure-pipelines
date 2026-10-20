@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "infra-net",
+    "template_id": "terraform-module",
+    "phase": "1",
+    "issue": 45,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "alice",
+    "payload": "{\"name\":\"infra-net\",\"cidr\":\"10.20.0.0/16\",\"subnets\":[1,2,3],\"tags\":{\"team\":\"platform\"}}",
+    "sha256": "080e05c06b1c3fd8f5dc4d947884421d7c84e617a098dcd4f099fc4b48281a05"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

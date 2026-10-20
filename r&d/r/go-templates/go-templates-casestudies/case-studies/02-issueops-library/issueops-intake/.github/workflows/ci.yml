@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOFLAGS: -mod=mod
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Preflight (vet, gofmt, test, bash -n, cross builds, wasm)
+        run: scripts/preflight.sh
+      - name: Fuzz the issue body parser
+        run: go test ./internal/issuebody -run '^$' -fuzz FuzzParse -fuzztime 30s

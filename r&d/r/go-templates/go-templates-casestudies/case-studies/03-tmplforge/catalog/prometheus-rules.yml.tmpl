@@ -1,0 +1,13 @@
+groups:
+  - name: [[ .group ]]
+    rules:
+[[- range .alerts ]]
+      - alert: [[ .name ]]
+        expr: [[ .expr ]]
+        for: [[ default "5m" .for ]]
+        labels:
+          severity: [[ .severity ]]
+        annotations:
+          summary: "[[ .summary ]] on {{ $labels.instance }}"
+          value: "{{ $value | humanize }}"
+[[- end ]]

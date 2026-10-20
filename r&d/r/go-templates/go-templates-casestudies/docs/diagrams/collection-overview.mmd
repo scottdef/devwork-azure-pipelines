@@ -1,0 +1,8 @@
+flowchart TB
+  subgraph substrate["Substrate: FuncMap + data source + destination"]
+    TT[text/template] --- HT[html/template] --- PP[text/template/parse]
+  end
+  CS1["CS1 tmplwatch<br/>KV repo → render → atomic write → cmd/signal"] --> substrate
+  CS2["CS2 IssueOps library<br/>static form → issue → dispatch → Pages → ledger"] --> substrate
+  CS3["CS3 tmplforge<br/>TUI + htmx GUI → lint/vars/diff/export → sandbox"] --> substrate
+  CB["cookbook/ (executable, generates COOKBOOK.md)"] --> substrate

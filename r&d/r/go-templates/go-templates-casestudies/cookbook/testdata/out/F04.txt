@@ -1,0 +1,2 @@
+who=rob@example.org
+retries=3

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="t d">
+  <title id="t">tmplwatch architecture</title>
+  <desc id="d">Sources feed snapshots to the brain, which renders only templates whose dependencies changed; complete renders are written atomically, then commands run and the supervised process is signalled. Metrics and status are served on a loopback listener.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b91c1c"/>
+    </marker>
+    <style>
+      text { font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; fill: #0f172a; }
+      .h { font-size: 15px; font-weight: bold; }
+      .s { font-size: 11.5px; fill: #334155; }
+      .cap { font-size: 12px; fill: #475569; }
+      .box { fill: #ffffff; stroke: #334155; stroke-width: 1.5; rx: 8; }
+      .src { fill: #eff6ff; stroke: #1d4ed8; }
+      .core { fill: #f0fdf4; stroke: #15803d; }
+      .out { fill: #fefce8; stroke: #a16207; }
+      .ops { fill: #faf5ff; stroke: #7e22ce; }
+      .bad { fill: #fef2f2; stroke: #b91c1c; }
+      .ln { stroke: #334155; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+      .dash { stroke-dasharray: 5 4; }
+      .lr { stroke: #b91c1c; stroke-width: 1.6; fill: none; marker-end: url(#r); stroke-dasharray: 5 4; }
+    </style>
+  </defs>
+
+  <rect width="900" height="500" fill="#f8fafc"/>
+  <text x="24" y="34" class="h" style="font-size:18px">tmplwatch</text>
+  <text x="140" y="34" class="cap">watch KV → render text/template → write atomically → command / signal</text>
+  <text x="250" y="112" class="cap">Snapshot →</text>
+
+  <!-- sources -->
+  <rect x="24" y="70" width="190" height="78" class="box src"/>
+  <text x="36" y="94" class="h">github source</text>
+  <text x="36" y="114" class="s">git/trees?recursive=1</text>
+  <text x="36" y="130" class="s">If-None-Match → 304</text>
+  <text x="36" y="143" class="s">blobs cached by sha</text>
+
+  <rect x="24" y="168" width="190" height="62" class="box src"/>
+  <text x="36" y="192" class="h">dir source</text>
+  <text x="36" y="212" class="s">tests, -once CI, Plan 9</text>
+
+  <rect x="24" y="250" width="190" height="62" class="box src"/>
+  <text x="36" y="274" class="h">ghapp</text>
+  <text x="36" y="294" class="s">RS256 JWT → inst. token</text>
+  <path d="M24 281 L12 281 L12 109 L22 109" class="ln dash"/>
+
+  <!-- watch -->
+  <rect x="250" y="120" width="150" height="62" class="box core"/>
+  <text x="262" y="144" class="h">source.Watch</text>
+  <text x="262" y="164" class="s">poll every 15s</text>
+  <path d="M214 109 L250 140" class="ln"/>
+  <path d="M214 199 L250 165" class="ln"/>
+
+  <!-- brain -->
+  <rect x="436" y="70" width="200" height="112" class="box core"/>
+  <text x="448" y="94" class="h">brain</text>
+  <text x="448" y="114" class="s">snapshot + changed keys</text>
+  <text x="448" y="130" class="s">deps[template] =</text>
+  <text x="448" y="146" class="s">  keys + prefixes/</text>
+  <text x="448" y="166" class="s">render only if touched</text>
+  <path d="M400 151 L436 140" class="ln"/>
+
+  <!-- funcs -->
+  <rect x="436" y="210" width="200" height="72" class="box core"/>
+  <text x="448" y="234" class="h">funcs FuncMap</text>
+  <text x="448" y="254" class="s">key ls tree toYAML toHCL</text>
+  <text x="448" y="270" class="s">each call records a dep</text>
+  <path d="M536 182 L536 210" class="ln"/>
+  <path d="M520 210 L520 182" class="ln"/>
+
+  <!-- runner -->
+  <rect x="672" y="70" width="204" height="112" class="box out"/>
+  <text x="684" y="94" class="h">runner</text>
+  <text x="684" y="114" class="s">sha256 equal? skip</text>
+  <text x="684" y="130" class="s">temp → fsync → chmod</text>
+  <text x="684" y="146" class="s">→ rename (+ .bak)</text>
+  <text x="684" y="166" class="s">-dry: unified diff</text>
+  <path d="M636 126 L672 126" class="ln"/>
+
+  <rect x="672" y="210" width="204" height="72" class="box out"/>
+  <text x="684" y="234" class="h">command argv</text>
+  <text x="684" y="254" class="s">after wait + splay</text>
+  <text x="684" y="270" class="s">no sh -c, ever</text>
+  <path d="M774 182 L774 210" class="ln"/>
+
+  <rect x="672" y="300" width="204" height="72" class="box out"/>
+  <text x="684" y="324" class="h">exec supervisor</text>
+  <text x="684" y="344" class="s">SIGHUP / note "hangup"</text>
+  <text x="684" y="360" class="s">restart with backoff</text>
+  <path d="M876 150 L890 150 L890 336 L878 336" class="ln"/>
+
+  <rect x="436" y="300" width="200" height="72" class="box bad"/>
+  <text x="448" y="324" class="h">incomplete</text>
+  <text x="448" y="344" class="s">missing key → write</text>
+  <text x="448" y="360" class="s">nothing, health 503</text>
+  <path d="M700 182 L600 300" class="lr"/>
+
+  <!-- ops -->
+  <rect x="250" y="400" width="626" height="76" class="box ops"/>
+  <text x="262" y="424" class="h">httpd 127.0.0.1:9180</text>
+  <text x="262" y="444" class="s">/healthz  /metrics (text/template exposition)  /render?template=  /status  /debug/vars</text>
+  <text x="262" y="462" class="s">-pprof: /debug/pprof on loopback only        -healthcheck: the binary probes itself</text>
+  <path d="M536 372 L536 400" class="ln"/>
+  <path d="M774 372 L774 400" class="ln"/>
+
+  <!-- legend -->
+  <rect x="24" y="400" width="190" height="76" class="box"/>
+  <text x="36" y="420" class="cap">legend</text>
+  <line x1="36" y1="438" x2="76" y2="438" class="ln"/>
+  <text x="84" y="442" class="s">data flow</text>
+  <line x1="36" y1="460" x2="76" y2="460" class="lr"/>
+  <text x="84" y="464" class="s">failure path</text>
+</svg>

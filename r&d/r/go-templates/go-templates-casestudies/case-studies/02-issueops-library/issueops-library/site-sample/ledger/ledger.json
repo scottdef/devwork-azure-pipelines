@@ -1,0 +1,37 @@
+[
+  {
+    "item": "payments-api/caddyfile/42",
+    "borrower": "bob",
+    "borrow_issue": 50,
+    "borrowed_at": "2026-10-02T09:00:00Z",
+    "due": "2026-10-16T09:00:00Z",
+    "returned_at": "2026-10-03T10:00:00Z",
+    "returned_by": "bob",
+    "reason": "phase 2 rollout"
+  },
+  {
+    "item": "docs-portal/readme/47",
+    "borrower": "carol",
+    "borrow_issue": 55,
+    "borrowed_at": "2026-10-04T09:00:00Z",
+    "due": "2026-10-11T09:00:00Z",
+    "returned_at": null
+  },
+  {
+    "item": "infra-net/terraform-module/45",
+    "borrower": "carol",
+    "borrow_issue": 56,
+    "borrowed_at": "2026-10-15T09:00:00Z",
+    "due": "2026-10-29T09:00:00Z",
+    "returned_at": null
+  },
+  {
+    "item": "edge-proxy/workflow/43",
+    "borrower": "dave",
+    "borrow_issue": 57,
+    "borrowed_at": "2026-10-16T09:00:00Z",
+    "due": "2026-10-23T09:00:00Z",
+    "returned_at": "2026-10-17T09:00:00Z",
+    "returned_by": "dave"
+  }
+]

@@ -1,0 +1,22 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{block "csp" .}}default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action https://github.com; base-uri 'none'{{end}}">
+<meta name="referrer" content="no-referrer">
+<title>{{block "title" .}}CoolGitOrg library intake{{end}}</title>
+<link rel="stylesheet" href="{{.Root}}static/site.css">
+</head>
+<body{{block "bodyattrs" .}}{{end}}>
+<header>
+<a class="brand" href="{{.Root}}">issueops-intake</a>
+<nav><a href="{{.Root}}">forms</a> <a href="{{.Root}}lab/">lab</a> <a href="{{.Library}}">library</a> <a href="{{.GitHub}}/{{.Repo}}">repo</a></nav>
+</header>
+<main>
+{{block "content" .}}{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

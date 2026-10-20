@@ -1,0 +1,22 @@
+{{define "head"}}
+{{- range .Assets}}
+<script src="{{.}}" defer></script>
+{{- end}}
+<script src="/chart.js?w={{.Window}}" defer></script>
+{{end}}
+{{define "content"}}
+<h1>Render latency</h1>
+<p class="lede">p50 and p95 of sandboxed renders per {{.Window}} window, from the last {{len .Points}} windows held in memory. Change the window with <a href="/chart?w=1m">?w=1m</a>.</p>
+<p id="chart-missing" class="warn" hidden>echarts.min.js is not installed under /static/echarts/, so the chart cannot draw. Run <code>scripts/fetch-echarts.sh</code> and restart, or pass <code>-assets DIR</code>. The table below has the same data.</p>
+{{.Element}}
+<table class="data">
+<thead><tr><th>window (UTC)</th><th>renders</th><th>p50 ms</th><th>p95 ms</th></tr></thead>
+<tbody>
+{{- range .Points}}
+<tr><td>{{hhmmss .At}}</td><td>{{.N}}</td><td>{{ms .P50}}</td><td>{{ms .P95}}</td></tr>
+{{- else}}
+<tr><td colspan="4">No renders yet.</td></tr>
+{{- end}}
+</tbody>
+</table>
+{{end}}

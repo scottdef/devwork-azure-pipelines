@@ -1,0 +1,19 @@
+{{- /* ledger render data: .Data is one overdue notice plus grace and base. */ -}}
+{{- with .Data -}}
+### Loan overdue: `{{.loan.item}}`
+
+@{{.loan.borrower}}, this loan was due {{dateFmt "date" .loan.due}} and is
+{{plural .days_late "day"}} late.
+{{- if eq .action "return"}}
+
+The {{.grace}} grace period has passed, so the library returned it
+automatically. The next phase of [`{{.loan.item}}`]({{.base}}items/{{.loan.item}}/)
+is free for anyone to borrow.
+{{- else}}
+
+Publish the next phase or file a return issue. If nothing happens, the item is
+returned automatically {{.grace}} after the due date.
+{{- end}}
+{{- end}}
+
+<sub>issueops-library / overdue sweep at {{dateFmt "human" .Now}}. Open loans in the library: {{len .Open}}; limit {{.Limit}} per login.</sub>

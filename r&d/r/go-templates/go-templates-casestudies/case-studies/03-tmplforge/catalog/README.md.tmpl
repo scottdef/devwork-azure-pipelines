@@ -1,0 +1,25 @@
+# {{ .name }}
+
+{{ .tagline }}
+
+{{ range $i, $b := .badges }}{{ if $i }} {{ end }}![{{ $b.alt }}]({{ $b.img }}){{ end }}
+
+## Install
+
+```sh
+{{- range .install }}
+{{ . }}
+{{- end }}
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+{{- range .commands }}
+| `{{ .name }}` | {{ .help | replace "|" "\\|" }} |
+{{- end }}
+
+## License
+
+{{ .license }}. {{ len .commands }} {{ plural "command" "commands" (len .commands) }} documented.

@@ -1,0 +1,8 @@
+containers:
+  - name: api
+    env:
+      LOG: debug
+      PORT: "8080"
+    args:
+      - --serve
+      - --verbose

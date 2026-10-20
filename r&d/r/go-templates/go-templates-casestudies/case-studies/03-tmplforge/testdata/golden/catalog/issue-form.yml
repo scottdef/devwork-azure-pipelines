@@ -1,0 +1,29 @@
+name: "New repository"
+description: "Request a repository in CoolGitOrg"
+title: "[repo] "
+labels: ["issueops","repo-request"]
+body:
+  - type: markdown
+    attributes:
+      value: "Fill this in; the bot parses it."
+  - type: input
+    id: name
+    attributes:
+      label: "Repository name"
+    validations:
+      required: true
+  - type: dropdown
+    id: visibility
+    attributes:
+      label: "Visibility"
+      options:
+        - "internal"
+        - "private"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: "Why"
+    validations:
+      required: false

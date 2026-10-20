@@ -1,0 +1,17 @@
+=== text/plain (text/template) ===
+Hello Ada "Countess" <ada@example.org>,
+
+Order A-1042:
+* 1 x Analytical engine @ 199.50
+* 3 x Punch cards <100> @ 2.25
+
+Total: 206.25. Pay by 5 Apr & enjoy.
+
+=== text/html (html/template) ===
+<p>Hello <b>Ada &#34;Countess&#34; &lt;ada@example.org&gt;</b>,</p>
+<p>Order A-1042:</p>
+<ul>
+  <li>1 x Analytical engine @ 199.50</li>
+  <li>3 x Punch cards &lt;100&gt; @ 2.25</li>
+</ul>
+<p>Total: 206.25. Pay by 5 Apr &amp; enjoy.</p>

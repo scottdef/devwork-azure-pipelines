@@ -1,0 +1,39 @@
+{{- /*
+  Caddyfile from caddy/sites/*: one JSON object per site.
+    {"host": "...", "upstreams": ["ip:port", ...], "tls": "internal|off",
+     "root": "/srv/www", "headers": {"Name": "value"}}
+  A site has either upstreams (reverse proxy) or root (file server).
+  Optional fields are read with index: under error_on_missing_key
+  (missingkey=error) a bare .headers on an absent field is an error, while
+  index returns the zero value.
+*/ -}}
+# Managed by tmplwatch from {{ key "site/env" }} KV. Do not edit by hand.
+{
+	email {{ key "site/email" }}
+	admin localhost:2019
+}
+{{ range ls "caddy/sites" }}
+{{- with parseJSON .Value }}
+{{ $tls := default "internal" (index . "tls") }}
+{{- if eq $tls "off" }}http://{{ end }}{{ .host }} {
+{{- if eq $tls "internal" }}
+	tls internal
+{{- end }}
+	encode zstd gzip
+{{- range $name, $v := index . "headers" }}
+	header {{ $name }} {{ $v }}
+{{- end }}
+{{- if index . "upstreams" }}
+	reverse_proxy {{ join " " .upstreams }} {
+		lb_policy round_robin
+		health_uri /healthz
+	}
+{{- else if index . "root" }}
+	root * {{ .root }}
+	file_server
+{{- else }}
+	{{ fail (printf "caddy site %s: needs upstreams or root" .host) }}
+{{- end }}
+}
+{{- end }}
+{{ end -}}

@@ -1,0 +1,46 @@
+{
+  "version": "20261019_001",
+  "description": "templates table",
+  "table": "templates",
+  "columns": [
+    {
+      "name": "id",
+      "type": "BIGSERIAL PRIMARY KEY",
+      "null": true,
+      "default": ""
+    },
+    {
+      "name": "name",
+      "type": "TEXT",
+      "null": false,
+      "default": ""
+    },
+    {
+      "name": "format",
+      "type": "TEXT",
+      "null": false,
+      "default": "'txt'"
+    },
+    {
+      "name": "created_at",
+      "type": "TIMESTAMPTZ",
+      "null": false,
+      "default": "now()"
+    }
+  ],
+  "indexes": [
+    {
+      "columns": [
+        "name"
+      ],
+      "unique": true
+    },
+    {
+      "columns": [
+        "format",
+        "created_at"
+      ],
+      "unique": false
+    }
+  ]
+}

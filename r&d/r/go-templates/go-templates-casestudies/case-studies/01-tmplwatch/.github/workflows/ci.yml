@@ -1,0 +1,90 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false # stdlib only: nothing to download, nothing to cache
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "::error::gofmt needed"; echo "$out"; exit 1; fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test -race
+        # The race detector needs cgo and runs on linux only; plan9 is
+        # covered by vet and the cross build below.
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race -count=1 ./...
+
+      - name: fuzz (short)
+        run: go test ./templates -run '^$' -fuzz FuzzRender -fuzztime 30s
+
+      - name: preflight
+        env:
+          CGO_ENABLED: "0"
+          PREFLIGHT_SKIP_TEST: "1" # tests already ran with -race above
+        run: scripts/preflight.sh
+
+  cross:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/arm64, plan9/amd64]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: build ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+          CGO_ENABLED: "0"
+        run: |
+          export GOOS=${TARGET%/*} GOARCH=${TARGET#*/}
+          go vet ./...
+          for b in tmplwatch tpl tmplload; do
+            go build -trimpath -ldflags="-s -w -X main.version=ci-${GITHUB_SHA::7}" -o "dist/${b}_${GOOS}_${GOARCH}" "./cmd/$b"
+          done
+          ls -l dist
+
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: terraform -chdir=terraform fmt -check -recursive
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate

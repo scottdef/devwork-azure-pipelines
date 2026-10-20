@@ -1,0 +1,7 @@
+{
+  "notes": "Changed template from caddyfile to readme.",
+  "payload": "{\n  \"name\": \"docs-portal\",\n  \"summary\": \"Internal docs site.\\n### Not a heading: inside a JSON string\",\n  \"owners\": [\"@coolgitorg/platform\"]\n}",
+  "phase": "1",
+  "source-id": "docs-portal",
+  "template-id": "readme"
+}

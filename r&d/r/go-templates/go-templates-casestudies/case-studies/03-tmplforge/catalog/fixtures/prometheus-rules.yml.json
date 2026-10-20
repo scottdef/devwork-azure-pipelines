@@ -1,0 +1,19 @@
+{
+  "group": "tmplforge",
+  "alerts": [
+    {
+      "name": "TmplforgeRenderSlow",
+      "expr": "histogram_quantile(0.99, sum(rate(tmplforge_render_seconds_bucket[5m])) by (le)) > 0.15",
+      "for": "10m",
+      "severity": "warning",
+      "summary": "p99 render latency above 150ms"
+    },
+    {
+      "name": "TmplforgeDown",
+      "expr": "up{job=\"tmplforge\"} == 0",
+      "for": "",
+      "severity": "page",
+      "summary": "tmplforge is down"
+    }
+  ]
+}

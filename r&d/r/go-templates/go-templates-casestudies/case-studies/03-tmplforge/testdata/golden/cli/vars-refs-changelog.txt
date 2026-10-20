@@ -1,0 +1,6 @@
+.releases	list	5
+.releases[]	map	5
+.releases[].changes	map	7
+.releases[].date	string	6
+.releases[].version	string	6
+.repo	string	17

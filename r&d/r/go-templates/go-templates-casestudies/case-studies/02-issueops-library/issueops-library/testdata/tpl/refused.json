@@ -1,0 +1,1 @@
+{"action": "library-publish", "ok": false, "error": "phase 2 of payments-api/caddyfile is reserved by bob until 2026-11-02 (loan on payments-api/caddyfile/42)", "item_id": "payments-api/caddyfile/52", "issue": 52, "items": 0, "files": 0}

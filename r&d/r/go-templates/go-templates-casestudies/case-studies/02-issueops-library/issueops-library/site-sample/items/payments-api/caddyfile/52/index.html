@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>payments-api/caddyfile/52 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>payments-api</code> / caddyfile / #52</p>
+<h1><code>payments-api</code> &middot; caddyfile</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge in">available</span>
+The phase 3 slot is free.
+<a class="button" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=borrow.yml&amp;title=%5Bborrow%5D%20payments-api/caddyfile/52&amp;item-id=payments-api/caddyfile/52">Borrow phase 3</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>payments-api/caddyfile/52</code></dd>
+<dt>Phase</dt><dd>2 of 3</dd>
+<dt>Published</dt><dd>3 Oct 2026 10:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/52">https://github.com/CoolGitOrg/issueops-intake/issues/52</a></dd>
+<dt>Requested by</dt><dd>bob</dd>
+<dt>Continues</dt><dd><a href="../../../../items/payments-api/caddyfile/42/"><code>payments-api/caddyfile/42</code></a></dd>
+<dt>Payload sha256</dt><dd><code class="hash">1dd32bdfa99fa39c43c0a497ca0a0f114684254c968259ed836980b58e1bd903</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">19a82460283c2ccefa8d372dfc177b24c41c1f54a0d1c6e123b5184648474632</code></dd>
+</dl>
+<p><a class="button" href="artifact.caddyfile" download>Download artifact.caddyfile</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">319 B</td><td><code class="hash">4181bded3622864c8ea9b3da7e9c54f37257f1dc39cc1dbd409000e487ae2ae8</code></td></tr>
+<tr class="odd"><td><a href="artifact.caddyfile">artifact.caddyfile</a></td><td class="num">373 B</td><td><code class="hash">4c626cc5ac724c25f242fe13a038bc06845854771cecf9f8be5df7f8e47ea9b7</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">1017 B</td><td><code class="hash">61bef62de5edbad4f8e28bf28d74a07c7f440c4a68ef019008ca08106e55b232</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">697 B</td><td><code class="hash">f4e3686e98ed736795c702f0a9c2c87a738f4708b98883956b752931bb771bcd</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">836 B</td><td><code class="hash">c4e224a4633f105cf378b678375278deae5d00d1217493b787984cbebc00d42f</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/52/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.caddyfile"># payments-api: Caddyfile, phase 2 of payments-api/caddyfile/52
+# Rendered by issueops-library; edit the request issue, not this file.
+{
+	admin off
+}
+
+pay.coolgit.org {
+	tls internal
+	encode zstd gzip
+	reverse_proxy /pay* 127.0.0.1:9443
+	reverse_proxy /refund* 127.0.0.1:9443
+	reverse_proxy /status* 127.0.0.1:9443
+	log {
+		output file /var/log/caddy/payments-api.log
+	}
+}
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 3. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for payments-api/caddyfile/52
+  Generated from templates/meta/next.tmpl.tmpl when phase 2 was published.
+  Borrow payments-api/caddyfile/52, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id payments-api, template caddyfile,
+  phase 3, payload = payload.json. Keys you do not set keep their
+  phase 2 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;payments-api/caddyfile/52&#34;,
+  &#34;domain&#34;: {{if hasKey . &#34;domain&#34;}}{{toJSON (index . &#34;domain&#34;)}}{{else}}{{&#34;\&#34;pay.coolgit.org\&#34;&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;payments-api\&#34;&#34;}}{{end}},
+  &#34;port&#34;: {{if hasKey . &#34;port&#34;}}{{toJSON (index . &#34;port&#34;)}}{{else}}{{&#34;9443&#34;}}{{end}},
+  &#34;routes&#34;: {{if hasKey . &#34;routes&#34;}}{{toJSON (index . &#34;routes&#34;)}}{{else}}{{&#34;[\&#34;/pay\&#34;,\&#34;/refund\&#34;,\&#34;/status\&#34;]&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "now": "2026-10-16T09:00:00Z",
+  "grace": "7d",
+  "applied": true,
+  "notices": [
+    {
+      "loan": {
+        "item": "a1/readme/1",
+        "borrower": "bob",
+        "borrow_issue": 1,
+        "borrowed_at": "2026-10-01T09:00:00Z",
+        "due": "2026-10-08T09:00:00Z",
+        "returned_at": "2026-10-16T09:00:00Z",
+        "returned_by": "overdue"
+      },
+      "action": "return",
+      "days_late": 8
+    },
+    {
+      "loan": {
+        "item": "a1/readme/2",
+        "borrower": "bob",
+        "borrow_issue": 2,
+        "borrowed_at": "2026-10-04T09:00:00Z",
+        "due": "2026-10-11T09:00:00Z",
+        "returned_at": null
+      },
+      "action": "warn",
+      "days_late": 5
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"listen":443,"server_name":"auth.example.internal","upstream":"auth"}

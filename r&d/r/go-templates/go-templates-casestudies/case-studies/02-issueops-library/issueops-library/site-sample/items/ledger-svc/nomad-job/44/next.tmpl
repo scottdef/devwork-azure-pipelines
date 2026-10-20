@@ -1,0 +1,16 @@
+{{- /*
+  next.tmpl for ledger-svc/nomad-job/44
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow ledger-svc/nomad-job/44, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id ledger-svc, template nomad-job,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "ledger-svc/nomad-job/44",
+  "count": {{if hasKey . "count"}}{{toJSON (index . "count")}}{{else}}{{"3"}}{{end}},
+  "env": {{if hasKey . "env"}}{{toJSON (index . "env")}}{{else}}{{"{\"LOG_LEVEL\":\"info\"}"}}{{end}},
+  "image": {{if hasKey . "image"}}{{toJSON (index . "image")}}{{else}}{{"\"ghcr.io/coolgitorg/ledger:1.4.2\""}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"ledger-svc\""}}{{end}}
+}

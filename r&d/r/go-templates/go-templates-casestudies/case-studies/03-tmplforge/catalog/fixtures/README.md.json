@@ -1,0 +1,29 @@
+{
+  "name": "tmplforge",
+  "tagline": "Go templates, forged at the terminal or in the browser.",
+  "badges": [
+    {
+      "alt": "ci",
+      "img": "https://github.com/CoolGitOrg/tmplforge/actions/workflows/ci.yml/badge.svg"
+    }
+  ],
+  "install": [
+    "go install github.com/CoolGitOrg/tmplforge/cmd/tmplforge@latest",
+    "tmplforge version"
+  ],
+  "commands": [
+    {
+      "name": "sh",
+      "help": "line-command TUI (ed/sam style)"
+    },
+    {
+      "name": "serve",
+      "help": "HTML GUI | htmx"
+    },
+    {
+      "name": "render",
+      "help": "one-shot render"
+    }
+  ],
+  "license": "MIT"
+}

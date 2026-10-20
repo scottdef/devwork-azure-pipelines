@@ -1,0 +1,12 @@
+{
+  "name": "on-dispatch",
+  "types": [
+    "tmplforge-render",
+    "tmplforge-release"
+  ],
+  "contents": "",
+  "payload": [
+    "ref",
+    "template"
+  ]
+}

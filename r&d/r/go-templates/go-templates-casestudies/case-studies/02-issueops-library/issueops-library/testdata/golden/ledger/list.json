@@ -1,0 +1,35 @@
+[
+  {
+    "item": "a1/readme/1",
+    "borrower": "bob",
+    "borrow_issue": 1,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-08T09:00:00Z",
+    "returned_at": "2026-10-01T09:00:00Z",
+    "returned_by": "bob"
+  },
+  {
+    "item": "a1/readme/2",
+    "borrower": "bob",
+    "borrow_issue": 2,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-08T09:00:00Z",
+    "returned_at": null
+  },
+  {
+    "item": "a1/readme/3",
+    "borrower": "bob",
+    "borrow_issue": 3,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-08T09:00:00Z",
+    "returned_at": null
+  },
+  {
+    "item": "a1/readme/4",
+    "borrower": "bob",
+    "borrow_issue": 9,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-15T09:00:00Z",
+    "returned_at": null
+  }
+]

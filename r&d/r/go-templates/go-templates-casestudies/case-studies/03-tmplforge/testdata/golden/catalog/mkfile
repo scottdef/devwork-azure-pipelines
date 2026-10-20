@@ -1,0 +1,12 @@
+</$objtype/mkfile
+
+TARG=forge
+OFILES=\
+	main.$O\
+	render.$O\
+	diff.$O
+
+HFILES=forge.h
+BIN=/$objtype/bin
+
+</sys/src/cmd/mkone

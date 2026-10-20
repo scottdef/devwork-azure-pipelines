@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant Dev as Developer
+    participant KV as CoolGitOrg/tmplwatch-kv
+    participant N as notify.yml
+    participant RC as tmplwatch render-check.yml
+    participant TW as tmplwatch daemon
+    participant GH as api.github.com
+    participant FS as Destination file
+    participant P as Process (caddy)
+
+    Dev->>KV: merge PR (kv/caddy/sites/3)
+    KV->>N: push to main
+    N->>N: create-github-app-token@v3
+    N->>RC: repository_dispatch kv-changed {sha}
+    RC->>RC: tmplwatch -once -dry (testdata + live kv)
+    loop every interval (15s)
+        TW->>GH: GET git/trees/main?recursive=1 (If-None-Match)
+        alt unchanged
+            GH-->>TW: 304 Not Modified (free)
+        else changed
+            GH-->>TW: 200 tree + new ETag
+            TW->>GH: GET git/blobs/{sha} (new blobs only)
+            TW->>TW: diff keys, render dirty templates
+            alt complete and content differs
+                TW->>FS: temp, fsync, chmod, rename
+                TW->>TW: wait (quiet period) + splay
+                TW->>P: command argv / change_signal (SIGHUP)
+            else missing key
+                TW->>TW: keep old file, /healthz 503
+            end
+        end
+    end

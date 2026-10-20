@@ -1,0 +1,15 @@
+{
+  "source": {
+    "type": "github",
+    "repo": "CoolGitOrg/tmplwatch-kv",
+    "ref": "main",
+    "prefix": "kv/",
+    "interval": "15s",
+    "app_client_id_env": "APP_CLIENT_ID",
+    "app_private_key_file": "/run/secrets/app-private-key.pem"
+  },
+  "templates": [
+    {"source": "templates/motd.txt.tmpl", "destination": "out/motd", "perms": "0644"}
+  ],
+  "listen": "127.0.0.1:9180"
+}

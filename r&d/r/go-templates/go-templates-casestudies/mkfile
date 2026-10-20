@@ -1,0 +1,21 @@
+# Plan 9 mk file for the collection. Orchestrates the per-repo mkfiles.
+CASES=case-studies/01-tmplwatch case-studies/02-issueops-library case-studies/03-tmplforge
+
+all:V: preflight
+
+build:V:
+	for(d in $CASES) @{ cd $d && mk build }
+
+test:V:
+	for(d in $CASES) @{ cd $d && mk test }
+	cd cookbook && go test ./...
+
+preflight:V:
+	rc ./scripts/preflight.rc || sh ./scripts/preflight.sh
+
+checksums:V:
+	sh ./scripts/checksums.sh
+
+clean:V:
+	for(d in $CASES) @{ cd $d && mk clean }
+	rm -f go-templates-casestudies.zip SHA256SUMS

@@ -1,0 +1,53 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # gh release create
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+  CGO_ENABLED: "0"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # --generate-notes compares against the previous tag
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+
+      - name: test
+        run: go test -count=1 ./...
+
+      - name: build static binaries
+        run: |
+          mkdir -p dist
+          for t in linux/amd64 linux/arm64 darwin/arm64 plan9/amd64; do
+            os=${t%/*} arch=${t#*/}
+            for b in tmplwatch tpl tmplload; do
+              GOOS=$os GOARCH=$arch go build -trimpath \
+                -ldflags="-s -w -X main.version=$GITHUB_REF_NAME" \
+                -o "dist/${b}_${os}_${arch}" "./cmd/$b"
+            done
+          done
+          cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: smoke test the release binary
+        run: |
+          dist/tmplwatch_linux_amd64 -version | grep -Fx "tmplwatch $GITHUB_REF_NAME"
+          dist/tmplwatch_linux_amd64 -c config/testdata.json -once -dry -a off > /dev/null
+
+      - name: gh release create
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "tmplwatch $GITHUB_REF_NAME"

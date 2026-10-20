@@ -1,0 +1,22 @@
+[[- /* Meta-template: runs at publish time with [[ ]] delimiters, so every
+   {{ }} below is literal text. Its output is next.tmpl, a Go template that
+   a borrower renders (bin/tpl) to produce the phase N+1 request payload. */ -]]
+{{- /*
+  next.tmpl for [[.Item.ID]]
+  Generated from templates/meta/next.tmpl.tmpl when phase [[.Item.Phase]] was published.
+[[- if .Final]]
+  Phase [[.Item.Phase]] is final: there is no next phase to borrow.
+[[- else]]
+  Borrow [[.Item.ID]], then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id [[.Item.SourceID]], template [[.Item.TemplateID]],
+  phase [[.NextPhase]], payload = payload.json. Keys you do not set keep their
+  phase [[.Item.Phase]] values.
+[[- end]]
+*/ -}}
+{
+  "phase_of": [[quote .Item.ID]]
+[[- range .Keys]][[if ne . "phase_of"]],
+  [[quote .]]: {{if hasKey . [[quote .]]}}{{toJSON (index . [[quote .]])}}{{else}}{{[[index $.Item.Payload . | toJSON | quote]]}}{{end}}
+[[- end]][[end]]
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "field": "payload",
+    "rule": "json",
+    "message": "Payload is not valid JSON: unexpected end of JSON input"
+  },
+  {
+    "field": "source-id",
+    "rule": "pattern",
+    "message": "Source ID \"Payments_API!\" does not match ^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+  }
+]

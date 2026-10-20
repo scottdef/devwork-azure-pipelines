@@ -1,0 +1,12 @@
+{
+  "targ": "forge",
+  "files": [
+    "main",
+    "render",
+    "diff"
+  ],
+  "headers": [
+    "forge.h"
+  ],
+  "bin": ""
+}

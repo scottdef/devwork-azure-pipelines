@@ -1,0 +1,20 @@
+{
+  "client_payload": {
+    "days": "14",
+    "issue": 42,
+    "item_id": "payments-api/caddyfile/42",
+    "reason": "Building the phase 2 rollout config.",
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "alice"
+  },
+  "event_type": "library-borrow",
+  "receipt": {
+    "event": "library-borrow",
+    "repo": "CoolGitOrg/issueops-library",
+    "issue": 42,
+    "item_id": "payments-api/caddyfile/42",
+    "item_url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/",
+    "keys": 6,
+    "dry_run": true
+  }
+}

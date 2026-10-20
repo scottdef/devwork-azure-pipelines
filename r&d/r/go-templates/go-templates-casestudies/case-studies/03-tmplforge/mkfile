@@ -1,0 +1,48 @@
+# tmplforge mkfile (Plan 9 mk). Recipes are indented with TABS.
+# Build on Plan 9 with the Go port: GOOS=plan9 is the native target.
+# Recipes are rc(1); under plan9port run with MKSHELL=rc.
+
+BIN=tmplforge
+VERSION=dev
+LDFLAGS=-s -w -X main.version=$VERSION
+PKGS=./cmd/... ./internal/... ./catalog/...
+
+all:V: vet test build
+
+build:V:
+	mkdir -p bin
+	CGO_ENABLED=0 go build -trimpath -ldflags $"LDFLAGS -o bin/$BIN ./cmd/$BIN
+	CGO_ENABLED=0 go build -trimpath -o bin/forgeload ./cmd/forgeload
+
+test:V:
+	go test $PKGS
+
+vet:V:
+	go vet $PKGS
+
+lint:V: vet
+	gofmt -l cmd internal catalog
+
+cross:V:
+	mkdir -p dist
+	for(t in linux/amd64 linux/arm64 darwin/arm64 plan9/amd64){
+		os=`{echo $t | sed 's,/.*,,'}
+		arch=`{echo $t | sed 's,.*/,,'}
+		CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags $"LDFLAGS -o dist/$BIN-$os-$arch ./cmd/$BIN
+	}
+
+release:V: clean cross
+	# 9front: sha1sum -2 256 prints SHA-256 in sha256sum(1) format
+	cd dist && sha1sum -2 256 * > SHA256SUMS
+
+docs:V:
+	go generate ./internal/funcs
+	go run ./catalog/gendoc -o docs/CATALOG.md
+	go run ./cmd/$BIN render -t catalog/CHANGELOG.md.tmpl -d docs/changelog.json > CHANGELOG.md
+	cp CHANGELOG.md docs/CHANGELOG.md
+
+loadtest:V: build
+	bin/forgeload -u http://127.0.0.1:8088/render -r 20 -d 5m -p99 150
+
+clean:V:
+	rm -rf bin dist

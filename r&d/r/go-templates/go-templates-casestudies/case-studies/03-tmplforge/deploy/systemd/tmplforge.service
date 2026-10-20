@@ -1,0 +1,61 @@
+# /etc/systemd/system/tmplforge.service
+#
+# Runs the GUI on loopback; put a TLS reverse proxy (catalog/Caddyfile.tmpl)
+# in front for remote users. To listen off loopback instead, set -a and a
+# token in /etc/tmplforge/env:  TMPLFORGE_TOKEN=<32+ random characters>
+[Unit]
+Description=tmplforge Go template forge (HTML GUI)
+Documentation=https://github.com/CoolGitOrg/tmplforge/blob/main/docs/OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=-/etc/tmplforge/env
+ExecStart=/usr/local/bin/tmplforge serve -a 127.0.0.1:8088 -rate 10 -timeout 2s
+# SIGINT is the graceful-shutdown signal tmplforge listens for everywhere.
+KillSignal=SIGINT
+TimeoutStopSec=15s
+Restart=on-failure
+RestartSec=2s
+
+# Each render is a child process of this unit: bound the whole tree.
+TasksMax=256
+MemoryMax=1G
+CPUQuota=200%
+
+# Hardening. The sandbox child needs only exec of the same binary and
+# /tmp for the fixture hand-off; nothing else is writable.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+# Go's runtime raises RLIMIT_NOFILE at start (setrlimit, in @resources),
+# so @resources must stay allowed. Denied calls fail with EPERM rather
+# than killing the process.
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

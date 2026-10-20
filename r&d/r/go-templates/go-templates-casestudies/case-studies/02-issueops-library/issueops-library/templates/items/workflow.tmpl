@@ -1,0 +1,27 @@
+#!tmpl ext=yml delims=[[,]]
+# [[.name]]: GitHub Actions workflow, phase [[._.phase]] of [[._.item_id]]
+# Rendered with double-square-bracket delimiters, so GitHub expressions pass through untouched.
+name: [[.name]]
+on:
+  push:
+    branches: [[ toJSON (.branches | default (list "main")) ]]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: [[.runs_on | default "ubuntu-latest"]]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ vars.GO_VERSION || '[[.go | default "1.24.x"]]' }}"
+[[- range .run]]
+      - run: [[quote .]]
+[[- else]]
+      - run: go test ./...
+[[- end]]

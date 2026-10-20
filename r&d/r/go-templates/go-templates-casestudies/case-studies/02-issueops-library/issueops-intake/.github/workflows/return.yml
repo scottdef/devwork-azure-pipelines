@@ -1,0 +1,70 @@
+# return.yml: return issues -> validated library-return dispatch.
+#
+# Untrusted text (the issue body, the title, the author's login) reaches
+# shell only through env:, never through ${{ }} inside run:.
+name: return
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: return-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  return:
+    # Edits re-run intake while the issue is open; the library re-publishes
+    # an item in place, so a corrected request replaces the earlier render.
+    if: >-
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'return')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOFLAGS: -mod=mod
+      ISSUE: ${{ github.event.issue.number }}
+      AUTHOR: ${{ github.event.issue.user.login }}
+      LIBRARY_REPO: ${{ github.repository_owner }}/issueops-library
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Build
+        run: make build
+      - name: Parse and validate
+        id: check
+        env:
+          BODY: ${{ github.event.issue.body }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/intake.sh check return
+      - name: Mint App token
+        if: steps.check.outputs.valid == 'true'
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: issueops-library,issueops-intake
+      - name: Dispatch to library
+        if: steps.check.outputs.valid == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: scripts/intake.sh dispatch return
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg s "return" --arg u "$RUN_URL" '{step:$s, run_url:$u}' > "$RUNNER_TEMP/failed.json"
+          bin/pagegen -comment templates/comment-failed.md.tmpl -d "$RUNNER_TEMP/failed.json" > "$RUNNER_TEMP/failed.md"
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/failed.md"

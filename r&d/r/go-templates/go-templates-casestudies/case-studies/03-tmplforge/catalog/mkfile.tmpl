@@ -1,0 +1,12 @@
+</$objtype/mkfile
+
+TARG={{ .targ }}
+OFILES=\
+{{- range $i, $f := .files }}{{ if $i }}\{{ end }}
+	{{ $f }}.$O
+{{- end }}
+
+HFILES={{ join " " .headers }}
+BIN={{ default "/$objtype/bin" .bin }}
+
+</sys/src/cmd/mkone

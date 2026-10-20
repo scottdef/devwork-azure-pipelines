@@ -1,0 +1,33 @@
+{
+  "id": "access-request/issue-form/46",
+  "source_id": "access-request",
+  "template_id": "issue-form",
+  "phase": 1,
+  "issue": 46,
+  "issue_url": "https://github.com/CoolGitOrg/issueops-intake/issues/46",
+  "requested_by": "dave",
+  "published_at": "2026-10-01T12:00:00Z",
+  "artifact": "artifact.yml",
+  "payload_sha256": "d24eaebf0dceea790476e9309c3299672854f5edc7c02615093e89e73990ee8a",
+  "template_sha256": "71b73c101e9bddb74afc03938e01db84cee5488a250d5cd0a93b823210ee5963",
+  "payload": {
+    "fields": [
+      {
+        "id": "system",
+        "label": "System",
+        "options": [
+          "vault",
+          "nomad"
+        ],
+        "required": true,
+        "type": "dropdown"
+      },
+      {
+        "id": "why",
+        "label": "Why",
+        "type": "textarea"
+      }
+    ],
+    "name": "Access request"
+  }
+}

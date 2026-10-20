@@ -1,0 +1,25 @@
+{
+  "id": "infra-net/terraform-module/45",
+  "source_id": "infra-net",
+  "template_id": "terraform-module",
+  "phase": 1,
+  "issue": 45,
+  "issue_url": "https://github.com/CoolGitOrg/issueops-intake/issues/45",
+  "requested_by": "alice",
+  "published_at": "2026-10-01T11:00:00Z",
+  "artifact": "artifact.tf",
+  "payload_sha256": "080e05c06b1c3fd8f5dc4d947884421d7c84e617a098dcd4f099fc4b48281a05",
+  "template_sha256": "88ac40ec640f7db4ec9d0e1763020edacec197c4017f7845cf6878f8cf6a51d6",
+  "payload": {
+    "cidr": "10.20.0.0/16",
+    "name": "infra-net",
+    "subnets": [
+      1,
+      2,
+      3
+    ],
+    "tags": {
+      "team": "platform"
+    }
+  }
+}

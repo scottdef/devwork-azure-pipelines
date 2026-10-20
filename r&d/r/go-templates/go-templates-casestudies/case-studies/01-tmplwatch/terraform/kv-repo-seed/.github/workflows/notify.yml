@@ -1,0 +1,50 @@
+# Lives in CoolGitOrg/tmplwatch-kv (seeded by terraform/main.tf).
+# On every push to main that touches kv/, tell CoolGitOrg/tmplwatch to run
+# its render check against the new data.
+#
+# Why a GitHub App token: events created with the default GITHUB_TOKEN do
+# not trigger workflows (GitHub's loop guard), and that token cannot reach
+# another repository anyway. An installation token from
+# issueops-autoadmin-app, scoped to the target repository, can do both.
+name: notify
+
+on:
+  push:
+    branches: [main]
+    paths: ["kv/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mint App token for CoolGitOrg/tmplwatch
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: CoolGitOrg
+          repositories: tmplwatch
+
+      - name: Send repository_dispatch kv-changed
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          KV_SHA: ${{ github.sha }}
+          KV_REPO: ${{ github.repository }}
+          KV_REF: ${{ github.ref_name }}
+        run: |
+          gh api repos/CoolGitOrg/tmplwatch/dispatches \
+            -f event_type=kv-changed \
+            -F "client_payload[sha]=$KV_SHA" \
+            -F "client_payload[repo]=$KV_REPO" \
+            -F "client_payload[ref]=$KV_REF"
+          echo "dispatched kv-changed for $KV_REPO@$KV_SHA" >> "$GITHUB_STEP_SUMMARY"

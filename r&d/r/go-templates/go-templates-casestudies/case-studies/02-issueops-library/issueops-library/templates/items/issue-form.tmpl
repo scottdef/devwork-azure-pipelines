@@ -1,0 +1,34 @@
+#!tmpl ext=yml
+# {{.name}}: issue form, phase {{._.phase}} of {{._.item_id}}
+name: {{quote .name}}
+description: {{quote (.description | default (printf "%s request" .name))}}
+title: {{quote (printf "[%s] " (slugify .name))}}
+labels: {{toJSON (.labels | default (list "issueops"))}}
+body:
+{{- range .fields}}
+  - type: {{.type | default "input"}}
+    id: {{slugify .id}}
+    attributes:
+      label: {{quote .label}}
+{{- if .description}}
+      description: {{quote .description}}
+{{- end}}
+{{- if .options}}
+      options:
+{{- range .options}}
+        - {{quote .}}
+{{- end}}
+{{- end}}
+{{- if eq (.type | default "input") "textarea"}}{{if .render}}
+      render: {{.render}}
+{{- end}}{{end}}
+    validations:
+      required: {{.required | default false}}
+{{- else}}
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+{{- end}}

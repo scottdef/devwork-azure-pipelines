@@ -1,0 +1,18 @@
+flowchart LR
+    subgraph sources["Sources (internal/source)"]
+        GH["GitHub repo<br/>git/trees?recursive=1<br/>If-None-Match ETag"]
+        DIR["dir source<br/>local tree, mtime walk"]
+    end
+    APP["internal/ghapp<br/>RS256 JWT → installation token"] -.-> GH
+    GH --> W["source.Watch<br/>poll every interval"]
+    DIR --> W
+    W -- "Snapshot{Data, Version}" --> B["internal/brain<br/>diff keys · deps per template"]
+    B -- "dirty templates" --> R["text/template Execute<br/>internal/funcs FuncMap<br/>records key/ls/tree"]
+    R -- "Result{Out, Deps, Missing}" --> RUN["internal/runner"]
+    RUN -- "complete + changed" --> WR["WriteAtomic<br/>temp · fsync · chmod · rename · .bak"]
+    RUN -- "incomplete" --> HOLD["write nothing<br/>/healthz 503"]
+    WR --> CMD["command argv<br/>after wait + splay"]
+    WR --> SUP["exec supervisor<br/>change_signal / restart"]
+    RUN --> M["internal/metrics<br/>ring buffer p50/p95/p99"]
+    M --> H["internal/httpd 127.0.0.1:9180<br/>/healthz /metrics /render /status"]
+    RUN --> H

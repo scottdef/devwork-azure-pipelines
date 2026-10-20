@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "payments-api",
+    "template_id": "caddyfile",
+    "phase": "1",
+    "issue": 42,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "alice",
+    "payload": "{\"name\":\"payments-api\",\"domain\":\"pay.coolgit.org\",\"port\":8443,\"routes\":[\"/pay\",\"/refund\"]}",
+    "sha256": "a696a2834d3ebfb35453652f13154128e629d5097639c12528b7b2a56aeef858"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

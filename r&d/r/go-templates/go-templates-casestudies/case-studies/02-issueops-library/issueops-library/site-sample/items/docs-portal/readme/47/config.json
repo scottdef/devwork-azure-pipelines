@@ -1,0 +1,23 @@
+{
+  "id": "docs-portal/readme/47",
+  "source_id": "docs-portal",
+  "template_id": "readme",
+  "phase": 1,
+  "issue": 47,
+  "issue_url": "https://github.com/CoolGitOrg/issueops-intake/issues/47",
+  "requested_by": "erin",
+  "published_at": "2026-10-01T13:00:00Z",
+  "artifact": "artifact.md",
+  "payload_sha256": "cc021728bcb7e8bf200dd4bdbd245dfbbf50b562f0a7e8570934b0ab4d53f0f7",
+  "template_sha256": "6a08f4af8f0d4a31e2a03b2f2ea0f8e989438e385375fba7c5fd8d39571a7125",
+  "payload": {
+    "links": [
+      "https://coolgitorg.github.io/docs/"
+    ],
+    "name": "docs-portal",
+    "owners": [
+      "@coolgitorg/platform"
+    ],
+    "summary": "Internal docs site \u003cscript\u003ealert(1)\u003c/script\u003e."
+  }
+}

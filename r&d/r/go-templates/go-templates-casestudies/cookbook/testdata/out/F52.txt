@@ -1,0 +1,5 @@
+templates: footer footer.tmpl item.tmpl page.tmpl
+Order for Ada
+* engine x1
+* cards x3
+-- 2 items --

@@ -1,0 +1,3 @@
+Order for {{ .Customer }}
+{{ range .Items }}{{ template "item.tmpl" . }}{{ end -}}
+{{ template "footer" . }}

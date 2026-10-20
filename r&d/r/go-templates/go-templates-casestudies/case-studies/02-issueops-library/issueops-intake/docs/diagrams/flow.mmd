@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor U as Requester
+    participant IP as Intake Pages<br/>(static form)
+    participant GH as GitHub Issues<br/>issueops-intake
+    participant IW as intake.yml<br/>issueparse / validate
+    participant APP as issueops-autoadmin-app<br/>(installation token)
+    participant LW as publish.yml<br/>pagegen / ledger
+    participant LR as issueops-library<br/>main: items, ledger, site
+    participant LP as Library Pages
+
+    U->>IP: fill form (JS: JSON parses, URL < 7000 chars)
+    IP->>GH: open /issues/new?template=request.yml&title=...&source-id=...&payload=...
+    U->>GH: pick dropdowns, submit issue
+    GH-->>IW: issues: opened (label request)
+    IW->>IW: printf "$BODY" | issueparse | validate
+    alt invalid
+        IW->>GH: comment (comment-invalid.md.tmpl), label invalid
+    else valid
+        IW->>APP: create-github-app-token@v3
+        APP-->>IW: token (repos: library, intake)
+        IW->>LW: POST /repos/.../dispatches library-publish (10 keys, payload + sha256)
+        IW->>GH: comment "dispatched", label accepted
+        LW->>LW: pagegen -describe (validate event)
+        LW->>LR: render items/src/tmpl/issue/*, rebuild site/, commit, push (retry on race)
+        LW->>LP: deploy job (concurrency library-pages): upload site/, deploy-pages
+        LW->>LP: notify job polls library.json until generated >= applied_at
+        LW->>GH: comment item URL (published.md.tmpl), label published, close
+    end
+    U->>LP: open item page, download artifact / next.tmpl / bundle.tar.gz

@@ -1,0 +1,16 @@
+{{- /*
+  next.tmpl for edge-proxy/workflow/43
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow edge-proxy/workflow/43, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id edge-proxy, template workflow,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "edge-proxy/workflow/43",
+  "branches": {{if hasKey . "branches"}}{{toJSON (index . "branches")}}{{else}}{{"[\"main\",\"release/*\"]"}}{{end}},
+  "go": {{if hasKey . "go"}}{{toJSON (index . "go")}}{{else}}{{"\"1.24.x\""}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"edge-proxy\""}}{{end}},
+  "run": {{if hasKey . "run"}}{{toJSON (index . "run")}}{{else}}{{"[\"go vet ./...\",\"go test -race ./...\"]"}}{{end}}
+}

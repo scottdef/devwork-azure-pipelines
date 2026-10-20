@@ -1,0 +1,13 @@
+{
+  "debug": false,
+  "features": [
+    "sandbox",
+    "metrics"
+  ],
+  "limits": {
+    "maxBody": 262144,
+    "rate": 10
+  },
+  "listen": "127.0.0.1:8088",
+  "service": "tmplforge"
+}

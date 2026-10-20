@@ -1,0 +1,71 @@
+[[- /*
+  A Nomad job. This template uses [[ ]] delimiters (set per template in the
+  config) so that Nomad's own {{ }} runtime templates pass through verbatim.
+  KV values are emitted with toHCL so "${" in data is escaped to "$${";
+  numbers go through "add 0", which fails on anything but an integer;
+  env names must be identifiers. (FuzzRender found the raw count.)
+*/ -]]
+# Managed by tmplwatch. Do not edit by hand.
+job [[ key "nomad/job/name" | toHCL ]] {
+  datacenters = [[ key "nomad/job/datacenters" | parseJSON | toHCL ]]
+  type        = "service"
+
+  update {
+    max_parallel     = 1
+    min_healthy_time = "10s"
+    auto_revert      = true
+  }
+
+  group [[ key "nomad/job/name" | toHCL ]] {
+    count = [[ key "nomad/job/count" | add 0 ]]
+
+    network {
+      port "http" { to = 8080 }
+    }
+
+    service {
+      name     = [[ key "nomad/job/name" | toHCL ]]
+      port     = "http"
+      provider = "nomad"
+      check {
+        type     = "http"
+        path     = "/healthz"
+        interval = "10s"
+        timeout  = "2s"
+      }
+    }
+
+    task "app" {
+      driver = "docker"
+      config {
+        image = [[ key "nomad/job/image" | toHCL ]]
+        ports = ["http"]
+      }
+
+[[- $w := 0 ]]
+[[- range ls "nomad/job/env" ]]
+[[-   if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" .Key) ]][[ fail (printf "nomad env name %q is not an identifier" .Key) ]][[ end ]]
+[[-   if gt (len .Key) $w ]][[ $w = len .Key ]][[ end ]]
+[[- end ]]
+      env {
+[[- range ls "nomad/job/env" ]]
+        [[ printf "%-*s" $w .Key ]] = [[ .Value | toHCL ]]
+[[- end ]]
+      }
+
+      # Nomad renders this block at runtime; tmplwatch leaves it alone.
+      template {
+        destination = "local/instance.env"
+        env         = true
+        data        = <<EOT
+NOMAD_ALLOC={{ env "NOMAD_ALLOC_ID" }}
+EOT
+      }
+
+      resources {
+        cpu    = 200
+        memory = 256
+      }
+    }
+  }
+}

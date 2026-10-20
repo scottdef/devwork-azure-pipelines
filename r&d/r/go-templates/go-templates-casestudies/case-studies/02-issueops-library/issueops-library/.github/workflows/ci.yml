@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    # Event commits touch only data; they are tested by the code that wrote them.
+    paths-ignore: ["items/**", "ledger/**", "site/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOFLAGS: -mod=mod
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Preflight (vet, gofmt, test, bash -n, cross builds, wasm)
+        run: scripts/preflight.sh
+      - name: Fuzz the event decoder
+        run: go test ./internal/event -run '^$' -fuzz FuzzDecode -fuzztime 30s

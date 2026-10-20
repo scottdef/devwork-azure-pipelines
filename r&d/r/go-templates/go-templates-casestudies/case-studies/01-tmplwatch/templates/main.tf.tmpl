@@ -1,0 +1,62 @@
+{{- /*
+  Terraform root module. Every KV-derived value goes through toHCL, which
+  quotes it and escapes "${" and "%{", so data can never become
+  interpolation. Numbers go through "add 0" (an error unless an integer)
+  and resource names must be identifiers, so nothing from KV is ever
+  emitted raw. Literal Terraform interpolation in this template is written
+  as plain text; the Go template engine does not care about "${".
+  tf/instances/<name> = {"type": "...", "count": N, "tags": {...}}
+*/ -}}
+# Managed by tmplwatch. Do not edit by hand.
+terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = {{ key "tf/region" | toHCL }}
+}
+
+locals {
+  env           = {{ key "site/env" | toHCL }}
+  allowed_cidrs = {{ key "tf/allowed_cidrs" | parseJSON | toHCL }}
+}
+
+data "aws_ami" "base" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+{{ range ls "tf/instances" }}
+{{- $name := .Key }}
+{{- if not (regexMatch "^[a-z][a-z0-9_]*$" $name) }}{{ fail (printf "tf instance name %q: want [a-z][a-z0-9_]*" $name) }}{{ end }}
+{{- with parseJSON .Value }}
+resource "aws_instance" {{ $name | toHCL }} {
+  count         = {{ add 0 .count }}
+  ami           = data.aws_ami.base.id
+  instance_type = {{ .type | toHCL }}
+
+  tags = merge({{ .tags | toHCL }}, {
+    Name = "${local.env}-{{ $name }}-${count.index}"
+  })
+}
+{{ end }}
+{{- end }}
+{{- /* Pad keys so "=" lines up as terraform fmt would have it. */}}
+{{- $w := 0 }}
+{{- range ls "tf/instances" }}{{ if gt (len .Key) $w }}{{ $w = len .Key }}{{ end }}{{ end }}
+output "instance_ids" {
+  value = {
+{{- range ls "tf/instances" }}
+    {{ printf "%-*s" $w .Key }} = aws_instance.{{ .Key }}[*].id
+{{- end }}
+  }
+}

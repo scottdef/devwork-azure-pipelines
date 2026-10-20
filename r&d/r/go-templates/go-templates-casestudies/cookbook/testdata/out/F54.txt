@@ -1,0 +1,2 @@
+gh api repos/CoolGitOrg/go-template-cookbook/issues --template '{{range .}}#{{.number}} {{.title}}{{"\n"}}{{end}}'
+gh api repos/CoolGitOrg/go-template-cookbook/issues --template '{{range .}}#{{.number}} {{.title}}{{"\n"}}{{end}}'

@@ -1,0 +1,53 @@
+# mkfile: the Plan 9 mk equivalent of the Makefile. Recipe lines start with a
+# TAB and run under rc. Variables assigned here are exported to the recipes.
+GO=go
+VERSION=dev
+DOCS=../docs
+GOFLAGS=-mod=mod
+GOPROXY=off
+CGO_ENABLED=0
+
+all:V: vet test build
+
+build:V:
+	mkdir -p bin
+	$GO build -trimpath -ldflags '-s -w -X main.version='$VERSION -o bin/cookbook ./cmd/cookbook
+
+test:V:
+	$GO test ./...
+
+vet:V:
+	$GO vet ./...
+
+# gofmt -l prints the names of unformatted files; the target fails if any.
+lint:V: vet
+	gofmt -l . >/tmp/cookbook.gofmt
+	test ! -s /tmp/cookbook.gofmt
+
+cross:V:
+	mkdir -p dist
+	GOOS=linux GOARCH=amd64 $GO build -trimpath -ldflags '-s -w -X main.version='$VERSION -o dist/cookbook-linux-amd64 ./cmd/cookbook
+	GOOS=linux GOARCH=arm64 $GO build -trimpath -ldflags '-s -w -X main.version='$VERSION -o dist/cookbook-linux-arm64 ./cmd/cookbook
+	GOOS=darwin GOARCH=arm64 $GO build -trimpath -ldflags '-s -w -X main.version='$VERSION -o dist/cookbook-darwin-arm64 ./cmd/cookbook
+	GOOS=plan9 GOARCH=amd64 $GO build -trimpath -ldflags '-s -w -X main.version='$VERSION -o dist/cookbook-plan9-amd64 ./cmd/cookbook
+
+# sha256sum comes from plan9port or 9front; stock Plan 9 has sha1sum.
+release:V: cross
+	cd dist; rm -f SHA256SUMS; sha256sum * >SHA256SUMS
+
+loadtest:V:
+	$GO test ./formulas -run XXX_NONE -bench BenchmarkAll -benchmem -count 3
+
+docs:V:
+	$GO run ./cmd/cookbook gen -o $DOCS/COOKBOOK.md
+	$GO run ./cmd/cookbook gen -funcs -o $DOCS/FUNCS-SHARED.md
+
+check:V:
+	$GO run ./cmd/cookbook check -docs $DOCS
+
+update:V:
+	$GO test ./formulas -update
+	mk docs
+
+clean:V:
+	rm -r -f bin dist

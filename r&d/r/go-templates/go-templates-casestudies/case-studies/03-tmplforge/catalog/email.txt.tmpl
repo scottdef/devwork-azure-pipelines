@@ -1,0 +1,12 @@
+Subject: {{ .subject }}
+
+Hello {{ .name }},
+
+{{ .body }}
+{{ range $i, $e := .items }}
+  {{ add $i 1 }}. {{ $e.title }}
+     {{ $e.url }}
+{{- end }}
+
+-- 
+{{ .signature }}

@@ -1,0 +1,22 @@
+{
+  "action": "library-borrow",
+  "branch": "main",
+  "client_payload": {
+    "item_id": "payments-api/caddyfile/42",
+    "days": "14",
+    "reason": "phase 2 rollout",
+    "issue": 50,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "bob"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

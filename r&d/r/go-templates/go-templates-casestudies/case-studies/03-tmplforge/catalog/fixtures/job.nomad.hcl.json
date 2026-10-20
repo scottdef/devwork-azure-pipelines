@@ -1,0 +1,12 @@
+{
+  "name": "tmplforge",
+  "datacenters": [
+    "dc1"
+  ],
+  "count": 2,
+  "port": 8088,
+  "image": "ghcr.io/coolgitorg/tmplforge",
+  "tag": "v0.1.0",
+  "cpu": 200,
+  "memory": 128
+}

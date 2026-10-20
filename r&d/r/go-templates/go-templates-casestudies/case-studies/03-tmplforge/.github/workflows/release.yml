@@ -1,0 +1,45 @@
+# Release: on a v* tag, test, build four static binaries, checksum them and
+# publish a GitHub release with gh. --verify-tag refuses to create a tag
+# that does not already exist, so a release is always of a pushed tag.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+  CGO_ENABLED: "0"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: test
+        run: go test -count=1 ./cmd/... ./internal/... ./catalog/...
+      - name: build
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          for t in linux/amd64 linux/arm64 darwin/arm64 plan9/amd64; do
+            os=${t%/*} arch=${t#*/}
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w -X main.version=$TAG" \
+              -o "dist/tmplforge-$os-$arch" ./cmd/tmplforge
+          done
+          cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --verify-tag --generate-notes --title "tmplforge $TAG"

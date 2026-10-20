@@ -1,0 +1,16 @@
+{{- /*
+  next.tmpl for payments-api/caddyfile/42
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow payments-api/caddyfile/42, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id payments-api, template caddyfile,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "payments-api/caddyfile/42",
+  "domain": {{if hasKey . "domain"}}{{toJSON (index . "domain")}}{{else}}{{"\"pay.coolgit.org\""}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"payments-api\""}}{{end}},
+  "port": {{if hasKey . "port"}}{{toJSON (index . "port")}}{{else}}{{"8443"}}{{end}},
+  "routes": {{if hasKey . "routes"}}{{toJSON (index . "routes")}}{{else}}{{"[\"/pay\",\"/refund\"]"}}{{end}}
+}

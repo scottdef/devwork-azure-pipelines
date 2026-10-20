@@ -1,0 +1,38 @@
+#!tmpl ext=nomad.hcl
+# {{.name}}: Nomad job, phase {{._.phase}} of {{._.item_id}}
+job {{quote .name}} {
+  datacenters = {{toJSON (.datacenters | default (list "dc1"))}}
+  type        = "service"
+
+  group {{quote .name}} {
+    count = {{.count | default 1}}
+
+    network {
+      port "http" {
+        to = {{.port | default 8080}}
+      }
+    }
+
+    task {{quote .name}} {
+      driver = "docker"
+
+      config {
+        image = {{quote .image}}
+        ports = ["http"]
+      }
+
+      resources {
+        cpu    = {{.cpu | default 200}}
+        memory = {{.memory | default 256}}
+      }
+{{- with .env}}
+
+      env {
+{{- range $k, $v := .}}
+        {{$k}} = {{quote (printf "%v" $v)}}
+{{- end}}
+      }
+{{- end}}
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{{- /* Data: bin/validate report {"ok": false, "errors": [{field, rule, message}]} */ -}}
+### Request not accepted
+
+The library could not accept this issue. Edit the issue body to fix the
+{{len .errors}} problem{{if ne (len .errors) 1}}s{{end}} below; editing re-runs the check.
+
+| Field | Rule | Problem |
+|---|---|---|
+{{- range .errors}}
+| {{inline .field}} | {{.rule}} | {{.message | inline}} |
+{{- end}}
+
+<sub>issueops-intake / validate. Label `invalid` is removed automatically when the issue passes.</sub>

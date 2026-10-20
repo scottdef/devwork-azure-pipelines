@@ -1,0 +1,63 @@
+{{define "content"}}
+{{with .S}}
+<h1>Builder <small>{{.Name}}</small></h1>
+{{with .Desc}}<p class="lede">{{.}}</p>{{end}}
+<form id="builder" method="post" action="/export">
+<input type="hidden" name="name" value="{{.Name}}">
+
+<fieldset>
+<legend>1. Format</legend>
+<label>Output format
+<select name="format" hx-post="/render" hx-target="#preview" hx-trigger="change">
+{{- $f := .Format}}
+{{- range .Formats}}
+<option value="{{.}}"{{if eq . $f}} selected{{end}}>{{.}}</option>
+{{- end}}
+</select></label>
+<label>Delimiters <input name="delims" value="{{.Delims}}" placeholder="{{"{{"}},{{"}}"}}" size="8" pattern="[^,\s]+,[^,\s]+"></label>
+<p class="hint">html uses html/template (contextual escaping); the others use text/template. Use <code>[[,]]</code> to keep <code>${{"{{"}} {{"}}"}}</code> or <code>{{"{{"}} $labels {{"}}"}}</code> literal.</p>
+</fieldset>
+
+<fieldset>
+<legend>2. Variables</legend>
+<table class="vars">
+<thead><tr><th>name</th><th>type</th><th>default</th><th></th></tr></thead>
+<tbody id="vars">
+{{- $types := .Types}}
+{{- range .Vars}}
+{{template "var-row" (dict "V" . "Types" $types)}}
+{{- end}}
+</tbody>
+</table>
+<div class="row" id="new-var">
+<input name="new_name" placeholder="name" size="12">
+<select name="new_type">{{range .Types}}<option>{{.}}</option>{{end}}</select>
+<input name="new_default" placeholder="default" size="16">
+<button type="button" hx-post="/builder/var" hx-include="#new-var" hx-target="#vars" hx-swap="beforeend">add variable</button>
+</div>
+</fieldset>
+
+<fieldset>
+<legend>3. Template</legend>
+<textarea name="template" rows="20" spellcheck="false" hx-post="/render" hx-trigger="keyup changed delay:300ms" hx-target="#preview">{{.Template}}</textarea>
+<div class="row">
+<button type="button" hx-post="/lint" hx-target="#lint">lint</button>
+<button type="button" hx-post="/vars" hx-target="#fixture-wrap">fixture from template</button>
+<button type="submit">export .tar.gz</button>
+{{if ne .Name "untitled"}}<a href="/test?name={{.Name}}">test with two fixtures</a>{{end}}
+</div>
+<div id="lint" aria-live="polite"></div>
+</fieldset>
+
+<fieldset>
+<legend>4. Fixture and preview</legend>
+<div class="cols">
+<div id="fixture-wrap">{{template "fixture" (dict "JSON" .Fixture)}}</div>
+<div id="preview" aria-live="polite" hx-post="/render" hx-trigger="load, refresh">
+<p class="hint">Preview renders here.</p>
+</div>
+</div>
+</fieldset>
+</form>
+{{end}}
+{{end}}

@@ -1,0 +1,4 @@
+name=anonymous
+port=8080
+host=example.org
+debug=off

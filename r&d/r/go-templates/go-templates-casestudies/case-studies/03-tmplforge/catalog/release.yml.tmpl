@@ -1,0 +1,31 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '[[ .go ]]' }}
+      - name: build
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+[[- range .targets ]]
+          CGO_ENABLED=0 GOOS=[[ .os ]] GOARCH=[[ .arch ]] go build -trimpath -ldflags="-s -w -X main.version=$TAG" -o dist/[[ $.binary ]]-[[ .os ]]-[[ .arch ]] ./cmd/[[ $.binary ]]
+[[- end ]]
+          cd dist && sha256sum * > SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --verify-tag --generate-notes

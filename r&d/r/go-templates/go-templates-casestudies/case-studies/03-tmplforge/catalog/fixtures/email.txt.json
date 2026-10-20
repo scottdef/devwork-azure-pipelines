@@ -1,0 +1,16 @@
+{
+  "subject": "Your weekly forge digest",
+  "name": "Glenda",
+  "body": "3 templates changed this week.",
+  "items": [
+    {
+      "url": "https://github.com/CoolGitOrg/tmplforge/pull/1",
+      "title": "Add mkfile catalog entry"
+    },
+    {
+      "url": "https://github.com/CoolGitOrg/tmplforge/pull/2",
+      "title": "Sandbox output cap"
+    }
+  ],
+  "signature": "tmplforge, CoolGitOrg"
+}

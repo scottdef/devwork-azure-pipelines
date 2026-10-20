@@ -1,0 +1,8 @@
+{
+  "source": {"type": "dir", "path": "/testdata/kv", "interval": "5s"},
+  "templates": [
+    {"source": "/templates/Caddyfile.tmpl", "destination": "/out/Caddyfile", "error_on_missing_key": true},
+    {"source": "/templates/motd.txt.tmpl", "destination": "/out/motd", "error_on_missing_key": true}
+  ],
+  "listen": "0.0.0.0:9180"
+}

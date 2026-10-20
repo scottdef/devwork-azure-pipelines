@@ -1,0 +1,4 @@
+ITEM         BORROWER  ISSUE  BORROWED    DUE         STATE
+a1/readme/2  bob       #2     2026-10-01  2026-10-08  overdue 3d
+a1/readme/3  bob       #3     2026-10-01  2026-10-08  overdue 3d
+a1/readme/4  bob       #9     2026-10-01  2026-10-15  out

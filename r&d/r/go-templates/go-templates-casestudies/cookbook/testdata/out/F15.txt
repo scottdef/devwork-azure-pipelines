@@ -1,0 +1,3 @@
+loop:  ["a","b","esc\u001b"]
+whole: ["a","b","esc\u001b"]
+%q:    ["a","b","esc\x1b"]

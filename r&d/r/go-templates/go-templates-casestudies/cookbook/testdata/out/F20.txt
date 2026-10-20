@@ -1,0 +1,8 @@
+cookbook/
+  funcs/
+    funcs.go
+    yaml.go
+  cmd/
+    cookbook/
+      main.go
+  go.mod

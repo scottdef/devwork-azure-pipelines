@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>Library catalog</h1>
+<p>{{plural (len .Entries) "item"}} rendered from <a href="{{.GitHub}}/{{.IntakeRepo}}/issues">intake issues</a>.
+Anyone may read and download any item. To build the next phase of one, borrow it: a loan reserves the
+next-phase slot for 7 or 14 days, at most 3 per login, and lapses on its own when overdue.
+<a href="{{.IntakeURL}}">Request a new item</a>.</p>
+<p><label for="q">Filter</label>
+<input id="q" type="search" placeholder="source, template or issue" autocomplete="off" data-filter="#catalog tbody tr">
+<span id="q-count" class="mut" aria-live="polite"></span></p>
+<table id="catalog">
+<thead><tr><th>Source</th><th>Template</th><th>Phase</th><th>Issue</th><th>Published</th><th>State</th></tr></thead>
+<tbody>
+{{- range $i, $e := .Entries}}
+{{template "item-row" (dict "E" $e "Odd" (odd $i) "Now" $.Now "Root" $.Root)}}
+{{- else}}
+<tr><td colspan="6">The library is empty. <a href="{{.IntakeURL}}">Request the first item.</a></td></tr>
+{{- end}}
+</tbody>
+</table>
+<h2>Out on loan</h2>
+<div hx-get="{{.Root}}ledger/open.html" hx-trigger="load, every 120s" hx-swap="innerHTML">
+{{template "ledger-open" .}}
+</div>
+{{end}}

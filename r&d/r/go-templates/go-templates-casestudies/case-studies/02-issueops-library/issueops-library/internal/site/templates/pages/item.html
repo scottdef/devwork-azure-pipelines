@@ -1,0 +1,39 @@
+{{define "content"}}{{with .Entry}}
+<p class="crumbs"><a href="{{$.Root}}">catalog</a> / <code>{{.SourceID}}</code> / {{.TemplateID}} / #{{.Issue}}</p>
+<h1><code>{{.SourceID}}</code> &middot; {{.TemplateID}}</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+{{template "item-status" $}}
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>{{.ID}}</code></dd>
+<dt>Phase</dt><dd>{{.Phase}} of 3</dd>
+<dt>Published</dt><dd>{{dateFmt "human" .PublishedAt}}</dd>
+<dt>Request</dt><dd><a href="{{.IssueURL}}">{{.IssueURL}}</a></dd>
+<dt>Requested by</dt><dd>{{.RequestedBy}}</dd>
+{{- if .Supersedes}}
+<dt>Continues</dt><dd><a href="{{$.Root}}items/{{.Supersedes}}/"><code>{{.Supersedes}}</code></a></dd>
+{{- end}}
+<dt>Payload sha256</dt><dd><code class="hash">{{.PayloadSHA}}</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">{{.TemplateSHA}}</code></dd>
+</dl>
+<p><a class="button" href="{{.ArtifactFile.Name}}" download>Download {{.ArtifactFile.Name}}</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+{{- range $i, $f := .Files}}
+<tr class="{{if odd $i}}odd{{else}}even{{end}}"><td><a href="{{$f.Name}}">{{$f.Name}}</a></td><td class="num">{{humanSize $f.Size}}</td><td><code class="hash">{{$f.SHA256}}</code></td></tr>
+{{- end}}
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO {{.URL}}SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="{{.ArtifactFile.Name}}">{{$.Artifact}}</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase {{add .Phase 1}}. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{$.Next}}</pre>
+{{end}}{{end}}

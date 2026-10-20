@@ -1,0 +1,28 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: ["beta","prod"]
+      dry_run:
+        description: "Plan only"
+        type: boolean
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: run
+        env:
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: "./scripts/deploy.sh \"$INPUT_ENVIRONMENT\" \"$INPUT_DRY_RUN\""

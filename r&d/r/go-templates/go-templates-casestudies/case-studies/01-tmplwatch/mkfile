@@ -1,0 +1,46 @@
+# tmplwatch for Plan 9 mk(1). Run from rc: mk, mk test, mk cross.
+# Go on Plan 9 reads GOFLAGS and GOPROXY from the environment like
+# anywhere else; there is no module network access by design.
+
+GOFLAGS=-mod=mod
+GOPROXY=off
+CGO_ENABLED=0
+VERSION=dev
+LDFLAGS=-s -w -X main.version=$VERSION
+TARGETS=linux/amd64 linux/arm64 darwin/arm64 plan9/amd64
+BINS=tmplwatch tpl tmplload
+
+all:V: vet test build
+
+build:V:
+	mkdir -p bin
+	for(b in $BINS) go build -trimpath -ldflags $"LDFLAGS -o bin/$b ./cmd/$b
+
+test:V:
+	go test -count'=1' ./...
+
+vet:V:
+	go vet ./...
+
+docs:V:
+	go generate ./internal/funcs
+
+golden:V:
+	go test ./templates -update
+
+cross:V:
+	mkdir -p dist
+	for(t in $TARGETS){
+		os=`{echo $t | sed 's,/.*,,'}
+		arch=`{echo $t | sed 's,.*/,,'}
+		for(b in $BINS) GOOS=$os GOARCH=$arch go build -trimpath -ldflags $"LDFLAGS -o dist/$b^_$os^_$arch ./cmd/$b
+	}
+
+once:V: build
+	bin/tmplwatch -c config/testdata.json -once -dry -a off
+
+run:V: build
+	bin/tmplwatch -c config/testdata.json -v
+
+clean:V:
+	rm -rf bin dist out

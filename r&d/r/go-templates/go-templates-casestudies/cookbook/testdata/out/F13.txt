@@ -1,0 +1,6 @@
+pi:      0003.142
+columns: [   42|42   ]
+bases:   ff 377 101
+quoted:  "ken"
+percent: 87.5%
+width:   [ken     ]

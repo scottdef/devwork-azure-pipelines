@@ -1,0 +1,6 @@
+FROM gcr.io/distroless/static:nonroot
+LABEL org.opencontainers.image.source="https://github.com/CoolGitOrg/go-template-cookbook"
+COPY --chmod=0755 server /app/server
+EXPOSE 8080
+USER nonroot:nonroot
+ENTRYPOINT ["/app/server","-a",":8080","-c","/etc/app.conf"]

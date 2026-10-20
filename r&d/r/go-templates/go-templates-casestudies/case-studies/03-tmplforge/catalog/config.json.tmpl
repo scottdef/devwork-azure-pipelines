@@ -1,0 +1,1 @@
+{{ dict "service" .service "listen" (printf "%s:%d" .host .port) "features" .features "limits" (dict "rate" .rate "maxBody" (mul .maxBodyKiB 1024)) "debug" (ternary true false (eq .env "dev")) | toPrettyJSON }}

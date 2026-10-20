@@ -1,0 +1,8 @@
+# HELP http_requests_total Total HTTP requests.
+# TYPE http_requests_total counter
+http_requests_total{code="200",method="get"} 1027
+http_requests_total{code="500",method="post"} 3
+# HELP room_temperature_celsius Line one\nLine two with a \\ backslash.
+# TYPE room_temperature_celsius gauge
+room_temperature_celsius{room="a \"big\" \\ room"} 21.5
+room_temperature_celsius 0.5

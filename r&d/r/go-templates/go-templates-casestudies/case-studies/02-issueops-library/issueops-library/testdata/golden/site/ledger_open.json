@@ -1,0 +1,18 @@
+[
+  {
+    "item": "payments-api/caddyfile/42",
+    "borrower": "bob",
+    "borrow_issue": 50,
+    "borrowed_at": "2026-09-29T12:00:00Z",
+    "due": "2026-10-13T12:00:00Z",
+    "returned_at": null
+  },
+  {
+    "item": "docs-portal/readme/47",
+    "borrower": "carol",
+    "borrow_issue": 51,
+    "borrowed_at": "2026-10-19T11:00:00Z",
+    "due": "2026-10-26T11:00:00Z",
+    "returned_at": null
+  }
+]

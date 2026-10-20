@@ -1,0 +1,23 @@
+{
+  "repos": [
+    {
+      "name": "tmplforge",
+      "description": "Go template generator",
+      "visibility": "internal",
+      "topics": [
+        "go",
+        "templates"
+      ],
+      "reviews": 2
+    },
+    {
+      "name": "plan9.tools",
+      "description": "Plan 9 utilities",
+      "visibility": "",
+      "topics": [
+        "plan9"
+      ],
+      "reviews": 0
+    }
+  ]
+}

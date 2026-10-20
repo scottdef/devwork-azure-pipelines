@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
+<title>{{.Title}} - tmplforge</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+{{- block "head" .}}{{end}}
+</head>
+<body>
+<header>
+<a class="brand" href="/">tmplforge</a>
+<nav>
+<a href="/">catalog</a>
+<a href="/builder">builder</a>
+<a href="/test">test</a>
+<a href="/new">generate</a>
+<a href="/chart">latency</a>
+<a href="/metrics">metrics</a>
+</nav>
+</header>
+<main>
+{{block "content" .}}{{end}}
+</main>
+<footer>tmplforge {{.Version}} &middot; renders run in a sandboxed child process &middot; 64 KiB template, 1 MiB output, 2 s</footer>
+</body>
+</html>

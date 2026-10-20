@@ -1,0 +1,16 @@
+{
+	email ops@coolgitorg.example
+}
+
+forge.coolgitorg.example {
+	encode zstd gzip
+	reverse_proxy /* 127.0.0.1:8088
+	header Strict-Transport-Security "max-age=31536000"
+}
+
+docs.coolgitorg.example {
+	encode zstd gzip
+	root * /srv/docs
+	file_server
+	header Strict-Transport-Security "max-age=31536000"
+}

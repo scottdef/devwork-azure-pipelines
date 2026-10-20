@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>edge-proxy/workflow/43 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>edge-proxy</code> / workflow / #43</p>
+<h1><code>edge-proxy</code> &middot; workflow</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge in">available</span>
+The phase 2 slot is free.
+<a class="button" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=borrow.yml&amp;title=%5Bborrow%5D%20edge-proxy/workflow/43&amp;item-id=edge-proxy/workflow/43">Borrow phase 2</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>edge-proxy/workflow/43</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 09:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/43">https://github.com/CoolGitOrg/issueops-intake/issues/43</a></dd>
+<dt>Requested by</dt><dd>bob</dd>
+<dt>Payload sha256</dt><dd><code class="hash">9c6dd975ff523e7f051d90fcfb3ccf9765aad51967c0945fa987a870e206a444</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">c4a666136a72f2bf7da0d9116337b44f60e1467fdef0b1571365ff7dc2791ca1</code></dd>
+</dl>
+<p><a class="button" href="artifact.yml" download>Download artifact.yml</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">313 B</td><td><code class="hash">d5257555db9941103bf4efa0f7b5ffe5c0bb9be9da793f373fd398454cb64790</code></td></tr>
+<tr class="odd"><td><a href="artifact.yml">artifact.yml</a></td><td class="num">647 B</td><td><code class="hash">5b5d252e3bb8f159f24ce45eff4f3cc8a3b7f002541d39e5ad9dc667ac30b376</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">1.1 KiB</td><td><code class="hash">2590e7a50a7bc1840d328ba8cf28b921fbd7865d6fc648ee75ec0ea8ce74c6d4</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">664 B</td><td><code class="hash">9471003b5c1aff1549c2e55d09da0a752c3784ffd522cb192f3786dae99a33b2</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">832 B</td><td><code class="hash">60aab2f59981ed7c1cf4f256416097ac68c47c0df314b5cb9869d87c3eef92bd</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/edge-proxy/workflow/43/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.yml"># edge-proxy: GitHub Actions workflow, phase 1 of edge-proxy/workflow/43
+# Rendered with double-square-bracket delimiters, so GitHub expressions pass through untouched.
+name: edge-proxy
+on:
+  push:
+    branches: [&#34;main&#34;,&#34;release/*&#34;]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: &#34;${{ vars.GO_VERSION || &#39;1.24.x&#39; }}&#34;
+      - run: &#34;go vet ./...&#34;
+      - run: &#34;go test -race ./...&#34;
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for edge-proxy/workflow/43
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow edge-proxy/workflow/43, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id edge-proxy, template workflow,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;edge-proxy/workflow/43&#34;,
+  &#34;branches&#34;: {{if hasKey . &#34;branches&#34;}}{{toJSON (index . &#34;branches&#34;)}}{{else}}{{&#34;[\&#34;main\&#34;,\&#34;release/*\&#34;]&#34;}}{{end}},
+  &#34;go&#34;: {{if hasKey . &#34;go&#34;}}{{toJSON (index . &#34;go&#34;)}}{{else}}{{&#34;\&#34;1.24.x\&#34;&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;edge-proxy\&#34;&#34;}}{{end}},
+  &#34;run&#34;: {{if hasKey . &#34;run&#34;}}{{toJSON (index . &#34;run&#34;)}}{{else}}{{&#34;[\&#34;go vet ./...\&#34;,\&#34;go test -race ./...\&#34;]&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,293 @@
+{
+  "generated": "2026-10-19T12:00:00Z",
+  "base": "https://coolgitorg.github.io/issueops-library/",
+  "count": 7,
+  "items": [
+    {
+      "id": "payments-api/caddyfile/52",
+      "source_id": "payments-api",
+      "template_id": "caddyfile",
+      "phase": 2,
+      "issue": 52,
+      "published_at": "2026-10-03T10:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/52/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/52/artifact.caddyfile",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 319,
+          "sha256": "4181bded3622864c8ea9b3da7e9c54f37257f1dc39cc1dbd409000e487ae2ae8"
+        },
+        {
+          "name": "artifact.caddyfile",
+          "size": 373,
+          "sha256": "4c626cc5ac724c25f242fe13a038bc06845854771cecf9f8be5df7f8e47ea9b7"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1017,
+          "sha256": "61bef62de5edbad4f8e28bf28d74a07c7f440c4a68ef019008ca08106e55b232"
+        },
+        {
+          "name": "config.json",
+          "size": 697,
+          "sha256": "f4e3686e98ed736795c702f0a9c2c87a738f4708b98883956b752931bb771bcd"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 836,
+          "sha256": "c4e224a4633f105cf378b678375278deae5d00d1217493b787984cbebc00d42f"
+        }
+      ]
+    },
+    {
+      "id": "docs-portal/readme/47",
+      "source_id": "docs-portal",
+      "template_id": "readme",
+      "phase": 1,
+      "issue": 47,
+      "published_at": "2026-10-01T13:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/docs-portal/readme/47/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/docs-portal/readme/47/artifact.md",
+      "borrowed": true,
+      "due": "2026-10-11T09:00:00Z",
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 312,
+          "sha256": "5922099d6d1de846f7771998360babb9648180483ab3d5d067348345314e6a1b"
+        },
+        {
+          "name": "artifact.md",
+          "size": 217,
+          "sha256": "35cf8c32f24d05fca1825af1aa6f6e04231ec6c8c6231636aee5965a4cd2114e"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 950,
+          "sha256": "f0b45f79a966cee10aa80f654c2f83dadc743543ee82ad03e637245811625647"
+        },
+        {
+          "name": "config.json",
+          "size": 717,
+          "sha256": "ed646652430e6ad3f7f1963c42e29abd4706f2cae91f3fe4cb6ff7ea510a7d12"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 883,
+          "sha256": "b816665b4d425300b6e11f978ab77210f8a9bd01b2f059017c77fbee84d59a61"
+        }
+      ]
+    },
+    {
+      "id": "access-request/issue-form/46",
+      "source_id": "access-request",
+      "template_id": "issue-form",
+      "phase": 1,
+      "issue": 46,
+      "published_at": "2026-10-01T12:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/access-request/issue-form/46/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/access-request/issue-form/46/artifact.yml",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 313,
+          "sha256": "74c385c1b1514639a1d786ac832a7a8c75cdcfdb743e70d0e7b56fb2dae439eb"
+        },
+        {
+          "name": "artifact.yml",
+          "size": 451,
+          "sha256": "e902fb6416a2ffaed619619a53cf7084cbb8c3d6d1d4688ffa66d78838980880"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1052,
+          "sha256": "9eb651fe2ccc8892068120043501d7a498ec474e2c6801e0a6b5462bf0b284ab"
+        },
+        {
+          "name": "config.json",
+          "size": 835,
+          "sha256": "bc720bb9508f40f5de7865bfd0224699f1d13eda1c0dc4e03b328bfa7df828e8"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 796,
+          "sha256": "53addf1a42771aca6916692ea0182b649950a93529a4ba3b556b6a81aa831fae"
+        }
+      ]
+    },
+    {
+      "id": "infra-net/terraform-module/45",
+      "source_id": "infra-net",
+      "template_id": "terraform-module",
+      "phase": 1,
+      "issue": 45,
+      "published_at": "2026-10-01T11:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/infra-net/terraform-module/45/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/infra-net/terraform-module/45/artifact.tf",
+      "borrowed": true,
+      "due": "2026-10-29T09:00:00Z",
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 312,
+          "sha256": "0a583b23ff1845eab06bc779b2c6d7afd79029e80a63821c32d041515962ac8d"
+        },
+        {
+          "name": "artifact.tf",
+          "size": 562,
+          "sha256": "073cd67fe1882737b0e184242cc49601816f597d2efdd7bfc39ea9b9cc95e004"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1020,
+          "sha256": "383deaff32a1d523952c4fad164ca5a9422717c15210f5c57327622bd3b27d84"
+        },
+        {
+          "name": "config.json",
+          "size": 655,
+          "sha256": "73c418e0e0d33a15f8f806bccfb6af403eef4b7e9e68433b5d816f0bc9548af8"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 835,
+          "sha256": "bb7a5881199490d14028ddfd28bb58a6c86985763abff3c1de344764fc12dd9e"
+        }
+      ]
+    },
+    {
+      "id": "ledger-svc/nomad-job/44",
+      "source_id": "ledger-svc",
+      "template_id": "nomad-job",
+      "phase": 1,
+      "issue": 44,
+      "published_at": "2026-10-01T10:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/ledger-svc/nomad-job/44/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/ledger-svc/nomad-job/44/artifact.nomad.hcl",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 319,
+          "sha256": "504ce3813fe51c525d59b94fa373da4850e7f1e5e131ef5703493e2db8de5603"
+        },
+        {
+          "name": "artifact.nomad.hcl",
+          "size": 511,
+          "sha256": "cacd5b62141ce65e73d5346848e68d432b2840510dc15bc928d294c721f04462"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1031,
+          "sha256": "e908e01130781af5bd54f75879f675d7387c2a1203f60bbbd0b775fc0767faf1"
+        },
+        {
+          "name": "config.json",
+          "size": 637,
+          "sha256": "ce2dc19c6a044d0a332fd0bdeb996cedc70a9a047b88e06ffd973c26a35de1db"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 820,
+          "sha256": "4910bd56ab44d9472145ea4814ead312999ed4e7cb59d857f6eaa142c197ca09"
+        }
+      ]
+    },
+    {
+      "id": "edge-proxy/workflow/43",
+      "source_id": "edge-proxy",
+      "template_id": "workflow",
+      "phase": 1,
+      "issue": 43,
+      "published_at": "2026-10-01T09:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/edge-proxy/workflow/43/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/edge-proxy/workflow/43/artifact.yml",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 313,
+          "sha256": "d5257555db9941103bf4efa0f7b5ffe5c0bb9be9da793f373fd398454cb64790"
+        },
+        {
+          "name": "artifact.yml",
+          "size": 647,
+          "sha256": "5b5d252e3bb8f159f24ce45eff4f3cc8a3b7f002541d39e5ad9dc667ac30b376"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1161,
+          "sha256": "2590e7a50a7bc1840d328ba8cf28b921fbd7865d6fc648ee75ec0ea8ce74c6d4"
+        },
+        {
+          "name": "config.json",
+          "size": 664,
+          "sha256": "9471003b5c1aff1549c2e55d09da0a752c3784ffd522cb192f3786dae99a33b2"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 832,
+          "sha256": "60aab2f59981ed7c1cf4f256416097ac68c47c0df314b5cb9869d87c3eef92bd"
+        }
+      ]
+    },
+    {
+      "id": "payments-api/caddyfile/42",
+      "source_id": "payments-api",
+      "template_id": "caddyfile",
+      "phase": 1,
+      "issue": 42,
+      "published_at": "2026-10-01T08:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/artifact.caddyfile",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 319,
+          "sha256": "3a908162c7f6ad8429390ddae2f4069da33cb3b3cea36ef9852e10e4bad5d19a"
+        },
+        {
+          "name": "artifact.caddyfile",
+          "size": 334,
+          "sha256": "2398f8cb639b0ba598e9d0f70b630df9aba77e294f9ae4a98bf911cafef8267b"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 990,
+          "sha256": "978242cbe7cd346015d07882c8b4c829e76c1e03d8573d46c82fa7009f6cfc23"
+        },
+        {
+          "name": "config.json",
+          "size": 637,
+          "sha256": "a3d6780ab65789cabef830721964d101eef481b1615e0c2a6d58dd78711f3820"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 824,
+          "sha256": "d2a2e7e1e7b2ad0f72c4c9d0c7932f44aa4e19612f84660466d2c852712800a4"
+        }
+      ]
+    }
+  ],
+  "open_loans": [
+    {
+      "item": "docs-portal/readme/47",
+      "borrower": "carol",
+      "borrow_issue": 55,
+      "borrowed_at": "2026-10-04T09:00:00Z",
+      "due": "2026-10-11T09:00:00Z",
+      "returned_at": null
+    },
+    {
+      "item": "infra-net/terraform-module/45",
+      "borrower": "carol",
+      "borrow_issue": 56,
+      "borrowed_at": "2026-10-15T09:00:00Z",
+      "due": "2026-10-29T09:00:00Z",
+      "returned_at": null
+    }
+  ]
+}

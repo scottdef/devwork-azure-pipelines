@@ -1,0 +1,17 @@
+{
+  "id": "catalog-rows",
+  "rows": [
+    {
+      "name": "hello.go",
+      "format": "txt"
+    },
+    {
+      "name": "email.html",
+      "format": "html"
+    },
+    {
+      "name": "x\" onmouseover=\"alert(1)",
+      "format": "txt"
+    }
+  ]
+}

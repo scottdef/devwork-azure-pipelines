@@ -1,0 +1,32 @@
+# Borrow a published item's next-phase slot. One login may hold three.
+name: Library borrow
+description: Reserve an item's next-phase slot for 7 or 14 days.
+title: "[borrow] "
+labels: [issueops, borrow]
+body:
+  - type: input
+    id: item-id
+    attributes:
+      label: Item ID
+      description: source-id/template-id/issue, as shown on the item page.
+      placeholder: payments-api/caddyfile/42
+    validations:
+      required: true
+  - type: dropdown
+    id: days
+    attributes:
+      label: Days
+      description: Loan period. Overdue loans are warned, then returned after a 7 day grace.
+      options:
+        - "7"
+        - "14"
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason
+      description: What you plan to build in the next phase.
+    validations:
+      required: false

@@ -1,0 +1,34 @@
+{{define "title"}}Request a library item | CoolGitOrg{{end}}
+{{define "bodyattrs"}} data-base="{{.GitHub}}/{{.Repo}}/issues/new" data-max="{{.MaxURL}}" data-flags="{{.Root}}flags.json"{{end}}
+{{define "content"}}
+<h1>CoolGitOrg library intake</h1>
+<p>Each form below is generated from the issue form of the same name. Filling it in here only
+builds a link: <strong>submitting opens GitHub</strong> with your answers prefilled, and you file
+the issue there. The library publishes accepted requests to
+<a href="{{.Library}}">{{.Library}}</a>; every item is open to everyone.</p>
+<p id="flag-off" class="warn" hidden>Submissions are paused (beta gate). You can still browse the library.</p>
+<noscript><p class="warn">JavaScript is off. Use the links to the plain issue forms below.</p></noscript>
+<ul class="toc">
+{{- range .Pages}}
+<li><a href="#{{.Slug}}">{{.Form.Name}}</a> &mdash; {{.Form.Description}}</li>
+{{- end}}
+</ul>
+{{range .Pages}}
+<section id="{{.Slug}}">
+<h2>{{.Form.Name}}</h2>
+{{- range .Markdown}}
+<p class="md">{{mdLinks .}}</p>
+{{- end}}
+<form class="intake" data-template="{{.Form.File}}" data-title="{{.Form.Title}}" data-title-fields="{{join .TitleFields " "}}" novalidate>
+{{range .Fields}}{{template "field" .}}
+{{end}}
+<div class="actions">
+<button type="submit">Open prefilled issue on GitHub</button>
+<a class="plain" href="{{$.GitHub}}/{{$.Repo}}/issues/new?template={{.Form.File}}">plain form</a>
+</div>
+<pre class="out" aria-live="polite"></pre>
+</form>
+</section>
+{{end}}
+<script src="{{.Root}}static/intake.js"></script>
+{{end}}

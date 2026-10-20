@@ -1,0 +1,20 @@
+== untrimmed
+{{ range .Items }}
+  {{ . }}
+{{ end }}
+=> "\n  a\n\n  b\n\n  c\n"
+== left-trim
+{{- range .Items }}
+  {{ . }}
+{{- end }}
+=> "\n  a\n  b\n  c"
+== both-trim
+{{- range .Items -}}
+  {{ . }}
+{{- end -}}
+=> "abc"
+== idiom
+{{ range .Items -}}
+  {{ . }}
+{{ end -}}
+=> "a\nb\nc\n"

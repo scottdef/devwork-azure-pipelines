@@ -1,0 +1,15 @@
+{
+  "source": {"type": "dir", "path": "testdata/kv", "interval": "2s"},
+  "templates": [
+    {"source": "templates/Caddyfile.tmpl", "destination": "out/Caddyfile", "error_on_missing_key": true},
+    {"source": "templates/nginx.conf.tmpl", "destination": "out/nginx.conf", "error_on_missing_key": true},
+    {"source": "templates/wg0.conf.tmpl", "destination": "out/wg0.conf", "perms": "0600", "error_on_missing_key": true},
+    {"source": "templates/prometheus.yml.tmpl", "destination": "out/prometheus.yml", "error_on_missing_key": true},
+    {"source": "templates/main.tf.tmpl", "destination": "out/main.tf", "error_on_missing_key": true},
+    {"source": "templates/job.nomad.hcl.tmpl", "destination": "out/job.nomad.hcl", "left_delimiter": "[[", "right_delimiter": "]]", "error_on_missing_key": true},
+    {"source": "templates/corefile.tmpl", "destination": "out/Corefile", "error_on_missing_key": true},
+    {"source": "templates/motd.txt.tmpl", "destination": "out/motd", "error_on_missing_key": true},
+    {"source": "templates/hosts.tmpl", "destination": "out/hosts", "error_on_missing_key": true}
+  ],
+  "listen": "127.0.0.1:9180"
+}

@@ -1,0 +1,78 @@
+# pages.yml: rebuild and redeploy the library site after a human change to
+# templates or code lands on main (events deploy through publish.yml).
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "templates/**"
+      - "internal/**"
+      - "cmd/pagegen/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GOFLAGS: -mod=mod
+      BASE_URL: ${{ vars.LIBRARY_BASE_URL || 'https://coolgitorg.github.io/issueops-library/' }}
+    steps:
+      - name: Mint App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: issueops-library
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app.outputs.token }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Rebuild site and commit if it changed
+        run: |
+          make build
+          bin/pagegen -base "$BASE_URL" -site site -items items -ledger ledger/ledger.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A site
+          if ! git diff --cached --quiet; then
+            git commit -m "library: rebuild site after template change"
+            git push origin HEAD:main
+          fi
+
+  deploy:
+    needs: rebuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: library-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5

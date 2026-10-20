@@ -1,0 +1,31 @@
+{
+  "source": {
+    "type": "github",
+    "repo": "CoolGitOrg/tmplwatch-kv",
+    "ref": "main",
+    "prefix": "kv/",
+    "interval": "15s",
+    "token_env": "GITHUB_TOKEN"
+  },
+  "templates": [
+    {
+      "source": "templates/Caddyfile.tmpl",
+      "destination": "out/Caddyfile",
+      "perms": "0644",
+      "backup": true,
+      "command": ["caddy", "validate", "--config", "out/Caddyfile"],
+      "splay": "5s",
+      "left_delimiter": "{{",
+      "right_delimiter": "}}",
+      "error_on_missing_key": true,
+      "wait": "2s"
+    }
+  ],
+  "exec": {
+    "command": ["/usr/local/bin/app"],
+    "change_signal": "SIGHUP"
+  },
+  "listen": "127.0.0.1:9180",
+  "dry": false,
+  "once": false
+}

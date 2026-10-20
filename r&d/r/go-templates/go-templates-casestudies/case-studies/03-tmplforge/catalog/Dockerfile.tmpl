@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+FROM golang:{{ .go }} AS build
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/{{ .binary }} ./cmd/{{ .binary }}
+
+FROM scratch
+COPY --from=build /out/{{ .binary }} /{{ .binary }}
+{{- range .ports }}
+EXPOSE {{ . }}
+{{- end }}
+{{- range $k := sortedKeys .labels }}
+LABEL {{ $k }}={{ index $.labels $k | toJSON }}
+{{- end }}
+USER 65534:65534
+ENTRYPOINT [{{ printf "/%s" .binary | toJSON }}{{ range .args }}, {{ toJSON . }}{{ end }}]

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ .subject }}</title></head>
+<body>
+<h1>{{ .subject }}</h1>
+<p>Hello {{ .name }},</p>
+<p>{{ .body }}</p>
+<ul>
+{{- range .items }}
+  <li><a href="{{ .url }}">{{ .title }}</a></li>
+{{- end }}
+</ul>
+<p><a href="{{ .unsubscribe }}">Unsubscribe</a></p>
+</body>
+</html>

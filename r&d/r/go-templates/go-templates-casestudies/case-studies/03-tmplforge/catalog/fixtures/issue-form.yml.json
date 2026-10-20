@@ -1,0 +1,34 @@
+{
+  "name": "New repository",
+  "description": "Request a repository in CoolGitOrg",
+  "prefix": "repo",
+  "labels": [
+    "issueops",
+    "repo-request"
+  ],
+  "intro": "Fill this in; the bot parses it.",
+  "fields": [
+    {
+      "type": "input",
+      "id": "name",
+      "label": "Repository name",
+      "required": true
+    },
+    {
+      "type": "dropdown",
+      "id": "visibility",
+      "label": "Visibility",
+      "options": [
+        "internal",
+        "private"
+      ],
+      "required": true
+    },
+    {
+      "type": "textarea",
+      "id": "why",
+      "label": "Why",
+      "required": false
+    }
+  ]
+}

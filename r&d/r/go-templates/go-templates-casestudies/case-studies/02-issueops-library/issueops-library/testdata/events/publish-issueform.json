@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "access-request",
+    "template_id": "issue-form",
+    "phase": "1",
+    "issue": 46,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "dave",
+    "payload": "{\"name\":\"Access request\",\"fields\":[{\"id\":\"system\",\"label\":\"System\",\"type\":\"dropdown\",\"options\":[\"vault\",\"nomad\"],\"required\":true},{\"id\":\"why\",\"label\":\"Why\",\"type\":\"textarea\"}]}",
+    "sha256": "d24eaebf0dceea790476e9309c3299672854f5edc7c02615093e89e73990ee8a"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

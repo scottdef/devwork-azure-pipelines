@@ -1,0 +1,7 @@
+{
+  "notes": "First cut; TLS is internal.",
+  "payload": "{\"name\": \"payments-api\", \"domain\": \"pay.coolgit.org\", \"port\": 8443, \"routes\": [\"/pay\", \"/refund\"]}",
+  "phase": "1",
+  "source-id": "payments-api",
+  "template-id": "caddyfile"
+}

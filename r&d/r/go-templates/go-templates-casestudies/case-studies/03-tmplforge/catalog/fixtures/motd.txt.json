@@ -1,0 +1,12 @@
+{
+  "host": "plan9",
+  "greeting": "Welcome",
+  "user": "",
+  "kernel": "9front 10522",
+  "lastLogin": "2026-10-18T21:04:00Z",
+  "updates": 1,
+  "notices": [
+    "fossil snapshot at 04:00",
+    "venti scrub tonight"
+  ]
+}

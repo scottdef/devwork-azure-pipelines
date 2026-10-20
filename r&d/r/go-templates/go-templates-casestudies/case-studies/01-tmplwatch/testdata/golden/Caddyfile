@@ -1,0 +1,30 @@
+# Managed by tmplwatch from beta KV. Do not edit by hand.
+{
+	email ops@example.internal
+	admin localhost:2019
+}
+
+app.example.internal {
+	tls internal
+	encode zstd gzip
+	reverse_proxy 10.0.1.10:8080 10.0.1.11:8080 {
+		lb_policy round_robin
+		health_uri /healthz
+	}
+}
+
+grafana.example.internal {
+	tls internal
+	encode zstd gzip
+	header X-Frame-Options DENY
+	reverse_proxy 10.0.2.20:3000 {
+		lb_policy round_robin
+		health_uri /healthz
+	}
+}
+
+http://static.example.internal {
+	encode zstd gzip
+	root * /srv/www
+	file_server
+}

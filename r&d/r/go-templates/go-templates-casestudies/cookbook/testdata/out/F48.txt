@@ -1,0 +1,9 @@
+<p>text: O&#39;Reilly &amp; &lt;b&gt;&#34;Sons&#34;&lt;/b&gt;</p>
+<p title="O&#39;Reilly &amp; &lt;b&gt;&#34;Sons&#34;&lt;/b&gt;">quoted attribute</p>
+<p title=O&#39;Reilly&#32;&amp;&#32;&lt;b&gt;&#34;Sons&#34;&lt;/b&gt;>unquoted attribute</p>
+<a href="/q?s=O%27Reilly%20%26%20%3cb%3e%22Sons%22%3c%2fb%3e">URL query</a>
+<a href="#ZgotmplZ">URL scheme</a>
+<script>var x = "O'Reilly \u0026 \u003cb\u003e\"Sons\"\u003c/b\u003e";</script>
+<script>var s = "O\u0027Reilly \u0026 \u003cb\u003e\u0022Sons\u0022\u003c\/b\u003e";</script>
+<div style="font-family: ZgotmplZ">CSS</div>
+<button onclick="go(&#34;O&#39;Reilly \u0026 \u003cb\u003e\&#34;Sons\&#34;\u003c/b\u003e&#34;)">JS in attribute</button>

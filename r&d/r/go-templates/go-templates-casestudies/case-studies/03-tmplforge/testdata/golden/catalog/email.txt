@@ -1,0 +1,13 @@
+Subject: Your weekly forge digest
+
+Hello Glenda,
+
+3 templates changed this week.
+
+  1. Add mkfile catalog entry
+     https://github.com/CoolGitOrg/tmplforge/pull/1
+  2. Sandbox output cap
+     https://github.com/CoolGitOrg/tmplforge/pull/2
+
+-- 
+tmplforge, CoolGitOrg

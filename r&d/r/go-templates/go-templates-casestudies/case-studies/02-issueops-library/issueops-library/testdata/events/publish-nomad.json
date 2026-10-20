@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "ledger-svc",
+    "template_id": "nomad-job",
+    "phase": "1",
+    "issue": 44,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "carol",
+    "payload": "{\"name\":\"ledger-svc\",\"image\":\"ghcr.io/coolgitorg/ledger:1.4.2\",\"count\":3,\"env\":{\"LOG_LEVEL\":\"info\"}}",
+    "sha256": "9f4e25bd72b38faa599e76919ba3f25f09e410c6c44141478fd55b6a4f6a090f"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

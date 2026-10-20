@@ -1,0 +1,79 @@
+name: loadtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: Duration per endpoint (Go duration)
+        default: 5m
+        required: true
+      rate:
+        description: /render requests per second
+        default: "50"
+        required: true
+      template:
+        description: Template name for /render
+        default: Caddyfile
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+  CGO_ENABLED: "0"
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+
+      - name: build
+        run: |
+          mkdir -p bin
+          for b in tmplwatch tpl tmplload; do go build -trimpath -o "bin/$b" "./cmd/$b"; done
+
+      - name: start tmplwatch on 127.0.0.1:9180
+        run: |
+          mkdir -p dist/loadtest
+          nohup bin/tmplwatch -c config/testdata.json -a 127.0.0.1:9180 > dist/loadtest/tmplwatch.log 2>&1 &
+          echo $! > dist/loadtest/tmplwatch.pid
+          for i in $(seq 30); do
+            bin/tmplwatch -healthcheck -a 127.0.0.1:9180 && exit 0
+            sleep 1
+          done
+          cat dist/loadtest/tmplwatch.log
+          exit 1
+
+      - name: run scripts/loadtest.sh
+        id: load
+        # Inputs are untrusted text: they reach the script through env only.
+        env:
+          DURATION: ${{ inputs.duration }}
+          RATE: ${{ inputs.rate }}
+          TEMPLATE: ${{ inputs.template }}
+          TMPLLOAD: bin/tmplload
+        run: scripts/loadtest.sh http://127.0.0.1:9180
+
+      - name: job summary (rendered by tpl)
+        if: always()
+        run: |
+          if [ -f dist/loadtest/report.json ]; then
+            bin/tpl -t scripts/loadtest-summary.md.tmpl -d dist/loadtest/report.json -missingkey error >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '#### /metrics after the run' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          curl -fsS http://127.0.0.1:9180/metrics | grep -E '^tmplwatch_(renders|render_duration|source_polls)' >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: stop tmplwatch
+        if: always()
+        run: kill "$(cat dist/loadtest/tmplwatch.pid)" 2>/dev/null || true

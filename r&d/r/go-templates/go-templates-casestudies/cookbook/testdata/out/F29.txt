@@ -1,0 +1,12 @@
+BIN=cookbook
+
+all:V: build test
+
+build:V:
+	CGO_ENABLED=0 GOOS=plan9 GOARCH=amd64 go build -o bin/$BIN ./cmd/$BIN
+
+test:V: build
+	go test ./...
+
+clean:V:
+	rm -r bin

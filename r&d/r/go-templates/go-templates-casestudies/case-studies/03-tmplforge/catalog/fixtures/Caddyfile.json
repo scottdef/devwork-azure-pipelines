@@ -1,0 +1,21 @@
+{
+  "email": "ops@coolgitorg.example",
+  "hsts": 31536000,
+  "sites": [
+    {
+      "host": "forge.coolgitorg.example",
+      "root": "",
+      "proxies": [
+        {
+          "path": "/*",
+          "upstream": "127.0.0.1:8088"
+        }
+      ]
+    },
+    {
+      "host": "docs.coolgitorg.example",
+      "root": "/srv/docs",
+      "proxies": []
+    }
+  ]
+}

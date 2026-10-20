@@ -1,0 +1,6 @@
+iso:     2024-03-05T14:30:00Z
+short:   Tue Mar  5 2:30PM
+helper:  05 Mar 2024
+weekday: Tuesday
+next:    2024-03-12
+unix:    1709649000

@@ -1,0 +1,6 @@
+<table>
+  <tr class="even"><td>ada</td></tr>
+  <tr class="odd"><td>grace</td></tr>
+  <tr class="even"><td>ken</td></tr>
+  <tr class="odd"><td>dennis</td></tr>
+</table>

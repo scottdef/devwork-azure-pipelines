@@ -1,0 +1,6 @@
+{
+  "payload": "{\n  \"name\": \"ledger-svc\",\n  \"image\": \"ghcr.io/coolgitorg/ledger:1.4.2\",\n  \"count\": 3\n}",
+  "phase": "2",
+  "source-id": "ledger-svc",
+  "template-id": "nomad-job"
+}

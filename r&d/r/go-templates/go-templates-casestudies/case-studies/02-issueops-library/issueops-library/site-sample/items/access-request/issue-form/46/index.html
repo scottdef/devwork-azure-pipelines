@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>access-request/issue-form/46 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>access-request</code> / issue-form / #46</p>
+<h1><code>access-request</code> &middot; issue-form</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge in">available</span>
+The phase 2 slot is free.
+<a class="button" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=borrow.yml&amp;title=%5Bborrow%5D%20access-request/issue-form/46&amp;item-id=access-request/issue-form/46">Borrow phase 2</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>access-request/issue-form/46</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 12:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/46">https://github.com/CoolGitOrg/issueops-intake/issues/46</a></dd>
+<dt>Requested by</dt><dd>dave</dd>
+<dt>Payload sha256</dt><dd><code class="hash">d24eaebf0dceea790476e9309c3299672854f5edc7c02615093e89e73990ee8a</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">71b73c101e9bddb74afc03938e01db84cee5488a250d5cd0a93b823210ee5963</code></dd>
+</dl>
+<p><a class="button" href="artifact.yml" download>Download artifact.yml</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">313 B</td><td><code class="hash">74c385c1b1514639a1d786ac832a7a8c75cdcfdb743e70d0e7b56fb2dae439eb</code></td></tr>
+<tr class="odd"><td><a href="artifact.yml">artifact.yml</a></td><td class="num">451 B</td><td><code class="hash">e902fb6416a2ffaed619619a53cf7084cbb8c3d6d1d4688ffa66d78838980880</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">1.0 KiB</td><td><code class="hash">9eb651fe2ccc8892068120043501d7a498ec474e2c6801e0a6b5462bf0b284ab</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">835 B</td><td><code class="hash">bc720bb9508f40f5de7865bfd0224699f1d13eda1c0dc4e03b328bfa7df828e8</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">796 B</td><td><code class="hash">53addf1a42771aca6916692ea0182b649950a93529a4ba3b556b6a81aa831fae</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/access-request/issue-form/46/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.yml"># Access request: issue form, phase 1 of access-request/issue-form/46
+name: &#34;Access request&#34;
+description: &#34;Access request request&#34;
+title: &#34;[access-request] &#34;
+labels: [&#34;issueops&#34;]
+body:
+  - type: dropdown
+    id: system
+    attributes:
+      label: &#34;System&#34;
+      options:
+        - &#34;vault&#34;
+        - &#34;nomad&#34;
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: &#34;Why&#34;
+    validations:
+      required: false
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for access-request/issue-form/46
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow access-request/issue-form/46, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id access-request, template issue-form,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;access-request/issue-form/46&#34;,
+  &#34;fields&#34;: {{if hasKey . &#34;fields&#34;}}{{toJSON (index . &#34;fields&#34;)}}{{else}}{{&#34;[{\&#34;id\&#34;:\&#34;system\&#34;,\&#34;label\&#34;:\&#34;System\&#34;,\&#34;options\&#34;:[\&#34;vault\&#34;,\&#34;nomad\&#34;],\&#34;required\&#34;:true,\&#34;type\&#34;:\&#34;dropdown\&#34;},{\&#34;id\&#34;:\&#34;why\&#34;,\&#34;label\&#34;:\&#34;Why\&#34;,\&#34;type\&#34;:\&#34;textarea\&#34;}]&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;Access request\&#34;&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

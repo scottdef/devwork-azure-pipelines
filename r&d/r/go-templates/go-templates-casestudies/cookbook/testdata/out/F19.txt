@@ -1,0 +1,10 @@
+# Release notes
+== motd ==
+Welcome to the cookbook.
+Every formula here is tested.
+== header, indented ==
+    # Generated file
+    # Do not edit
+file "../formulas.go": template: probe:1:3: executing "probe" at <file .>: error calling file: file: invalid path "../formulas.go"
+file "/etc/passwd": template: probe:1:3: executing "probe" at <file .>: error calling file: file: invalid path "/etc/passwd"
+file "missing.txt": template: probe:1:3: executing "probe" at <file .>: error calling file: file: open missing.txt: file does not exist

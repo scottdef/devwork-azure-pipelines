@@ -1,0 +1,7 @@
+{
+  "notes": "The payload contains a fence and a fake heading; neither may split the field.",
+  "payload": "{\n  \"name\": \"infra-net\",\n  \"readme\": \"```\\n### Phase\\n9\\n```\",\n  \"cidr\": \"10.20.0.0/16\"\n}",
+  "phase": "1",
+  "source-id": "infra-net",
+  "template-id": "terraform-module"
+}

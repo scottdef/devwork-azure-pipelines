@@ -1,0 +1,78 @@
+# Load test: start `tmplforge serve` on loopback in the runner, drive
+# POST /render at a constant rate, and publish the report to the job
+# summary. The summary is rendered by tmplforge itself from
+# scripts/loadtest-report.md.tmpl against the JSON report.
+name: loadtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      rate:
+        description: "Requests per second"
+        type: number
+        required: false
+        default: 20
+      duration:
+        description: "Go duration, e.g. 5m"
+        type: string
+        required: false
+        default: "5m"
+      p99_ms:
+        description: "SLO: p99 latency in ms (includes sandbox spawn)"
+        type: number
+        required: false
+        default: 150
+
+permissions:
+  contents: read
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    environment: beta
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: validate inputs
+        env:
+          RATE: ${{ inputs.rate }}
+          DURATION: ${{ inputs.duration }}
+          P99_MS: ${{ inputs.p99_ms }}
+        run: |
+          case "$RATE" in ''|*[!0-9]*) echo "rate must be a whole number" >&2; exit 1 ;; esac
+          case "$P99_MS" in ''|*[!0-9]*) echo "p99_ms must be a whole number" >&2; exit 1 ;; esac
+          printf '%s' "$DURATION" | grep -Eq '^[0-9]+(ms|s|m)$' || { echo "duration must look like 30s or 5m" >&2; exit 1; }
+      - name: load test
+        id: run
+        env:
+          RATE: ${{ inputs.rate }}
+          DURATION: ${{ inputs.duration }}
+          P99_MS: ${{ inputs.p99_ms }}
+          REPORT: loadtest.json
+        run: |
+          set +e
+          # vegeta/hey are not on the runner image; scripts/loadtest.sh
+          # falls back to cmd/forgeload, which writes loadtest.json.
+          ./scripts/loadtest.sh > loadtest.md
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+      - name: job summary
+        if: always()
+        run: |
+          if [ -s loadtest.json ]; then
+            go run ./cmd/tmplforge render -t scripts/loadtest-report.md.tmpl -d loadtest.json -f md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "load test produced no report" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: SLO
+        env:
+          STATUS: ${{ steps.run.outputs.status }}
+        run: test "$STATUS" = 0

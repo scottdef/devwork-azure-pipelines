@@ -1,0 +1,26 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>{{.Title}} | CoolGitOrg library</title>
+<link rel="stylesheet" href="{{.Root}}static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="{{.Root}}feed.xml">
+<script src="{{.Root}}static/htmx/htmx.min.js" defer></script>
+<script src="{{.Root}}static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="{{.Root}}">issueops-library</a>
+<nav><a href="{{.Root}}">catalog</a> <a href="{{.Root}}ledger/">ledger</a> <a href="{{.IntakeURL}}">request</a> <a href="{{.Root}}feed.xml">feed</a></nav>
+</header>
+<main>
+{{block "content" .}}{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>
+{{end}}

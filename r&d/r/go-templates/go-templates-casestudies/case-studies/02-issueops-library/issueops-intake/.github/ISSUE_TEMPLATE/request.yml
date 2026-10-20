@@ -1,0 +1,65 @@
+# Library publish request. Field ids key the parsed JSON (bin/issueparse)
+# and the prefill query parameters built by the intake page; renaming an id
+# is a breaking change for both.
+name: Library request
+description: Render a template into the CoolGitOrg library and publish it on Pages.
+title: "[request] "
+labels: [issueops, request]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill this in by hand or start from the
+        [intake page](https://coolgitorg.github.io/issueops-intake/), which
+        prefills it. The rendered item is open to everyone once published.
+  - type: input
+    id: source-id
+    attributes:
+      label: Source ID
+      description: Stable name of the thing being described (a-z, 0-9, dash; 2-48 chars).
+      placeholder: payments-api
+    validations:
+      required: true
+  - type: dropdown
+    id: template-id
+    attributes:
+      label: Template
+      description: Which library template renders the payload.
+      options:
+        - caddyfile
+        - workflow
+        - issue-form
+        - terraform-module
+        - nomad-job
+        - readme
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      description: Phase 1 renders the artifact; 2 and 3 render from a borrowed next-phase template.
+      options:
+        - "1"
+        - "2"
+        - "3"
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: payload
+    attributes:
+      label: Payload
+      description: JSON object handed to the template as its data (max 32 KiB).
+      render: json
+      placeholder: '{"name": "payments-api"}'
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything a reviewer should know. Not used for rendering.
+    validations:
+      required: false

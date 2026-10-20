@@ -1,0 +1,10 @@
+{{- /* Data: pagegen or ledger result JSON with ok=false. */ -}}
+### Not done
+
+{{with index . "item_id"}}Item `{{.}}`: {{end}}{{with index . "item"}}Item `{{.}}`: {{end}}the library refused this request.
+
+```text
+{{.error}}
+```
+
+Fix the issue body (editing re-runs intake) or open a new request.

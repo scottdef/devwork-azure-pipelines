@@ -1,0 +1,4 @@
+dist/
+bin/
+*.zip
+/SHA256SUMS

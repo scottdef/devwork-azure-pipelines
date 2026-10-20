@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>tmplforge GUI wireframe: builder page</title>
+  <desc>Header nav, then the four builder steps: format and delimiters, variables table with add row, template textarea with lint, vars and export buttons, and side-by-side fixture and live preview.</desc>
+  <style>
+    .frame { fill: #fffff4; stroke: #333; stroke-width: 1.5; }
+    .bar { fill: #f3f3ea; stroke: #d6d6c2; }
+    .fs { fill: none; stroke: #d6d6c2; stroke-width: 1.2; }
+    .field { fill: #fff; stroke: #999; }
+    .btn { fill: #fff; stroke: #2a5db0; }
+    .btnt { fill: #2a5db0; font-size: 12px; }
+    .lg { font-weight: bold; fill: #1d1d1b; }
+    .m { font-family: Menlo, Consolas, monospace; font-size: 11.5px; fill: #333; }
+    .s { font-size: 11px; fill: #6b6b60; }
+    .hx { font-family: Menlo, Consolas, monospace; font-size: 10.5px; fill: #b35c00; }
+    .err { fill: #fff2b3; }
+  </style>
+
+  <rect class="frame" x="10" y="10" width="940" height="620" rx="6"/>
+  <rect class="bar" x="10" y="10" width="940" height="38" rx="6"/>
+  <text x="28" y="35" font-family="Menlo, monospace" font-weight="bold">tmplforge</text>
+  <text x="130" y="35" fill="#2a5db0">catalog</text><text x="200" y="35" fill="#2a5db0">builder</text><text x="268" y="35" fill="#2a5db0">test</text><text x="314" y="35" fill="#2a5db0">generate</text><text x="390" y="35" fill="#2a5db0">latency</text><text x="458" y="35" fill="#2a5db0">metrics</text>
+
+  <text x="28" y="78" font-size="20" font-weight="bold">Builder</text>
+  <text x="120" y="78" class="m">email.html</text>
+
+  <!-- step 1 -->
+  <rect class="fs" x="28" y="92" width="904" height="62"/>
+  <text class="lg" x="38" y="108">1. Format</text>
+  <rect class="field" x="38" y="118" width="110" height="24"/><text class="m" x="46" y="134">html  v</text>
+  <rect class="field" x="170" y="118" width="80" height="24"/><text class="m" x="178" y="134">{{,}}</text>
+  <text class="s" x="270" y="134">html uses html/template; others text/template. [[,]] keeps ${{ }} literal.</text>
+  <text class="hx" x="38" y="152">hx-post=/render hx-trigger=change hx-target=#preview</text>
+
+  <!-- step 2 -->
+  <rect class="fs" x="28" y="164" width="904" height="108"/>
+  <text class="lg" x="38" y="180">2. Variables</text>
+  <text class="s" x="38" y="198">name</text><text class="s" x="156" y="198">type</text><text class="s" x="244" y="198">default</text>
+  <rect class="field" x="38" y="204" width="110" height="20"/><text class="m" x="44" y="218">subject</text>
+  <rect class="field" x="156" y="204" width="80" height="20"/><text class="m" x="162" y="218">string</text>
+  <rect class="field" x="244" y="204" width="140" height="20"/>
+  <text class="m" x="394" y="218">x</text>
+  <rect class="field" x="38" y="240" width="110" height="22"/><text class="s" x="44" y="255">name</text>
+  <rect class="field" x="156" y="240" width="80" height="22"/><text class="m" x="162" y="255">int v</text>
+  <rect class="field" x="244" y="240" width="140" height="22"/><text class="s" x="250" y="255">default</text>
+  <rect class="btn" x="394" y="240" width="100" height="22"/><text class="btnt" x="404" y="255">add variable</text>
+  <text class="hx" x="506" y="255">hx-post=/builder/var hx-target=#vars hx-swap=beforeend</text>
+
+  <!-- step 3 -->
+  <rect class="fs" x="28" y="282" width="904" height="160"/>
+  <text class="lg" x="38" y="298">3. Template</text>
+  <rect class="field" x="38" y="306" width="884" height="96"/>
+  <text class="m" x="46" y="324">&lt;h1&gt;{{ .subject }}&lt;/h1&gt;</text>
+  <text class="m" x="46" y="340">&lt;p&gt;Hello {{ .name }},&lt;/p&gt;</text>
+  <text class="m" x="46" y="356">{{- range .items }}</text>
+  <text class="m" x="46" y="372">  &lt;li&gt;&lt;a href="{{ .url }}"&gt;{{ .title }}&lt;/a&gt;&lt;/li&gt;</text>
+  <text class="hx" x="560" y="396">hx-post=/render hx-trigger="keyup changed delay:300ms"</text>
+  <rect class="btn" x="38" y="410" width="50" height="22"/><text class="btnt" x="50" y="425">lint</text>
+  <rect class="btn" x="96" y="410" width="150" height="22"/><text class="btnt" x="106" y="425">fixture from template</text>
+  <rect class="btn" x="254" y="410" width="110" height="22"/><text class="btnt" x="264" y="425">export .tar.gz</text>
+  <text class="s" x="380" y="425">lint -&gt; #lint: "email.html:3: warning: .x referenced but not declared"</text>
+
+  <!-- step 4 -->
+  <rect class="fs" x="28" y="452" width="904" height="168"/>
+  <text class="lg" x="38" y="468">4. Fixture and preview</text>
+  <rect class="field" x="38" y="476" width="430" height="134"/>
+  <text class="m" x="46" y="494">{</text>
+  <text class="m" x="46" y="510">  "subject": "Your weekly forge digest",</text>
+  <text class="m" x="46" y="526">  "name": "Glenda &lt;glenda@9front.org&gt;",</text>
+  <text class="m" x="46" y="542">  "items": [ ... ]</text>
+  <text class="m" x="46" y="558">}</text>
+  <text class="hx" x="46" y="600">#fixture-wrap  (POST /vars swaps a skeleton here)</text>
+
+  <rect class="field" x="490" y="476" width="432" height="134"/>
+  <text class="s" x="498" y="492">#preview   612 bytes in 6.9ms</text>
+  <text class="m" x="498" y="510">&lt;h1&gt;Your weekly forge digest&lt;/h1&gt;</text>
+  <text class="m" x="498" y="526">&lt;p&gt;Hello Glenda &amp;lt;glenda@9front.org&amp;gt;,&lt;/p&gt;</text>
+  <rect class="err" x="492" y="562" width="428" height="16"/>
+  <text class="m" x="498" y="574">3  {{ .x | nofunc }}     &lt;- error line highlighted</text>
+  <text class="hx" x="498" y="600">sandboxed child render, escaped &lt;pre&gt;</text>
+</svg>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>docs-portal/readme/47 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>docs-portal</code> / readme / #47</p>
+<h1><code>docs-portal</code> &middot; readme</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge late" title="was due 2026-10-11">overdue</span>
+Next phase reserved by <strong>carol</strong> until 2026-10-11
+(<a href="https://github.com/CoolGitOrg/issueops-intake/issues/55">#55</a>).
+<a class="button ghost" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=return.yml&amp;title=%5Breturn%5D%20docs-portal/readme/47&amp;item-id=docs-portal/readme/47">Return (borrower)</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>docs-portal/readme/47</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 13:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/47">https://github.com/CoolGitOrg/issueops-intake/issues/47</a></dd>
+<dt>Requested by</dt><dd>erin</dd>
+<dt>Payload sha256</dt><dd><code class="hash">cc021728bcb7e8bf200dd4bdbd245dfbbf50b562f0a7e8570934b0ab4d53f0f7</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">6a08f4af8f0d4a31e2a03b2f2ea0f8e989438e385375fba7c5fd8d39571a7125</code></dd>
+</dl>
+<p><a class="button" href="artifact.md" download>Download artifact.md</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">312 B</td><td><code class="hash">5922099d6d1de846f7771998360babb9648180483ab3d5d067348345314e6a1b</code></td></tr>
+<tr class="odd"><td><a href="artifact.md">artifact.md</a></td><td class="num">217 B</td><td><code class="hash">35cf8c32f24d05fca1825af1aa6f6e04231ec6c8c6231636aee5965a4cd2114e</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">950 B</td><td><code class="hash">f0b45f79a966cee10aa80f654c2f83dadc743543ee82ad03e637245811625647</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">717 B</td><td><code class="hash">ed646652430e6ad3f7f1963c42e29abd4706f2cae91f3fe4cb6ff7ea510a7d12</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">883 B</td><td><code class="hash">b816665b4d425300b6e11f978ab77210f8a9bd01b2f059017c77fbee84d59a61</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/docs-portal/readme/47/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.md"># docs-portal
+
+Internal docs site &lt;script&gt;alert(1)&lt;/script&gt;.
+
+| | |
+|---|---|
+| Library item | `docs-portal/readme/47` |
+| Phase | 1 |
+| Owners | @coolgitorg/platform |
+
+## Links
+
+- https://coolgitorg.github.io/docs/
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for docs-portal/readme/47
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow docs-portal/readme/47, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id docs-portal, template readme,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;docs-portal/readme/47&#34;,
+  &#34;links&#34;: {{if hasKey . &#34;links&#34;}}{{toJSON (index . &#34;links&#34;)}}{{else}}{{&#34;[\&#34;https://coolgitorg.github.io/docs/\&#34;]&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;docs-portal\&#34;&#34;}}{{end}},
+  &#34;owners&#34;: {{if hasKey . &#34;owners&#34;}}{{toJSON (index . &#34;owners&#34;)}}{{else}}{{&#34;[\&#34;@coolgitorg/platform\&#34;]&#34;}}{{end}},
+  &#34;summary&#34;: {{if hasKey . &#34;summary&#34;}}{{toJSON (index . &#34;summary&#34;)}}{{else}}{{&#34;\&#34;Internal docs site &lt;script&gt;alert(1)&lt;/script&gt;.\&#34;&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

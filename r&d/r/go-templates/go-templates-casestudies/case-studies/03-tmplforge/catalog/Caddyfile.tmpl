@@ -1,0 +1,17 @@
+{
+	email {{ .email }}
+}
+{{- range .sites }}
+
+{{ .host }} {
+	encode zstd gzip
+{{- if .root }}
+	root * {{ .root }}
+	file_server
+{{- end }}
+{{- range .proxies }}
+	reverse_proxy {{ .path }} {{ .upstream }}
+{{- end }}
+	header Strict-Transport-Security "max-age={{ $.hsts }}"
+}
+{{- end }}

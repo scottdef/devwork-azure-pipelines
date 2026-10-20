@@ -1,0 +1,26 @@
+# Test-only form exercising checkboxes and multi-select dropdowns.
+name: Checks
+description: test form
+labels: ["test"]
+body:
+  - type: checkboxes
+    id: environments
+    attributes:
+      label: Environments
+      options:
+        - label: staging
+        - label: production
+        - label: sandbox
+  - type: dropdown
+    id: regions
+    attributes:
+      label: Regions
+      multiple: true
+      options: [us-east-1, eu-west-1, ap-south-1]
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledge
+      options:
+        - label: I read the library rules
+          required: true

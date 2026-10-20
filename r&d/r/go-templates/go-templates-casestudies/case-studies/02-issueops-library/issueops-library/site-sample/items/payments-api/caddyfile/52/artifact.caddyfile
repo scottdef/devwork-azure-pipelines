@@ -1,0 +1,16 @@
+# payments-api: Caddyfile, phase 2 of payments-api/caddyfile/52
+# Rendered by issueops-library; edit the request issue, not this file.
+{
+	admin off
+}
+
+pay.coolgit.org {
+	tls internal
+	encode zstd gzip
+	reverse_proxy /pay* 127.0.0.1:9443
+	reverse_proxy /refund* 127.0.0.1:9443
+	reverse_proxy /status* 127.0.0.1:9443
+	log {
+		output file /var/log/caddy/payments-api.log
+	}
+}

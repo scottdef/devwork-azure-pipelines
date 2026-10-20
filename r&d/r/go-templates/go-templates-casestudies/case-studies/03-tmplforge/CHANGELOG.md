@@ -1,0 +1,26 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [0.1.0-beta.1] - 2026-10-19
+
+### Added
+
+- `tmplforge sh`: ed/sam-style line-command TUI over bufio; prompt only on a character device, ANSI colour only with TERM set, not dumb, on a TTY; `$EDITOR` or ed-style `.`-terminated input; scriptable (`tmplforge sh < x.tf`).
+- `tmplforge serve`: html/template + htmx GUI with catalog, builder wizard (live preview, lint, skeleton fixture, export), two-fixture diff, IssueOps and CI/CD generators, `/metrics`, `/chart` (go-echarts p50/p95 with a data-table fallback), `/healthz`.
+- `render`, `lint`, `vars`, `test`, `export`, `catalog`, `new issueops`, `new cicd`, `version` subcommands.
+- Parse-tree walker (`vars`) tracking dot through range, with, variables, `{{template}}` and pipelines.
+- LCS line diff with unified output (stdlib has none).
+- 36-function FuncMap with `Safe()` subset; `docs/FUNCS.md` generated from it.
+- 25-entry embedded catalog, each with fixture and golden output.
+- Reproducible export bundles: template, fixture, output, standalone `run.go`, Makefile, SHA256SUMS.
+- `cmd/forgeload`: open-loop constant-rate load generator; `scripts/loadtest.sh`.
+- Terraform for the repository, ruleset, `GO_VERSION` variable and `beta` environment.
+
+### Security
+
+- Every GUI render runs in a re-executed child (`render -sandbox`): Safe funcs, 64 KiB template, 1 MiB output, 2 s timeout, 32 MiB stack, minimal environment; parent hard-kills and caps reads.
+- CSP `script-src 'self'`, same-origin check on every POST, per-IP token bucket and mandatory token off loopback, request body cap.
+
+[0.1.0-beta.1]: https://github.com/CoolGitOrg/tmplforge/releases/tag/v0.1.0-beta.1

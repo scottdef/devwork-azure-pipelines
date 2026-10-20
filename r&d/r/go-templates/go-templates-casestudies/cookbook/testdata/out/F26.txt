@@ -1,0 +1,27 @@
+name: Bug report
+description: "Something is broken: tell us"
+title: "[bug] "
+labels: ["bug","triage"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - linux
+        - darwin
+        - plan9
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: false

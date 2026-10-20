@@ -1,0 +1,12 @@
+{
+  "service": "tmplforge",
+  "host": "127.0.0.1",
+  "port": 8088,
+  "features": [
+    "sandbox",
+    "metrics"
+  ],
+  "rate": 10,
+  "maxBodyKiB": 256,
+  "env": "prod"
+}

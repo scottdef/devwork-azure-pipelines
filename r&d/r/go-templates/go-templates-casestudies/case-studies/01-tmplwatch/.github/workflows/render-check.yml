@@ -1,0 +1,113 @@
+# Render every template against testdata/kv without writing anything, and
+# fail on any render error or missing key.
+#
+# Triggers:
+#  - a push or PR touching templates, testdata or the renderer itself;
+#  - repository_dispatch "kv-changed", sent by CoolGitOrg/tmplwatch-kv's
+#    notify.yml (workflow → App token → dispatch → workflow). In that case
+#    the job also checks out the kv repository at the pushed SHA and renders
+#    the real data.
+name: render-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "testdata/**"
+      - "templates/**"
+      - "internal/**"
+      - "cmd/tmplwatch/**"
+      - "config/testdata.json"
+  pull_request:
+    paths:
+      - "testdata/**"
+      - "templates/**"
+      - "internal/**"
+      - "cmd/tmplwatch/**"
+      - "config/testdata.json"
+  repository_dispatch:
+    types: [kv-changed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-check-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+  CGO_ENABLED: "0"
+
+jobs:
+  render-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+
+      - name: build
+        run: go build -o bin/tmplwatch ./cmd/tmplwatch
+
+      - name: render testdata (-once -dry)
+        run: |
+          set -o pipefail
+          bin/tmplwatch -c config/testdata.json -once -dry -a off | tee render.diff
+          {
+            echo "### render-check: testdata"
+            echo '```diff'
+            head -c 60000 render.diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: App token for the kv repository
+        if: github.event_name == 'repository_dispatch'
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: CoolGitOrg
+          repositories: tmplwatch-kv
+
+      - name: checkout kv at the dispatched SHA
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/checkout@v6
+        with:
+          repository: CoolGitOrg/tmplwatch-kv
+          ref: ${{ github.event.client_payload.sha }}
+          token: ${{ steps.app.outputs.token }}
+          path: kv-repo
+          persist-credentials: false
+
+      - name: render live kv (-once -dry)
+        if: github.event_name == 'repository_dispatch'
+        env:
+          KV_SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          # Same templates, real data: point the dir source at kv-repo/kv.
+          jq '.source.path = "kv-repo/kv"' config/testdata.json > live.json
+          rc=0
+          bin/tmplwatch -c live.json -once -dry -a off > live.diff || rc=$?
+          cat live.diff
+          # Exit 3 = some template lacks keys in this kv repo: worth a
+          # warning, not a red build (hosts may not use every template).
+          # Exit 1 = a render error (bad JSON, fail guard): fail.
+          case $rc in
+            0) ;;
+            3) echo "::warning::some templates are incomplete against tmplwatch-kv@${KV_SHA:0:12}; see the log" ;;
+            *) exit "$rc" ;;
+          esac
+          {
+            echo "### render-check: tmplwatch-kv@${KV_SHA:0:12}"
+            echo '```diff'
+            head -c 60000 live.diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,20 @@
+<table id="catalog-rows">
+<thead><tr><th>Name</th><th>Format</th><th></th></tr></thead>
+<tbody>
+<tr id="row-hello-go">
+  <td>hello.go</td>
+  <td>txt</td>
+  <td><button hx-post="/builder/var" hx-vals="{&#34;name&#34;:&#34;hello.go&#34;}" hx-target="closest tr" hx-swap="outerHTML">edit</button></td>
+</tr>
+<tr id="row-email-html">
+  <td>email.html</td>
+  <td>html</td>
+  <td><button hx-post="/builder/var" hx-vals="{&#34;name&#34;:&#34;email.html&#34;}" hx-target="closest tr" hx-swap="outerHTML">edit</button></td>
+</tr>
+<tr id="row-x&#34; onmouseover=&#34;alert(1)">
+  <td>x&#34; onmouseover=&#34;alert(1)</td>
+  <td>txt</td>
+  <td><button hx-post="/builder/var" hx-vals="{&#34;name&#34;:&#34;x\&#34; onmouseover=\&#34;alert(1)&#34;}" hx-target="closest tr" hx-swap="outerHTML">edit</button></td>
+</tr>
+</tbody>
+</table>

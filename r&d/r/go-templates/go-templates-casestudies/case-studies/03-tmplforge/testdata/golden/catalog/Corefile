@@ -1,0 +1,15 @@
+lab.coolgitorg.example:53 {
+    errors
+    log
+    template IN A lab.coolgitorg.example {
+        match "^ip-(?P<a>[0-9]*)-(?P<b>[0-9]*)-(?P<c>[0-9]*)-(?P<d>[0-9]*)[.]"
+        answer "{{ .Name }} 60 IN A {{ .Group.a }}.{{ .Group.b }}.{{ .Group.c }}.{{ .Group.d }}"
+        fallthrough
+    }
+    hosts {
+        10.0.0.10 forge.lab.coolgitorg.example
+        fallthrough
+    }
+    forward . 9.9.9.9 1.1.1.1
+    cache 60
+}

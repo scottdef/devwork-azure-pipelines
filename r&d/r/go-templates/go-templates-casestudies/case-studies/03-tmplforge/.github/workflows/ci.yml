@@ -1,0 +1,80 @@
+# CI: vet, gofmt, race tests on Linux, preflight, cross-compile matrix.
+# Job names are the required status checks in terraform/variables.tf.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOFLAGS: -mod=mod
+  GOPROXY: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: vet
+        run: go vet ./cmd/... ./internal/... ./catalog/...
+      - name: gofmt
+        run: |
+          out=$(gofmt -l cmd internal catalog)
+          if [ -n "$out" ]; then
+            echo "::error::gofmt needed"
+            echo "$out"
+            exit 1
+          fi
+      - name: test -race
+        run: go test -race -count=1 ./cmd/... ./internal/... ./catalog/...
+      - name: fuzz (short)
+        run: |
+          go test ./internal/forge -run '^$' -fuzz FuzzLint -fuzztime 20s
+          go test ./internal/forge -run '^$' -fuzz FuzzSandbox -fuzztime 20s
+
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - run: ./scripts/preflight.sh
+
+  cross:
+    name: cross (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/arm64, plan9/amd64]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: build
+        env:
+          TARGET: ${{ matrix.target }}
+          CGO_ENABLED: "0"
+        run: |
+          export GOOS=${TARGET%/*} GOARCH=${TARGET#*/}
+          go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_SHA::12}" -o "tmplforge-$GOOS-$GOARCH" ./cmd/tmplforge
+          go vet ./cmd/... ./internal/... ./catalog/...
+          ls -l "tmplforge-$GOOS-$GOARCH"

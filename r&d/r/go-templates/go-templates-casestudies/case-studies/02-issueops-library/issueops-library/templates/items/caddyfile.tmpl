@@ -1,0 +1,19 @@
+#!tmpl ext=caddyfile
+# {{.name}}: Caddyfile, phase {{._.phase}} of {{._.item_id}}
+# Rendered by issueops-library; edit the request issue, not this file.
+{
+	admin off
+}
+
+{{.domain | default (printf "%s.coolgit.internal" .name)}} {
+	tls {{.tls | default "internal"}}
+	encode zstd gzip
+{{- range .routes}}
+	reverse_proxy {{.}}* {{$.upstream | default "127.0.0.1"}}:{{$.port | default 8080}}
+{{- else}}
+	reverse_proxy {{.upstream | default "127.0.0.1"}}:{{.port | default 8080}}
+{{- end}}
+	log {
+		output file /var/log/caddy/{{slugify .name}}.log
+	}
+}

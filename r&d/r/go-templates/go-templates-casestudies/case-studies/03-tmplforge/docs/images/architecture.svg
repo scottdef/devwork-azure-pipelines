@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>tmplforge architecture</title>
+  <desc>One binary. The sh TUI and CLI render in-process with the full FuncMap; the web GUI renders every untrusted template in a child process running render -sandbox.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <style>
+      .box { fill: #fffff4; stroke: #333; stroke-width: 1.4; }
+      .pkg { fill: #eef3fb; stroke: #2a5db0; stroke-width: 1.4; }
+      .ext { fill: #f3f3ea; stroke: #888; stroke-width: 1.2; stroke-dasharray: 5 3; }
+      .child { fill: #fff3e8; stroke: #b35c00; stroke-width: 1.6; }
+      .actor { fill: #fff; stroke: #333; stroke-width: 1.2; }
+      .t { fill: #1d1d1b; }
+      .h { font-weight: bold; }
+      .m { font-family: Menlo, Consolas, monospace; font-size: 12px; }
+      .s { font-size: 11px; fill: #555; }
+      .edge { stroke: #333; stroke-width: 1.3; fill: none; marker-end: url(#arrow); }
+      .trust { stroke: #b3261e; stroke-width: 2; stroke-dasharray: 8 5; fill: none; }
+    </style>
+  </defs>
+
+  <!-- actors -->
+  <rect class="actor" x="20" y="60" width="150" height="56" rx="28"/>
+  <text class="t h" x="95" y="84" text-anchor="middle">operator</text>
+  <text class="s" x="95" y="101" text-anchor="middle">terminal, acme, rio (trusted)</text>
+
+  <rect class="actor" x="20" y="250" width="150" height="56" rx="28"/>
+  <text class="t h" x="95" y="274" text-anchor="middle">browser</text>
+  <text class="s" x="95" y="291" text-anchor="middle">template author (untrusted)</text>
+
+  <rect class="actor" x="20" y="440" width="150" height="56" rx="28"/>
+  <text class="t h" x="95" y="464" text-anchor="middle">CI / scripts</text>
+  <text class="s" x="95" y="481" text-anchor="middle">render, lint, vars, test</text>
+
+  <!-- binary boundary -->
+  <rect class="box" x="210" y="20" width="560" height="520" rx="6"/>
+  <text class="t h" x="226" y="42">tmplforge: one static binary (linux, darwin, plan9)</text>
+
+  <rect class="pkg" x="230" y="60" width="170" height="60" rx="4"/>
+  <text class="t h m" x="315" y="84" text-anchor="middle">internal/tui</text>
+  <text class="s" x="315" y="102" text-anchor="middle">sh: c f v e a d n p l t w x g !</text>
+
+  <rect class="pkg" x="230" y="250" width="170" height="60" rx="4"/>
+  <text class="t h m" x="315" y="274" text-anchor="middle">internal/web</text>
+  <text class="s" x="315" y="292" text-anchor="middle">CSP, CSRF, bucket, /metrics</text>
+
+  <rect class="pkg" x="230" y="440" width="170" height="60" rx="4"/>
+  <text class="t h m" x="315" y="464" text-anchor="middle">cmd/tmplforge</text>
+  <text class="s" x="315" y="482" text-anchor="middle">subcommand dispatch</text>
+
+  <rect class="pkg" x="450" y="150" width="140" height="70" rx="4"/>
+  <text class="t h m" x="520" y="176" text-anchor="middle">internal/forge</text>
+  <text class="s" x="520" y="194" text-anchor="middle">Render Lint Vars Diff</text>
+  <text class="s" x="520" y="209" text-anchor="middle">Export Catalog Sandbox</text>
+
+  <rect class="pkg" x="450" y="60" width="140" height="56" rx="4"/>
+  <text class="t h m" x="520" y="84" text-anchor="middle">internal/scaffold</text>
+  <text class="s" x="520" y="101" text-anchor="middle">IssueOps, CI/CD ([[ ]])</text>
+
+  <rect class="pkg" x="620" y="150" width="130" height="70" rx="4"/>
+  <text class="t h m" x="685" y="176" text-anchor="middle">internal/funcs</text>
+  <text class="s" x="685" y="194" text-anchor="middle">All(): 36 funcs</text>
+  <text class="s" x="685" y="209" text-anchor="middle">Safe(): minus env, file</text>
+
+  <rect class="pkg" x="620" y="60" width="130" height="56" rx="4"/>
+  <text class="t h m" x="685" y="84" text-anchor="middle">catalog/</text>
+  <text class="s" x="685" y="101" text-anchor="middle">embed.FS, 25 entries</text>
+
+  <rect class="ext" x="620" y="440" width="130" height="60" rx="4"/>
+  <text class="t h m" x="685" y="464" text-anchor="middle">go-echarts</text>
+  <text class="s" x="685" y="482" text-anchor="middle">v2.7.3, vendored</text>
+
+  <!-- sandbox child -->
+  <rect class="child" x="450" y="300" width="300" height="100" rx="4"/>
+  <text class="t h m" x="600" y="325" text-anchor="middle">tmplforge render -sandbox</text>
+  <text class="s" x="600" y="345" text-anchor="middle">child process per render: Safe() funcs, minimal env</text>
+  <text class="s" x="600" y="362" text-anchor="middle">64 KiB template, 1 MiB output, 2 s timer, 32 MiB stack</text>
+  <text class="s" x="600" y="379" text-anchor="middle">parent: kill at timeout+grace, read caps, semaphore</text>
+
+  <!-- trust boundary around child -->
+  <rect class="trust" x="440" y="290" width="320" height="120" rx="8"/>
+  <text x="752" y="286" text-anchor="end" font-size="11" fill="#b3261e">trust boundary (process)</text>
+
+  <!-- edges -->
+  <path class="edge" d="M170,88 L228,88"/>
+  <path class="edge" d="M170,278 L228,278"/>
+  <path class="edge" d="M170,468 L228,468"/>
+  <path class="edge" d="M400,90 L448,180"/>
+  <path class="edge" d="M400,80 L448,85"/>
+  <path class="edge" d="M400,268 L448,100"/>
+  <path class="edge" d="M400,290 L448,340"/>
+  <text class="s" x="404" y="282">exec</text>
+  <path class="edge" d="M400,305 L420,305 L420,470 L618,470"/>
+  <text class="s" x="520" y="463">/chart</text>
+  <path class="edge" d="M400,460 L448,210"/>
+  <path class="edge" d="M590,185 L618,185"/>
+  <path class="edge" d="M560,150 L640,118"/>
+  <path class="edge" d="M560,300 L540,222"/>
+
+  <!-- legend -->
+  <text class="t h" x="790" y="70">Rules</text>
+  <text class="s" x="790" y="92">TUI/CLI: in-process,</text>
+  <text class="s" x="790" y="107">full FuncMap (operator</text>
+  <text class="s" x="790" y="122">already has a shell).</text>
+  <text class="s" x="790" y="150">GUI: server never executes</text>
+  <text class="s" x="790" y="165">untrusted templates; it</text>
+  <text class="s" x="790" y="180">parses (lint, vars) only.</text>
+  <text class="s" x="790" y="208">Fixture data is JSON:</text>
+  <text class="s" x="790" y="223">map[string]any, no methods.</text>
+  <text class="s" x="790" y="251">html format uses</text>
+  <text class="s" x="790" y="266">html/template.</text>
+  <text class="s" x="790" y="294">No termios: sh runs on</text>
+  <text class="s" x="790" y="309">Plan 9 unchanged.</text>
+</svg>

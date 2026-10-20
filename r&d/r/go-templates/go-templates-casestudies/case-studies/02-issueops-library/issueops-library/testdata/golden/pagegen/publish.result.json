@@ -1,0 +1,13 @@
+{
+  "action": "library-publish",
+  "ok": true,
+  "item_id": "payments-api/caddyfile/42",
+  "item_url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/",
+  "issue": 42,
+  "repo": "CoolGitOrg/issueops-intake",
+  "requester": "alice",
+  "phase": 1,
+  "artifact": "artifact.caddyfile",
+  "items": 1,
+  "files": 24
+}

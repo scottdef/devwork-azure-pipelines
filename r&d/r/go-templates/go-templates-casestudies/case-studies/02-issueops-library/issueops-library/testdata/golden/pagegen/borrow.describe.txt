@@ -1,0 +1,7 @@
+action=library-borrow
+issue=50
+repo=CoolGitOrg/issueops-intake
+requester=bob
+item=payments-api/caddyfile/42
+days=14
+phase=0

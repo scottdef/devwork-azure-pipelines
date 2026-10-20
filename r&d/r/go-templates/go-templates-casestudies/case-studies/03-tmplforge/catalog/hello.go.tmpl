@@ -1,0 +1,24 @@
+// Command {{ .name }} {{ .synopsis }}.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+{{ $w := 0 }}
+{{- range .flags }}{{ if gt (len .name) $w }}{{ $w = len .name }}{{ end }}{{ end }}
+var (
+{{- range .flags }}
+	{{ printf "%-*s" $w .name }} = flag.{{ if eq .type "int" }}Int{{ else if eq .type "bool" }}Bool{{ else }}String{{ end }}({{ printf "%q" .name }}, {{ if eq .type "string" }}{{ printf "%q" .default }}{{ else }}{{ .default }}{{ end }}, {{ printf "%q" .usage }})
+{{- end }}
+)
+
+func main() {
+	flag.Parse()
+	if flag.NArg() > 0 {
+		fmt.Fprintln(os.Stderr, "usage: {{ .name }}{{ range .flags }} [-{{ .name }}]{{ end }}")
+		os.Exit(2)
+	}
+	fmt.Printf("%s, %s\n", *greeting, *who)
+}

@@ -1,0 +1,22 @@
+name: {{ .name | toJSON }}
+description: {{ .description | toJSON }}
+title: {{ printf "[%s] " .prefix | toJSON }}
+labels: {{ .labels | toJSON }}
+body:
+  - type: markdown
+    attributes:
+      value: {{ .intro | toJSON }}
+{{- range .fields }}
+  - type: {{ .type }}
+    id: {{ .id }}
+    attributes:
+      label: {{ .label | toJSON }}
+{{- with .options }}
+      options:
+{{- range . }}
+        - {{ toJSON . }}
+{{- end }}
+{{- end }}
+    validations:
+      required: {{ .required }}
+{{- end }}

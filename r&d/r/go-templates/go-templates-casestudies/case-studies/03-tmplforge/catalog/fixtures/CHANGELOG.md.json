@@ -1,0 +1,27 @@
+{
+  "repo": "https://github.com/CoolGitOrg/tmplforge",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "date": "2026-10-19",
+      "changes": {
+        "Added": [
+          "sh: ed-style TUI",
+          "serve: htmx GUI"
+        ],
+        "Security": [
+          "sandboxed renders in a child process"
+        ]
+      }
+    },
+    {
+      "version": "0.0.1",
+      "date": "2026-09-01",
+      "changes": {
+        "Added": [
+          "render subcommand"
+        ]
+      }
+    }
+  ]
+}

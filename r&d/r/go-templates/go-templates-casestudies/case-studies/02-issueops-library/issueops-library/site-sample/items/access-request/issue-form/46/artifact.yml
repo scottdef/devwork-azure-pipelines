@@ -1,0 +1,21 @@
+# Access request: issue form, phase 1 of access-request/issue-form/46
+name: "Access request"
+description: "Access request request"
+title: "[access-request] "
+labels: ["issueops"]
+body:
+  - type: dropdown
+    id: system
+    attributes:
+      label: "System"
+      options:
+        - "vault"
+        - "nomad"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: "Why"
+    validations:
+      required: false

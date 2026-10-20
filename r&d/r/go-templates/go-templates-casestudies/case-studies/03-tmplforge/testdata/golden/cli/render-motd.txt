@@ -1,0 +1,10 @@
+== PLAN9 ==
+Welcome, operator.
+
+Kernel:      9front 10522
+Last login:  Sun Oct 18 21:04 UTC 2026
+Updates:     1 package
+
+Notices:
+  * fossil snapshot at 04:00
+  * venti scrub tonight

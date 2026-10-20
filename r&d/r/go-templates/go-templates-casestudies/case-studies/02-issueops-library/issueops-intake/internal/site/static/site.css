@@ -1,0 +1,27 @@
+:root { --fg: #1b1f23; --bg: #fff; --mut: #57606a; --line: #d0d7de; --acc: #0969da; --bad: #cf222e; --alt: #f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #e6edf3; --bg: #0d1117; --mut: #8b949e; --line: #30363d; --acc: #58a6ff; --bad: #ff7b72; --alt: #161b22; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header, main, footer { max-width: 52rem; margin: 0 auto; padding: 0 16px; }
+header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-top: 12px; padding-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+header nav a { margin-left: 12px; }
+.brand { font-weight: 700; color: var(--fg); text-decoration: none; font-family: ui-monospace, monospace; }
+a { color: var(--acc); }
+code, pre, textarea, input, select { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+pre { background: var(--alt); border: 1px solid var(--line); padding: 8px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+section { border-top: 1px solid var(--line); margin-top: 24px; }
+.field { margin: 14px 0; }
+.field > label { font-weight: 600; display: block; }
+.help, .note, .md { color: var(--mut); margin: 2px 0 4px; font-size: 14px; }
+.req { color: var(--bad); }
+input[type=text], textarea, select { width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
+.cb { display: block; font-weight: 400; }
+.actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+button { padding: 8px 14px; border: 1px solid var(--acc); background: var(--acc); color: #fff; border-radius: 4px; cursor: pointer; font: inherit; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.out:empty { display: none; }
+.out.bad { border-color: var(--bad); color: var(--bad); }
+.warn { border-left: 4px solid var(--bad); padding-left: 8px; }
+footer { color: var(--mut); font-size: 13px; border-top: 1px solid var(--line); margin-top: 32px; }

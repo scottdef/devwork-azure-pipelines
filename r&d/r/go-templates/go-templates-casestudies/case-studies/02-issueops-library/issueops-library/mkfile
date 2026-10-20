@@ -1,0 +1,38 @@
+# mkfile for issueops-library (Plan 9 mk). Same targets as the Makefile.
+# On Plan 9: mk build; elsewhere with plan9port: 9 mk build.
+GO=go
+BINS=pagegen ledger tpl siteload
+TARGETS=linux/amd64 linux/arm64 darwin/arm64 plan9/amd64
+VERSION=`{git describe --tags --always >[2]/dev/null || echo dev}
+
+all:V: vet test build
+
+build:V:
+	for b in $BINS; do CGO_ENABLED=0 GOFLAGS=-mod=mod $GO build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o bin/$b ./cmd/$b || exit 1; done
+
+test:V:
+	GOFLAGS=-mod=mod $GO test ./...
+
+vet:V:
+	GOFLAGS=-mod=mod $GO vet ./...
+
+lint:V: vet
+	test -z "`{gofmt -l .}"
+
+cross:V:
+	for t in $TARGETS; do os=`{echo $t | sed 's,/.*,,'}; arch=`{echo $t | sed 's,.*/,,'}; for b in $BINS; do CGO_ENABLED=0 GOOS=$os GOARCH=$arch GOFLAGS=-mod=mod $GO build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o dist/$b-$os-$arch ./cmd/$b || exit 1; done; done
+
+release:V: clean cross
+	cd dist && sha256sum * > SHA256SUMS
+
+preflight:V:
+	scripts/preflight.sh
+
+loadtest:V:
+	scripts/loadtest.sh
+
+clean:V:
+	rm -rf bin dist _site site.tmp
+
+site-sample:V:
+	scripts/site-sample.sh

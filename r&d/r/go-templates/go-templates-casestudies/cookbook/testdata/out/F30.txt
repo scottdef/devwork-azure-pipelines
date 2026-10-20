@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+name='it'\''s "quoted"; rm -rf /'
+dest='/tmp/my dir'
+
+mkdir -p -- "$dest"
+printf '%s\n' "$name" > "$dest/name.txt"
+cp -- 'a b.txt' "$dest/"
+cp -- 'c'\''d.txt' "$dest/"
+cp -- plain.txt "$dest/"

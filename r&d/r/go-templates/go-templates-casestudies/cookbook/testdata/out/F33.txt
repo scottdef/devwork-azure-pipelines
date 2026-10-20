@@ -1,0 +1,19 @@
+#include <u.h>
+#include <libc.h>
+
+static char *names[] = {
+	"rob",
+	"ken",
+	"dennis \"dmr\"",
+	"plan 9\tfrom bell labs",
+};
+
+void
+main(int, char**)
+{
+	int i;
+
+	for(i = 0; i < nelem(names); i++)
+		print("%s\n", names[i]);
+	exits(nil);
+}

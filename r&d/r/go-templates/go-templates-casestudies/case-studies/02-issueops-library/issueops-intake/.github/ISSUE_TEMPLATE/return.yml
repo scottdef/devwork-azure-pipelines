@@ -1,0 +1,14 @@
+# Return a borrowed item early.
+name: Library return
+description: Give back a borrowed item so someone else can take the next phase.
+title: "[return] "
+labels: [issueops, return]
+body:
+  - type: input
+    id: item-id
+    attributes:
+      label: Item ID
+      description: source-id/template-id/issue of the item you borrowed.
+      placeholder: payments-api/caddyfile/42
+    validations:
+      required: true

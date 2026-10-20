@@ -1,0 +1,18 @@
+{
+  "op": "borrow",
+  "ok": true,
+  "item": "a1/readme/3",
+  "by": "bob",
+  "issue": 3,
+  "loan": {
+    "item": "a1/readme/3",
+    "borrower": "bob",
+    "borrow_issue": 3,
+    "borrowed_at": "2026-10-01T09:00:00Z",
+    "due": "2026-10-08T09:00:00Z",
+    "returned_at": null
+  },
+  "held": 3,
+  "limit": 3,
+  "item_exists": true
+}

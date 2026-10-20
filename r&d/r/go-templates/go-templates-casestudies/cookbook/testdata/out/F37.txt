@@ -1,0 +1,8 @@
+{{/* generated from Contact */ -}}
+{{ define "Contact" -}}
+Name: {{ .Name }}
+Email: {{ .Email }}
+{{- end }}
+-- executed with Name=rob Email=rob@example.org --
+Name: rob
+Email: rob@example.org

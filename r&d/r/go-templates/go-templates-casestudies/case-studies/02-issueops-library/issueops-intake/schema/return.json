@@ -1,0 +1,6 @@
+{
+  "additional": false,
+  "fields": {
+    "item-id": {"title": "Item ID", "required": true, "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]/(caddyfile|workflow|issue-form|terraform-module|nomad-job|readme)/[1-9][0-9]*$", "maxLength": 96}
+  }
+}

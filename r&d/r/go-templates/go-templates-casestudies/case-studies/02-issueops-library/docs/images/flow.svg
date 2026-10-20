@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" font-family="system-ui, -apple-system, Segoe UI, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">IssueOps library: request flow</title>
+  <desc id="d">A requester fills the static intake page, which opens a prefilled GitHub issue. The intake workflow parses and validates it, mints a GitHub App token and dispatches a repository_dispatch event to the library repository. The library workflow renders the item, commits it, deploys GitHub Pages and comments the item URL back on the issue.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0969da"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .zone { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1; }
+      .key { fill: #ddf4ff; stroke: #0969da; stroke-width: 1.5; }
+      .app { fill: #fff8c5; stroke: #9a6700; stroke-width: 1.5; }
+      .h { font-size: 15px; font-weight: 600; fill: #1f2328; }
+      .s { font-size: 12px; fill: #57606a; }
+      .m { font-size: 11.5px; fill: #1f2328; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .z { font-size: 13px; font-weight: 600; fill: #57606a; letter-spacing: .04em; }
+      .n { font-size: 12px; font-weight: 700; fill: #ffffff; }
+      .e { stroke: #57606a; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+      .eb { stroke: #0969da; stroke-width: 2; fill: none; marker-end: url(#ab); }
+      .ed { stroke: #57606a; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; marker-end: url(#a); }
+      .lab { font-size: 11.5px; fill: #57606a; }
+    </style>
+  </defs>
+
+  <rect width="1000" height="560" fill="#ffffff"/>
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#1f2328">IssueOps library: one request, end to end</text>
+  <text x="24" y="54" class="s">Text is the interface: issue body → JSON → repository_dispatch → files in git → static Pages. No server, no secrets in the browser.</text>
+
+  <!-- zones -->
+  <rect x="16" y="76" width="300" height="468" rx="10" class="zone"/>
+  <text x="30" y="98" class="z">BROWSER</text>
+  <rect x="332" y="76" width="300" height="468" rx="10" class="zone"/>
+  <text x="346" y="98" class="z">CoolGitOrg/issueops-intake</text>
+  <rect x="648" y="76" width="336" height="468" rx="10" class="zone"/>
+  <text x="662" y="98" class="z">CoolGitOrg/issueops-library</text>
+
+  <!-- 1 user -->
+  <rect x="36" y="116" width="260" height="70" rx="8" class="box"/>
+  <circle cx="58" cy="138" r="11" fill="#1f2328"/><text x="58" y="142" text-anchor="middle" class="n">1</text>
+  <text x="78" y="143" class="h">Requester</text>
+  <text x="52" y="168" class="s">fills the form; JS checks the JSON</text>
+
+  <!-- 2 intake pages -->
+  <rect x="36" y="216" width="260" height="96" rx="8" class="key"/>
+  <circle cx="58" cy="238" r="11" fill="#0969da"/><text x="58" y="242" text-anchor="middle" class="n">2</text>
+  <text x="78" y="243" class="h">Intake Pages (static)</text>
+  <text x="52" y="266" class="m">pagegen -intake ← ISSUE_TEMPLATE/*.yml</text>
+  <text x="52" y="284" class="m">/issues/new?template=request.yml</text>
+  <text x="52" y="300" class="m">  &amp;source-id=…&amp;payload=… (≤7000)</text>
+
+  <!-- 9 user reads -->
+  <rect x="36" y="420" width="260" height="104" rx="8" class="box"/>
+  <circle cx="58" cy="442" r="11" fill="#1a7f37"/><text x="58" y="446" text-anchor="middle" class="n">9</text>
+  <text x="78" y="447" class="h">Requester gets the item</text>
+  <text x="52" y="470" class="s">artifact · next.tmpl · config.json</text>
+  <text x="52" y="488" class="s">bundle.tar.gz · SHA256SUMS</text>
+  <text x="52" y="508" class="s">open to everyone; borrow = next phase</text>
+
+  <!-- 3 issue -->
+  <rect x="352" y="116" width="260" height="70" rx="8" class="box"/>
+  <circle cx="374" cy="138" r="11" fill="#1f2328"/><text x="374" y="142" text-anchor="middle" class="n">3</text>
+  <text x="394" y="143" class="h">Issue (form)</text>
+  <text x="368" y="168" class="s">labels issueops, request · user picks dropdowns</text>
+
+  <!-- 4 intake workflow -->
+  <rect x="352" y="216" width="260" height="96" rx="8" class="box"/>
+  <circle cx="374" cy="238" r="11" fill="#1f2328"/><text x="374" y="242" text-anchor="middle" class="n">4</text>
+  <text x="394" y="243" class="h">intake.yml</text>
+  <text x="368" y="266" class="m">printf '%s' "$BODY" | issueparse</text>
+  <text x="368" y="284" class="m">validate -schema request.json</text>
+  <text x="368" y="302" class="s">invalid → comment + label, stop</text>
+
+  <!-- 5 app token -->
+  <rect x="352" y="336" width="260" height="62" rx="8" class="app"/>
+  <circle cx="374" cy="358" r="11" fill="#9a6700"/><text x="374" y="362" text-anchor="middle" class="n">5</text>
+  <text x="394" y="363" class="h">App token</text>
+  <text x="368" y="386" class="m">create-github-app-token@v3</text>
+
+  <!-- 6 dispatch -->
+  <rect x="352" y="420" width="260" height="104" rx="8" class="box"/>
+  <circle cx="374" cy="442" r="11" fill="#1f2328"/><text x="374" y="446" text-anchor="middle" class="n">6</text>
+  <text x="394" y="447" class="h">dispatch</text>
+  <text x="368" y="470" class="m">POST /repos/…/dispatches</text>
+  <text x="368" y="488" class="m">library-publish, ≤10 keys</text>
+  <text x="368" y="506" class="s">payload ≤32 KiB + sha256 · retry 5xx</text>
+
+  <!-- 7 publish workflow -->
+  <rect x="668" y="116" width="296" height="136" rx="8" class="box"/>
+  <circle cx="690" cy="138" r="11" fill="#1f2328"/><text x="690" y="142" text-anchor="middle" class="n">7</text>
+  <text x="710" y="143" class="h">publish.yml · apply</text>
+  <text x="684" y="166" class="m">pagegen -event - -site site</text>
+  <text x="684" y="184" class="m">items/&lt;source&gt;/&lt;tmpl&gt;/&lt;issue&gt;/</text>
+  <text x="684" y="202" class="m">ledger borrow|return (≤3 per login)</text>
+  <text x="684" y="222" class="s">commit as github-actions[bot], push;</text>
+  <text x="684" y="240" class="s">lost race → fetch, re-apply, push</text>
+
+  <!-- git -->
+  <rect x="668" y="272" width="296" height="62" rx="8" class="box"/>
+  <text x="684" y="296" class="h">main</text>
+  <text x="684" y="318" class="m">items/  ledger/ledger.json  site/</text>
+
+  <!-- 8 pages -->
+  <rect x="668" y="356" width="296" height="168" rx="8" class="key"/>
+  <circle cx="690" cy="378" r="11" fill="#0969da"/><text x="690" y="382" text-anchor="middle" class="n">8</text>
+  <text x="710" y="383" class="h">deploy · notify</text>
+  <text x="684" y="406" class="m">concurrency: library-pages</text>
+  <text x="684" y="424" class="m">upload-pages-artifact@v5 (site)</text>
+  <text x="684" y="442" class="m">deploy-pages@v5</text>
+  <text x="684" y="464" class="s">poll library.json until generated ≥ applied</text>
+  <text x="684" y="484" class="s">comment item URL, label published,</text>
+  <text x="684" y="502" class="s">close issue (App token)</text>
+
+  <!-- edges -->
+  <path class="e" d="M166 186 V214"/>
+  <path class="eb" d="M296 250 C 320 250, 320 151, 350 151"/>
+  <text x="300" y="206" class="lab" transform="rotate(-90 300 206)">prefilled URL</text>
+  <path class="e" d="M482 186 V214"/>
+  <text x="490" y="205" class="lab">issues: opened</text>
+  <path class="e" d="M482 312 V334"/>
+  <path class="e" d="M482 398 V418"/>
+  <path class="eb" d="M612 472 C 640 472, 640 184, 666 184"/>
+  <text x="628" y="330" class="lab" transform="rotate(-90 628 330)">repository_dispatch</text>
+  <path class="e" d="M816 252 V270"/>
+  <path class="e" d="M816 334 V354"/>
+  <path class="ed" d="M668 500 C 640 540, 340 548, 300 498"/>
+  <text x="470" y="550" class="lab">comment + close on the intake issue · user follows the link</text>
+  <path class="ed" d="M668 140 C 645 140, 640 151, 614 151"/>
+</svg>

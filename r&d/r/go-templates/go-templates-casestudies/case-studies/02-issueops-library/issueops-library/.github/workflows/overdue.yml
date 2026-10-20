@@ -1,0 +1,84 @@
+# overdue.yml: daily sweep of the loan ledger. Warns borrowers whose loans
+# are past due and returns loans that are past due + grace, then deploys.
+name: overdue
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # off the hour: scheduled runs at :00 queue longest
+  workflow_dispatch:
+    inputs:
+      grace:
+        description: "Grace after due date before auto-return (e.g. 7d, 36h)"
+        default: "7d"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: library-overdue
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GOFLAGS: -mod=mod
+      INTAKE_REPO: ${{ github.repository_owner }}/issueops-intake
+      BASE_URL: ${{ vars.LIBRARY_BASE_URL || 'https://coolgitorg.github.io/issueops-library/' }}
+    outputs:
+      changed: ${{ steps.sweep.outputs.changed }}
+    steps:
+      - name: Mint App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: issueops-library,issueops-intake
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Build
+        run: make build
+      - name: Sweep
+        id: sweep
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GRACE: ${{ inputs.grace || '7d' }}
+        run: scripts/overdue.sh
+
+  deploy:
+    needs: sweep
+    if: needs.sweep.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: library-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5

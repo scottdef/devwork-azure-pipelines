@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>payments-api/caddyfile/42 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>payments-api</code> / caddyfile / #42</p>
+<h1><code>payments-api</code> &middot; caddyfile</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge in">available</span>
+Phase 2 was published as
+<a href="../../../../items/payments-api/caddyfile/52/"><code>payments-api/caddyfile/52</code></a>; borrow that one to continue.</p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>payments-api/caddyfile/42</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 08:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/42">https://github.com/CoolGitOrg/issueops-intake/issues/42</a></dd>
+<dt>Requested by</dt><dd>alice</dd>
+<dt>Payload sha256</dt><dd><code class="hash">a696a2834d3ebfb35453652f13154128e629d5097639c12528b7b2a56aeef858</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">19a82460283c2ccefa8d372dfc177b24c41c1f54a0d1c6e123b5184648474632</code></dd>
+</dl>
+<p><a class="button" href="artifact.caddyfile" download>Download artifact.caddyfile</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">319 B</td><td><code class="hash">3a908162c7f6ad8429390ddae2f4069da33cb3b3cea36ef9852e10e4bad5d19a</code></td></tr>
+<tr class="odd"><td><a href="artifact.caddyfile">artifact.caddyfile</a></td><td class="num">334 B</td><td><code class="hash">2398f8cb639b0ba598e9d0f70b630df9aba77e294f9ae4a98bf911cafef8267b</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">990 B</td><td><code class="hash">978242cbe7cd346015d07882c8b4c829e76c1e03d8573d46c82fa7009f6cfc23</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">637 B</td><td><code class="hash">a3d6780ab65789cabef830721964d101eef481b1615e0c2a6d58dd78711f3820</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">824 B</td><td><code class="hash">d2a2e7e1e7b2ad0f72c4c9d0c7932f44aa4e19612f84660466d2c852712800a4</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.caddyfile"># payments-api: Caddyfile, phase 1 of payments-api/caddyfile/42
+# Rendered by issueops-library; edit the request issue, not this file.
+{
+	admin off
+}
+
+pay.coolgit.org {
+	tls internal
+	encode zstd gzip
+	reverse_proxy /pay* 127.0.0.1:8443
+	reverse_proxy /refund* 127.0.0.1:8443
+	log {
+		output file /var/log/caddy/payments-api.log
+	}
+}
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for payments-api/caddyfile/42
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow payments-api/caddyfile/42, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id payments-api, template caddyfile,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;payments-api/caddyfile/42&#34;,
+  &#34;domain&#34;: {{if hasKey . &#34;domain&#34;}}{{toJSON (index . &#34;domain&#34;)}}{{else}}{{&#34;\&#34;pay.coolgit.org\&#34;&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;payments-api\&#34;&#34;}}{{end}},
+  &#34;port&#34;: {{if hasKey . &#34;port&#34;}}{{toJSON (index . &#34;port&#34;)}}{{else}}{{&#34;8443&#34;}}{{end}},
+  &#34;routes&#34;: {{if hasKey . &#34;routes&#34;}}{{toJSON (index . &#34;routes&#34;)}}{{else}}{{&#34;[\&#34;/pay\&#34;,\&#34;/refund\&#34;]&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

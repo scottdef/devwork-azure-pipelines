@@ -1,0 +1,54 @@
+{{- /*
+  nginx.conf from nginx/upstreams/<name> (JSON list of ip:port) and
+  nginx/servers/<name> (JSON object). Every server must name an upstream
+  that exists, or the render fails rather than ship a broken proxy_pass.
+*/ -}}
+# Managed by tmplwatch. Do not edit by hand.
+worker_processes {{ keyOrDefault "nginx/worker_processes" "auto" }};
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+    server_tokens off;
+    keepalive_timeout 65;
+{{- range ls "nginx/upstreams" }}
+
+    upstream {{ .Key }} {
+        least_conn;
+{{- range parseJSON .Value }}
+        server {{ . }} max_fails=3 fail_timeout=10s;
+{{- end }}
+        keepalive 16;
+    }
+{{- end }}
+{{- $ups := ls "nginx/upstreams" }}
+{{- range ls "nginx/servers" }}
+{{- with parseJSON .Value }}
+{{- if not (contains .upstream $ups) }}{{ fail (printf "nginx server %s: unknown upstream %q" .server_name .upstream) }}{{ end }}
+
+    server {
+        listen {{ .listen }} ssl;
+        http2 on;
+        server_name {{ .server_name }};
+        ssl_certificate     /etc/nginx/tls/{{ .server_name }}.crt;
+        ssl_certificate_key /etc/nginx/tls/{{ .server_name }}.key;
+        client_max_body_size {{ default "1m" (index . "client_max_body_size") }};
+
+        location / {
+            proxy_pass http://{{ .upstream }};
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+{{- end }}
+{{- end }}
+}

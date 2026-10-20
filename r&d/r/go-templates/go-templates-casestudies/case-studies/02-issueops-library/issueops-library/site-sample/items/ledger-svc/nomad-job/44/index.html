@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>ledger-svc/nomad-job/44 | CoolGitOrg library</title>
+<link rel="stylesheet" href="../../../../static/site.css">
+<link rel="alternate" type="application/atom+xml" title="Library feed" href="../../../../feed.xml">
+<script src="../../../../static/htmx/htmx.min.js" defer></script>
+<script src="../../../../static/library.js" defer></script>
+</head>
+<body>
+<header>
+<a class="brand" href="../../../../">issueops-library</a>
+<nav><a href="../../../../">catalog</a> <a href="../../../../ledger/">ledger</a> <a href="https://coolgitorg.github.io/issueops-intake/">request</a> <a href="../../../../feed.xml">feed</a></nav>
+</header>
+<main>
+
+<p class="crumbs"><a href="../../../../">catalog</a> / <code>ledger-svc</code> / nomad-job / #44</p>
+<h1><code>ledger-svc</code> &middot; nomad-job</h1>
+<div hx-get="status.html" hx-trigger="every 120s" hx-swap="outerHTML" hx-target="#status">
+<div id="status" class="status">
+<p><span class="badge in">available</span>
+The phase 2 slot is free.
+<a class="button" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=borrow.yml&amp;title=%5Bborrow%5D%20ledger-svc/nomad-job/44&amp;item-id=ledger-svc/nomad-job/44">Borrow phase 2</a></p>
+</div>
+
+</div>
+<dl class="meta">
+<dt>Item</dt><dd><code>ledger-svc/nomad-job/44</code></dd>
+<dt>Phase</dt><dd>1 of 3</dd>
+<dt>Published</dt><dd>1 Oct 2026 10:00 UTC</dd>
+<dt>Request</dt><dd><a href="https://github.com/CoolGitOrg/issueops-intake/issues/44">https://github.com/CoolGitOrg/issueops-intake/issues/44</a></dd>
+<dt>Requested by</dt><dd>carol</dd>
+<dt>Payload sha256</dt><dd><code class="hash">9f4e25bd72b38faa599e76919ba3f25f09e410c6c44141478fd55b6a4f6a090f</code></dd>
+<dt>Template sha256</dt><dd><code class="hash">fb4465169e35981a6d4eda31421dc658aacec073c669997b547ef8dee0854159</code></dd>
+</dl>
+<p><a class="button" href="artifact.nomad.hcl" download>Download artifact.nomad.hcl</a>
+<a class="button ghost" href="next.tmpl" download>next.tmpl</a>
+<a class="button ghost" href="bundle.tar.gz" download>bundle.tar.gz</a>
+<a class="button ghost" href="config.json">config.json</a></p>
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>sha256</th></tr></thead>
+<tbody>
+<tr class="even"><td><a href="SHA256SUMS">SHA256SUMS</a></td><td class="num">319 B</td><td><code class="hash">504ce3813fe51c525d59b94fa373da4850e7f1e5e131ef5703493e2db8de5603</code></td></tr>
+<tr class="odd"><td><a href="artifact.nomad.hcl">artifact.nomad.hcl</a></td><td class="num">511 B</td><td><code class="hash">cacd5b62141ce65e73d5346848e68d432b2840510dc15bc928d294c721f04462</code></td></tr>
+<tr class="even"><td><a href="bundle.tar.gz">bundle.tar.gz</a></td><td class="num">1.0 KiB</td><td><code class="hash">e908e01130781af5bd54f75879f675d7387c2a1203f60bbbd0b775fc0767faf1</code></td></tr>
+<tr class="odd"><td><a href="config.json">config.json</a></td><td class="num">637 B</td><td><code class="hash">ce2dc19c6a044d0a332fd0bdeb996cedc70a9a047b88e06ffd973c26a35de1db</code></td></tr>
+<tr class="even"><td><a href="next.tmpl">next.tmpl</a></td><td class="num">820 B</td><td><code class="hash">4910bd56ab44d9472145ea4814ead312999ed4e7cb59d857f6eaa142c197ca09</code></td></tr>
+</tbody>
+</table>
+<p class="mut">Verify: <code>curl -sO https://coolgitorg.github.io/issueops-library/items/ledger-svc/nomad-job/44/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS</code> after downloading the files.</p>
+<h2>Artifact</h2>
+<pre class="artifact" data-file="artifact.nomad.hcl"># ledger-svc: Nomad job, phase 1 of ledger-svc/nomad-job/44
+job &#34;ledger-svc&#34; {
+  datacenters = [&#34;dc1&#34;]
+  type        = &#34;service&#34;
+
+  group &#34;ledger-svc&#34; {
+    count = 3
+
+    network {
+      port &#34;http&#34; {
+        to = 8080
+      }
+    }
+
+    task &#34;ledger-svc&#34; {
+      driver = &#34;docker&#34;
+
+      config {
+        image = &#34;ghcr.io/coolgitorg/ledger:1.4.2&#34;
+        ports = [&#34;http&#34;]
+      }
+
+      resources {
+        cpu    = 200
+        memory = 256
+      }
+
+      env {
+        LOG_LEVEL = &#34;info&#34;
+      }
+    }
+  }
+}
+</pre>
+<h2>Next phase</h2>
+<p>A Go template for phase 2. Render it with
+<code>tpl -d mine.json -t next.tmpl -o payload.json</code> and file a request with the result.</p>
+<pre class="artifact">{{- /*
+  next.tmpl for ledger-svc/nomad-job/44
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow ledger-svc/nomad-job/44, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id ledger-svc, template nomad-job,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  &#34;phase_of&#34;: &#34;ledger-svc/nomad-job/44&#34;,
+  &#34;count&#34;: {{if hasKey . &#34;count&#34;}}{{toJSON (index . &#34;count&#34;)}}{{else}}{{&#34;3&#34;}}{{end}},
+  &#34;env&#34;: {{if hasKey . &#34;env&#34;}}{{toJSON (index . &#34;env&#34;)}}{{else}}{{&#34;{\&#34;LOG_LEVEL\&#34;:\&#34;info\&#34;}&#34;}}{{end}},
+  &#34;image&#34;: {{if hasKey . &#34;image&#34;}}{{toJSON (index . &#34;image&#34;)}}{{else}}{{&#34;\&#34;ghcr.io/coolgitorg/ledger:1.4.2\&#34;&#34;}}{{end}},
+  &#34;name&#34;: {{if hasKey . &#34;name&#34;}}{{toJSON (index . &#34;name&#34;)}}{{else}}{{&#34;\&#34;ledger-svc\&#34;&#34;}}{{end}}
+}
+</pre>
+
+</main>
+<footer>
+<p>Generated by <code>pagegen</code> dev at 2026-10-19T12:00:00Z from
+<a href="https://github.com/CoolGitOrg/issueops-library">CoolGitOrg/issueops-library</a>. Machine index: <a href="../../../../library.json">library.json</a>,
+checksums: <a href="../../../../SHA256SUMS">SHA256SUMS</a>.
+Every item is open to everyone; a borrow only reserves the next phase.</p>
+</footer>
+</body>
+</html>

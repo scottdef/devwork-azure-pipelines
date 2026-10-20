@@ -1,0 +1,5 @@
+parse  parse error: template: t:1: unclosed action
+nil    ExecError in "t": template: t:1:8: executing "t" at <.user.name>: nil pointer evaluating interface {}.name
+args   ExecError in "t": template: t:1:3: executing "t" at <dict "a">: error calling dict: dict: bad arguments: odd number of arguments (1)
+       errors.Is(err, funcs.ErrArgs) = true
+write  not an ExecError: disk full

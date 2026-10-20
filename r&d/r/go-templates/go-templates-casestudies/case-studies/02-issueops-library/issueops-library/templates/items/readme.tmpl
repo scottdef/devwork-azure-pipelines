@@ -1,0 +1,24 @@
+#!tmpl ext=md
+# {{.name}}
+
+{{.summary | default "No summary given."}}
+
+| | |
+|---|---|
+| Library item | `{{._.item_id}}` |
+| Phase | {{._.phase}} |
+| Owners | {{join ", " (.owners | default (list "unowned"))}} |
+{{- with .links}}
+
+## Links
+{{range .}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- with .sections}}
+{{range .}}
+## {{.title}}
+
+{{.body}}
+{{end}}
+{{- end}}

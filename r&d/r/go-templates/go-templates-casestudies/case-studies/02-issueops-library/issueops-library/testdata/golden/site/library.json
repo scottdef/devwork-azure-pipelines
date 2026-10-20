@@ -1,0 +1,141 @@
+{
+  "generated": "2026-10-19T12:00:00Z",
+  "base": "https://coolgitorg.github.io/issueops-library/",
+  "count": 3,
+  "items": [
+    {
+      "id": "ledger-svc/nomad-job/44",
+      "source_id": "ledger-svc",
+      "template_id": "nomad-job",
+      "phase": 1,
+      "issue": 44,
+      "published_at": "2026-10-19T12:02:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/ledger-svc/nomad-job/44/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/ledger-svc/nomad-job/44/artifact.nomad.hcl",
+      "borrowed": false,
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 319,
+          "sha256": "b583400ed8a0c8ff2fd88fac56cd1adb8ec42d18db5e3b2892715b1acec489bf"
+        },
+        {
+          "name": "artifact.nomad.hcl",
+          "size": 511,
+          "sha256": "cacd5b62141ce65e73d5346848e68d432b2840510dc15bc928d294c721f04462"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 1032,
+          "sha256": "eeba13a18dc401d013866120f53a80f4c8be10f16bf024d7de213966b533c234"
+        },
+        {
+          "name": "config.json",
+          "size": 637,
+          "sha256": "f2790b81878be5d2653459dcf453df58ca487d5a216bd97348b273ef30b64587"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 820,
+          "sha256": "4910bd56ab44d9472145ea4814ead312999ed4e7cb59d857f6eaa142c197ca09"
+        }
+      ]
+    },
+    {
+      "id": "docs-portal/readme/47",
+      "source_id": "docs-portal",
+      "template_id": "readme",
+      "phase": 1,
+      "issue": 47,
+      "published_at": "2026-10-19T12:01:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/docs-portal/readme/47/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/docs-portal/readme/47/artifact.md",
+      "borrowed": true,
+      "due": "2026-10-26T11:00:00Z",
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 312,
+          "sha256": "388ee222757f2a08ba25ddcf02f76039640ee331611b23d8075688c6199c5c01"
+        },
+        {
+          "name": "artifact.md",
+          "size": 217,
+          "sha256": "35cf8c32f24d05fca1825af1aa6f6e04231ec6c8c6231636aee5965a4cd2114e"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 952,
+          "sha256": "7a1d6d30f4aaa5f651d6c254bfc6c85724ae5554bbcf923d6926fe20f3667ea5"
+        },
+        {
+          "name": "config.json",
+          "size": 717,
+          "sha256": "ea4e2ee290042c236bbc376d0ff55b4ead2b8a10e0d50fc1949259402235298a"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 883,
+          "sha256": "b816665b4d425300b6e11f978ab77210f8a9bd01b2f059017c77fbee84d59a61"
+        }
+      ]
+    },
+    {
+      "id": "payments-api/caddyfile/42",
+      "source_id": "payments-api",
+      "template_id": "caddyfile",
+      "phase": 1,
+      "issue": 42,
+      "published_at": "2026-10-19T12:00:00Z",
+      "url": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/",
+      "artifact": "https://coolgitorg.github.io/issueops-library/items/payments-api/caddyfile/42/artifact.caddyfile",
+      "borrowed": true,
+      "due": "2026-10-13T12:00:00Z",
+      "files": [
+        {
+          "name": "SHA256SUMS",
+          "size": 319,
+          "sha256": "eee337250ed7bd41b6351e317426d60698d1c5e315ac992781f21235b4fa7f2b"
+        },
+        {
+          "name": "artifact.caddyfile",
+          "size": 334,
+          "sha256": "2398f8cb639b0ba598e9d0f70b630df9aba77e294f9ae4a98bf911cafef8267b"
+        },
+        {
+          "name": "bundle.tar.gz",
+          "size": 989,
+          "sha256": "7cc3563ce8fe45d95cff8bb6a606b89154a0b64651f5078ef16a3fd623e2966d"
+        },
+        {
+          "name": "config.json",
+          "size": 637,
+          "sha256": "3f07933322ed7d425bf199faf5f7c0d574b7652261326ec9a5b23792f872a2d0"
+        },
+        {
+          "name": "next.tmpl",
+          "size": 824,
+          "sha256": "d2a2e7e1e7b2ad0f72c4c9d0c7932f44aa4e19612f84660466d2c852712800a4"
+        }
+      ]
+    }
+  ],
+  "open_loans": [
+    {
+      "item": "payments-api/caddyfile/42",
+      "borrower": "bob",
+      "borrow_issue": 50,
+      "borrowed_at": "2026-09-29T12:00:00Z",
+      "due": "2026-10-13T12:00:00Z",
+      "returned_at": null
+    },
+    {
+      "item": "docs-portal/readme/47",
+      "borrower": "carol",
+      "borrow_issue": 51,
+      "borrowed_at": "2026-10-19T11:00:00Z",
+      "due": "2026-10-26T11:00:00Z",
+      "returned_at": null
+    }
+  ]
+}

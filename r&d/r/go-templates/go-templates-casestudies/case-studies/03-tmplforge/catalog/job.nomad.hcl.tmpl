@@ -1,0 +1,34 @@
+job [[ .name | printf "%q" ]] {
+  datacenters = [[ .datacenters | toJSON ]]
+  type        = "service"
+
+  group "app" {
+    count = [[ .count ]]
+
+    network {
+      port "http" { to = [[ .port ]] }
+    }
+
+    task "server" {
+      driver = "docker"
+
+      config {
+        image = [[ printf "%s:%s" .image .tag | printf "%q" ]]
+        ports = ["http"]
+      }
+
+      template {
+        destination = "secrets/env"
+        env         = true
+        data        = <<EOT
+{{ with secret "kv/data/[[ .name ]]" }}TOKEN={{ .Data.data.token }}{{ end }}
+EOT
+      }
+
+      resources {
+        cpu    = [[ .cpu ]]
+        memory = [[ .memory ]]
+      }
+    }
+  }
+}

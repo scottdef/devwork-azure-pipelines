@@ -1,0 +1,13 @@
+== {{ upper .host }} ==
+{{ .greeting }}, {{ default "operator" .user }}.
+
+{{ printf "%-12s %s" "Kernel:" .kernel }}
+{{ printf "%-12s %s" "Last login:" (dateFmt "Mon Jan 2 15:04 MST 2006" .lastLogin) }}
+{{ printf "%-12s %d %s" "Updates:" .updates (plural "package" "packages" .updates) }}
+{{- with .notices }}
+
+Notices:
+{{- range . }}
+{{ printf "* %s" . | indent 2 }}
+{{- end }}
+{{- end }}

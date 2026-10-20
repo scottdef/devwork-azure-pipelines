@@ -1,0 +1,24 @@
+{
+  "action": "library-publish",
+  "branch": "main",
+  "client_payload": {
+    "source_id": "docs-portal",
+    "template_id": "readme",
+    "phase": "1",
+    "issue": 47,
+    "repo": "CoolGitOrg/issueops-intake",
+    "requester": "erin",
+    "payload": "{\"name\":\"docs-portal\",\"summary\":\"Internal docs site <script>alert(1)</script>.\",\"owners\":[\"@coolgitorg/platform\"],\"links\":[\"https://coolgitorg.github.io/docs/\"]}",
+    "sha256": "cc021728bcb7e8bf200dd4bdbd245dfbbf50b562f0a7e8570934b0ab4d53f0f7"
+  },
+  "repository": {
+    "full_name": "CoolGitOrg/issueops-library"
+  },
+  "sender": {
+    "login": "issueops-autoadmin-app[bot]",
+    "type": "Bot"
+  },
+  "installation": {
+    "id": 55501234
+  }
+}

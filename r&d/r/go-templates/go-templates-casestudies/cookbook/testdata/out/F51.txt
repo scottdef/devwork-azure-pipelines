@@ -1,0 +1,13 @@
+## one clone per page
+-- home --
+<!doctype html>
+<title>Home</title>
+<main>Hello, rob</main>
+-- about --
+<!doctype html>
+<title>About</title>
+<main>(empty)</main>
+## one shared set, home parsed first, then about
+<!doctype html>
+<title>About</title>
+<main>Hello, rob</main>

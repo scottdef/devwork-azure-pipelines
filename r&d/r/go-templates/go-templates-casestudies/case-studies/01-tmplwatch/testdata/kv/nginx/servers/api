@@ -1,0 +1,1 @@
+{"listen":443,"server_name":"api.example.internal","upstream":"api","client_max_body_size":"10m"}

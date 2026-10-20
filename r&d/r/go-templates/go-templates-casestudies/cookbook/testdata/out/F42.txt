@@ -1,0 +1,7 @@
+<div id="chart" style="width:600px;height:400px"></div>
+<script>
+  var viaMap = {"series":[{"data":[5,9,7],"type":"bar"}],"title":{"text":"\u003c/script\u003e\u003cb\u003eRequests"},"xAxis":{"data":["mon","tue","wed"],"type":"category"},"yAxis":{}};
+  var viaJS  = {"title":{"text":"pre-marshalled"}};
+  var viaStr = "{\"title\":{\"text\":\"a string\"}}";
+  echarts.init(document.getElementById("chart")).setOption(viaMap);
+</script>

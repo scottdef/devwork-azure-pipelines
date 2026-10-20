@@ -1,0 +1,162 @@
+# publish.yml: apply a library event, rebuild the site, deploy Pages, and
+# report back on the originating intake issue.
+#
+# Why three jobs and where the concurrency group sits:
+#   apply   no queue. GitHub keeps at most one pending run per concurrency
+#           group and cancels the rest, which would silently drop events.
+#           apply-event.sh instead commits with fetch/apply/push retries.
+#   deploy  concurrency "library-pages", cancel-in-progress false. It
+#           deploys whatever main holds when it starts, so if a pending
+#           deploy is replaced by a newer one, nothing is lost.
+#   notify  waits until the live site was generated after this event was
+#           applied, then comments and closes the issue.
+name: publish
+
+on:
+  repository_dispatch:
+    types: [library-publish, library-borrow, library-return]
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+    env:
+      GOFLAGS: -mod=mod
+      INTAKE_REPO: ${{ github.repository_owner }}/issueops-intake
+      BASE_URL: ${{ vars.LIBRARY_BASE_URL || 'https://coolgitorg.github.io/issueops-library/' }}
+    outputs:
+      ok: ${{ steps.apply.outputs.ok }}
+      changed: ${{ steps.apply.outputs.changed }}
+      issue: ${{ steps.apply.outputs.issue }}
+      item: ${{ steps.apply.outputs.item }}
+      close: ${{ steps.apply.outputs.close }}
+      applied_at: ${{ steps.apply.outputs.applied_at }}
+      comment: ${{ steps.apply.outputs.comment }}
+    steps:
+      # The App token pushes to main (it is the ruleset's bypass actor) and
+      # comments on the intake repo.
+      - name: Mint App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: issueops-library,issueops-intake
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24.x' }}
+          cache: false
+      - name: Build
+        run: make build
+      - name: Apply event and commit
+        id: apply
+        env:
+          EVENT: ${{ toJSON(github.event) }}
+        run: scripts/apply-event.sh
+      - name: Comment refusal
+        if: steps.apply.outputs.refused == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ISSUE: ${{ steps.apply.outputs.issue }}
+          COMMENT: ${{ steps.apply.outputs.comment }}
+        run: |
+          printf '%s\n' "$COMMENT" > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$ISSUE" --repo "$INTAKE_REPO" --body-file "$RUNNER_TEMP/comment.md"
+          gh issue edit "$ISSUE" --repo "$INTAKE_REPO" --add-label invalid --remove-label accepted
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          EVENT: ${{ toJSON(github.event) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue="$(printf '%s' "$EVENT" | jq -r '.client_payload.issue | numbers')" || exit 0
+          [ -n "$issue" ] || exit 0
+          printf '### Library failed\n\nThe library could not apply this request. An operator can see why in %s\n' "$RUN_URL" > "$RUNNER_TEMP/f.md"
+          gh issue comment "$issue" --repo "$INTAKE_REPO" --body-file "$RUNNER_TEMP/f.md"
+
+  deploy:
+    needs: apply
+    if: needs.apply.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: library-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  notify:
+    needs: [apply, deploy]
+    if: needs.apply.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      INTAKE_REPO: ${{ github.repository_owner }}/issueops-intake
+      BASE_URL: ${{ vars.LIBRARY_BASE_URL || 'https://coolgitorg.github.io/issueops-library/' }}
+    steps:
+      - name: Mint App token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: issueops-intake
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      - name: Wait for the live site
+        id: live
+        continue-on-error: true
+        env:
+          APPLIED_AT: ${{ needs.apply.outputs.applied_at }}
+        run: scripts/wait-live.sh
+      - name: Comment and close
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ISSUE: ${{ needs.apply.outputs.issue }}
+          CLOSE: ${{ needs.apply.outputs.close }}
+          COMMENT: ${{ needs.apply.outputs.comment }}
+          LIVE: ${{ steps.live.outcome }}
+        run: |
+          printf '%s\n' "$COMMENT" > "$RUNNER_TEMP/comment.md"
+          if [ "$LIVE" != success ]; then
+            printf '\n> Pages had not refreshed after 10 minutes; the change is committed and will appear with the next deploy.\n' >> "$RUNNER_TEMP/comment.md"
+          fi
+          gh issue comment "$ISSUE" --repo "$INTAKE_REPO" --body-file "$RUNNER_TEMP/comment.md"
+          gh issue edit "$ISSUE" --repo "$INTAKE_REPO" --add-label published
+          for n in $CLOSE; do
+            case "$n" in (*[!0-9]*|'') continue ;; esac
+            sleep 1
+            gh issue close "$n" --repo "$INTAKE_REPO" --reason completed
+          done

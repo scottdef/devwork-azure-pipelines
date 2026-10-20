@@ -1,0 +1,7 @@
+missingkey=default     map[string]any    A=1 B=<no value> C=fallback
+missingkey=default     map[string]int    A=1 B=<no value> C=fallback
+missingkey=zero        map[string]any    A=1 B=<no value> C=fallback
+missingkey=zero        map[string]int    A=1 B=0 C=fallback
+missingkey=error       map[string]any    error: template: t:1:16: executing "t" at <.B>: map has no entry for key "B"
+missingkey=error       map[string]int    error: template: t:1:16: executing "t" at <.B>: map has no entry for key "B"
+missingkey=default     struct            error: template: t:1:16: executing "t" at <.B>: can't evaluate field B in type struct { A int }

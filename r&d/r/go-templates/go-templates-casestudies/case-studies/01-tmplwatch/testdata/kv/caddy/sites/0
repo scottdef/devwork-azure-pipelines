@@ -1,0 +1,1 @@
+{"host":"app.example.internal","upstreams":["10.0.1.10:8080","10.0.1.11:8080"],"tls":"internal"}

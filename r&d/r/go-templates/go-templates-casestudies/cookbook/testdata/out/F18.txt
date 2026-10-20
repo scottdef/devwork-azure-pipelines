@@ -1,0 +1,4 @@
+app:  cookbook
+env:  staging
+home: /home/rob
+log:  info

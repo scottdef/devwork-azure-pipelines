@@ -1,0 +1,6 @@
+<p>&lt;b&gt;plain&lt;/b&gt;</p>
+<p><b>safe</b></p>
+<a href="#ZgotmplZ">string</a>
+<a href="javascript:alert%281%29">template.URL</a>
+<a onclick="x()">template.HTMLAttr</a>
+<script>alert(1)</script>

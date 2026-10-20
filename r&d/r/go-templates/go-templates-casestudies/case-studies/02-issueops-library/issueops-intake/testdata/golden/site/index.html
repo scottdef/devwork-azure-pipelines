@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action https://github.com; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Request a library item | CoolGitOrg</title>
+<link rel="stylesheet" href="./static/site.css">
+</head>
+<body data-base="https://github.com/CoolGitOrg/issueops-intake/issues/new" data-max="7000" data-flags="./flags.json">
+<header>
+<a class="brand" href="./">issueops-intake</a>
+<nav><a href="./">forms</a> <a href="./lab/">lab</a> <a href="https://coolgitorg.github.io/issueops-library/">library</a> <a href="https://github.com/CoolGitOrg/issueops-intake">repo</a></nav>
+</header>
+<main>
+
+<h1>CoolGitOrg library intake</h1>
+<p>Each form below is generated from the issue form of the same name. Filling it in here only
+builds a link: <strong>submitting opens GitHub</strong> with your answers prefilled, and you file
+the issue there. The library publishes accepted requests to
+<a href="https://coolgitorg.github.io/issueops-library/">https://coolgitorg.github.io/issueops-library/</a>; every item is open to everyone.</p>
+<p id="flag-off" class="warn" hidden>Submissions are paused (beta gate). You can still browse the library.</p>
+<noscript><p class="warn">JavaScript is off. Use the links to the plain issue forms below.</p></noscript>
+<ul class="toc">
+<li><a href="#request">Library request</a> &mdash; Render a template into the CoolGitOrg library and publish it on Pages.</li>
+<li><a href="#borrow">Library borrow</a> &mdash; Reserve an item&#39;s next-phase slot for 7 or 14 days.</li>
+<li><a href="#return">Library return</a> &mdash; Give back a borrowed item so someone else can take the next phase.</li>
+</ul>
+
+<section id="request">
+<h2>Library request</h2>
+<p class="md">Fill this in by hand or start from the
+<a href="https://coolgitorg.github.io/issueops-intake/">intake page</a>, which
+prefills it. The rendered item is open to everyone once published.</p>
+<form class="intake" data-template="request.yml" data-title="[request] " data-title-fields="source-id template-id" novalidate>
+<div class="field" data-id="source-id" data-type="input" data-prefill="1">
+<label for="f-request-source-id">Source ID <span class="req" title="required">*</span></label>
+<p class="help">Stable name of the thing being described (a-z, 0-9, dash; 2-48 chars).</p>
+<input id="f-request-source-id" name="source-id" type="text" autocomplete="off" placeholder="payments-api" required pattern="[a-z0-9][a-z0-9-]*[a-z0-9]" maxlength="48" minlength="2">
+</div>
+<div class="field" data-id="template-id" data-type="dropdown">
+<label for="f-request-template-id">Template <span class="req" title="required">*</span></label>
+<p class="help">Which library template renders the payload.</p>
+<select id="f-request-template-id" name="template-id" required>
+<option value="caddyfile" selected>caddyfile</option>
+<option value="workflow">workflow</option>
+<option value="issue-form">issue-form</option>
+<option value="terraform-module">terraform-module</option>
+<option value="nomad-job">nomad-job</option>
+<option value="readme">readme</option>
+</select>
+<p class="note">Dropdowns are not prefilled by GitHub: pick the same value again on the issue form.</p>
+</div>
+<div class="field" data-id="phase" data-type="dropdown">
+<label for="f-request-phase">Phase <span class="req" title="required">*</span></label>
+<p class="help">Phase 1 renders the artifact; 2 and 3 render from a borrowed next-phase template.</p>
+<select id="f-request-phase" name="phase" required>
+<option value="1" selected>1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+</select>
+<p class="note">Dropdowns are not prefilled by GitHub: pick the same value again on the issue form.</p>
+</div>
+<div class="field" data-id="payload" data-type="textarea" data-prefill="1">
+<label for="f-request-payload">Payload <span class="req" title="required">*</span></label>
+<p class="help">JSON object handed to the template as its data (max 32 KiB).</p>
+<textarea id="f-request-payload" name="payload" rows="12" spellcheck="false" placeholder="{&#34;name&#34;: &#34;payments-api&#34;}" required maxlength="32768" data-json="1"></textarea>
+</div>
+<div class="field" data-id="notes" data-type="textarea" data-prefill="1">
+<label for="f-request-notes">Notes</label>
+<p class="help">Anything a reviewer should know. Not used for rendering.</p>
+<textarea id="f-request-notes" name="notes" rows="4" spellcheck="false" maxlength="4000"></textarea>
+</div>
+
+<div class="actions">
+<button type="submit">Open prefilled issue on GitHub</button>
+<a class="plain" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=request.yml">plain form</a>
+</div>
+<pre class="out" aria-live="polite"></pre>
+</form>
+</section>
+
+<section id="borrow">
+<h2>Library borrow</h2>
+<form class="intake" data-template="borrow.yml" data-title="[borrow] " data-title-fields="item-id" novalidate>
+<div class="field" data-id="item-id" data-type="input" data-prefill="1">
+<label for="f-borrow-item-id">Item ID <span class="req" title="required">*</span></label>
+<p class="help">source-id/template-id/issue, as shown on the item page.</p>
+<input id="f-borrow-item-id" name="item-id" type="text" autocomplete="off" placeholder="payments-api/caddyfile/42" required pattern="[a-z0-9][a-z0-9-]*[a-z0-9]/(caddyfile|workflow|issue-form|terraform-module|nomad-job|readme)/[1-9][0-9]*" maxlength="96">
+</div>
+<div class="field" data-id="days" data-type="dropdown">
+<label for="f-borrow-days">Days <span class="req" title="required">*</span></label>
+<p class="help">Loan period. Overdue loans are warned, then returned after a 7 day grace.</p>
+<select id="f-borrow-days" name="days" required>
+<option value="7" selected>7</option>
+<option value="14">14</option>
+</select>
+<p class="note">Dropdowns are not prefilled by GitHub: pick the same value again on the issue form.</p>
+</div>
+<div class="field" data-id="reason" data-type="textarea" data-prefill="1">
+<label for="f-borrow-reason">Reason</label>
+<p class="help">What you plan to build in the next phase.</p>
+<textarea id="f-borrow-reason" name="reason" rows="4" spellcheck="false" maxlength="1024"></textarea>
+</div>
+
+<div class="actions">
+<button type="submit">Open prefilled issue on GitHub</button>
+<a class="plain" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=borrow.yml">plain form</a>
+</div>
+<pre class="out" aria-live="polite"></pre>
+</form>
+</section>
+
+<section id="return">
+<h2>Library return</h2>
+<form class="intake" data-template="return.yml" data-title="[return] " data-title-fields="item-id" novalidate>
+<div class="field" data-id="item-id" data-type="input" data-prefill="1">
+<label for="f-return-item-id">Item ID <span class="req" title="required">*</span></label>
+<p class="help">source-id/template-id/issue of the item you borrowed.</p>
+<input id="f-return-item-id" name="item-id" type="text" autocomplete="off" placeholder="payments-api/caddyfile/42" required pattern="[a-z0-9][a-z0-9-]*[a-z0-9]/(caddyfile|workflow|issue-form|terraform-module|nomad-job|readme)/[1-9][0-9]*" maxlength="96">
+</div>
+
+<div class="actions">
+<button type="submit">Open prefilled issue on GitHub</button>
+<a class="plain" href="https://github.com/CoolGitOrg/issueops-intake/issues/new?template=return.yml">plain form</a>
+</div>
+<pre class="out" aria-live="polite"></pre>
+</form>
+</section>
+
+<script src="./static/intake.js"></script>
+
+</main>
+<footer>
+<p>Static page generated by <code>pagegen -intake</code> test at 2026-10-19T00:00:00Z from
+<code>.github/ISSUE_TEMPLATE/*.yml</code>. No backend, no tokens: the button only opens GitHub's own form.</p>
+</footer>
+</body>
+</html>

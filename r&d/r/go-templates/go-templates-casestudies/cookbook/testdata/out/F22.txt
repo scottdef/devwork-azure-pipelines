@@ -1,0 +1,10 @@
+# naive: template only
+widget,fancy, shiny,3
+gadget,say "hi",1
+gizmo,two
+lines,2
+# safe: encoding/csv
+widget,"fancy, shiny",3
+gadget,"say ""hi""",1
+gizmo,"two
+lines",2

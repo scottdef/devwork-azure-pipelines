@@ -1,0 +1,21 @@
+{{- /* Rendered by: tpl -t scripts/loadtest-summary.md.tmpl -d dist/loadtest/report.json */ -}}
+## tmplwatch load test {{ if .pass }}passed{{ else }}FAILED{{ end }}
+
+| Endpoint | Rate | Requests | Errors | p50 ms | p95 ms | p99 ms | Target p99 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+{{- with .render }}
+| `/render` | {{ .rate }}/s | {{ .requests }} | {{ add .errors .dropped }} | {{ .p50_ms }} | {{ .p95_ms }} | {{ .p99_ms }} | < {{ $.targets.render_p99_ms }} |
+{{- end }}
+{{- with .metrics }}
+| `/metrics` | {{ .rate }}/s | {{ .requests }} | {{ add .errors .dropped }} | {{ .p50_ms }} | {{ .p95_ms }} | {{ .p99_ms }} | < {{ $.targets.metrics_p99_ms }} |
+{{- end }}
+
+Duration {{ .render.duration }} per endpoint, run concurrently.
+{{- with index .render "first_error" }}
+
+First `/render` error: `{{ . }}`
+{{- end }}
+{{- with index .metrics "first_error" }}
+
+First `/metrics` error: `{{ . }}`
+{{- end }}

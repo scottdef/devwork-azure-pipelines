@@ -1,0 +1,24 @@
+{{- /*
+  prometheus.yml. Each directory under prom/targets is a job; each key in
+  it is an instance whose value is host:port. tree returns keys sorted, so
+  "job/instance" keys of one job are adjacent: emit a job when its name
+  changes. Structures go through toYAML so quoting is always right.
+*/ -}}
+# Managed by tmplwatch. Do not edit by hand.
+global:
+  scrape_interval: {{ keyOrDefault "prom/global/scrape_interval" "15s" | toYAML }}
+  evaluation_interval: {{ keyOrDefault "prom/global/evaluation_interval" "30s" | toYAML }}
+  external_labels:
+    env: {{ key "site/env" | toYAML }}
+
+scrape_configs:
+{{- $env := key "site/env" }}
+{{- $prev := "" }}
+{{- range tree "prom/targets" }}
+{{-   $job := index (split "/" .Key) 0 }}
+{{-   if ne $job $prev }}
+{{-     $prev = $job }}
+{{-     $targets := tree (printf "prom/targets/%s" $job) | values }}
+  - {{ dict "job_name" $job "static_configs" (list (dict "targets" $targets "labels" (dict "env" $env))) | toYAML | indent 4 | trimSpace }}
+{{-   end }}
+{{- end }}

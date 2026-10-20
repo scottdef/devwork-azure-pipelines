@@ -1,0 +1,22 @@
+{
+  "go": "1.24.x",
+  "binary": "tmplforge",
+  "targets": [
+    {
+      "os": "linux",
+      "arch": "amd64"
+    },
+    {
+      "os": "linux",
+      "arch": "arm64"
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64"
+    },
+    {
+      "os": "plan9",
+      "arch": "amd64"
+    }
+  ]
+}

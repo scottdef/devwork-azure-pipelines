@@ -1,0 +1,16 @@
+{{- /*
+  next.tmpl for docs-portal/readme/47
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow docs-portal/readme/47, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id docs-portal, template readme,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "docs-portal/readme/47",
+  "links": {{if hasKey . "links"}}{{toJSON (index . "links")}}{{else}}{{"[\"https://coolgitorg.github.io/docs/\"]"}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"docs-portal\""}}{{end}},
+  "owners": {{if hasKey . "owners"}}{{toJSON (index . "owners")}}{{else}}{{"[\"@coolgitorg/platform\"]"}}{{end}},
+  "summary": {{if hasKey . "summary"}}{{toJSON (index . "summary")}}{{else}}{{"\"Internal docs site <script>alert(1)</script>.\""}}{{end}}
+}

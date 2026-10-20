@@ -1,0 +1,2 @@
+../../catalog/workflow.yml.tmpl:23: warning: .go referenced but not declared
+../../catalog/workflow.yml.tmpl:24: warning: .steps referenced but not declared

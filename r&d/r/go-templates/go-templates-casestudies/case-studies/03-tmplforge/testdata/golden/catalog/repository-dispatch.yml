@@ -1,0 +1,23 @@
+name: on-dispatch
+
+on:
+  repository_dispatch:
+    types: ["tmplforge-render","tmplforge-release"]
+
+permissions:
+  contents: read
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: handle ${{ github.event.action }}
+        env:
+          EVENT: ${{ github.event.action }}
+          REF: ${{ github.event.client_payload.ref }}
+          TEMPLATE: ${{ github.event.client_payload.template }}
+        run: |
+          printf 'event=%s\n' "$EVENT"
+          printf 'ref=%s\n' "$REF"
+          printf 'template=%s\n' "$TEMPLATE"

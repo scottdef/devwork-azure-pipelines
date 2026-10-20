@@ -1,0 +1,21 @@
+{
+  "ack": {
+    "selected": [
+      "I read the library rules"
+    ],
+    "unselected": []
+  },
+  "environments": {
+    "selected": [
+      "staging",
+      "sandbox"
+    ],
+    "unselected": [
+      "production"
+    ]
+  },
+  "regions": [
+    "us-east-1",
+    "eu-west-1"
+  ]
+}

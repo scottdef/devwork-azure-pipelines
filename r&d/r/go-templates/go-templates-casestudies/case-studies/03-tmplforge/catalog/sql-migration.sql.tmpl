@@ -1,0 +1,13 @@
+-- migration {{ .version }}: {{ .description }}
+-- +migrate Up
+CREATE TABLE {{ .table }} (
+{{- range $i, $c := .columns }}
+    {{ $c.name }} {{ $c.type }}{{ if not $c.null }} NOT NULL{{ end }}{{ with $c.default }} DEFAULT {{ . }}{{ end }}{{ if lt (add $i 1) (len $.columns) }},{{ end }}
+{{- end }}
+);
+{{ range .indexes }}
+CREATE {{ if .unique }}UNIQUE {{ end }}INDEX {{ $.table }}_{{ join "_" .columns }}_idx ON {{ $.table }} ({{ join ", " .columns }});
+{{- end }}
+
+-- +migrate Down
+DROP TABLE {{ .table }};

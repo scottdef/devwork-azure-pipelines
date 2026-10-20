@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph bin["tmplforge (one static binary)"]
+        direction TB
+        main["cmd/tmplforge<br/>subcommand dispatch"]
+        tui["internal/tui<br/>sh: ed/sam line commands<br/>bufio, no termios"]
+        web["internal/web<br/>serve: net/http + html/template<br/>CSP, CSRF, token bucket, metrics"]
+        forge["internal/forge<br/>Render · Lint · Vars · Diff<br/>Export · Catalog · Sandbox"]
+        scaffold["internal/scaffold<br/>IssueOps + CI/CD generators<br/>[[ ]] delimiters"]
+        funcs["internal/funcs<br/>All() / Safe() FuncMap"]
+        catalog[("catalog/<br/>embed.FS: 25 templates<br/>+ fixtures + index.json")]
+        echarts["third_party/go-echarts v2.7.3<br/>(replace, vendored)"]
+    end
+    user1(["operator at a terminal<br/>(trusted)"]) -->|stdin lines| tui
+    user2(["browser<br/>(untrusted author)"]) -->|htmx POST| web
+    ci(["CI / scripts"]) -->|render, lint, vars, test| main
+    main --> tui & web & forge & scaffold
+    tui --> forge
+    tui --> scaffold
+    web --> scaffold
+    web -->|"/chart"| echarts
+    web -->|"POST /render, /test, /export"| child
+    forge --> funcs
+    forge --> catalog
+    child["tmplforge render -sandbox<br/>(child process, Safe funcs,<br/>64 KiB in, 1 MiB out, 2 s)"]
+    child --> forge

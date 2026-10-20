@@ -1,0 +1,25 @@
+name: [[ .name ]]
+
+on:
+  repository_dispatch:
+    types: [[ toJSON .types ]]
+
+permissions:
+  contents: [[ default "read" .contents ]]
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: handle ${{ github.event.action }}
+        env:
+          EVENT: ${{ github.event.action }}
+[[- range .payload ]]
+          [[ upper . ]]: ${{ github.event.client_payload.[[ . ]] }}
+[[- end ]]
+        run: |
+          printf 'event=%s\n' "$EVENT"
+[[- range .payload ]]
+          printf '[[ . ]]=%s\n' "$[[ upper . ]]"
+[[- end ]]

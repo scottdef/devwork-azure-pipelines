@@ -1,0 +1,90 @@
+# /etc/systemd/system/tmplwatch.service
+#
+# Install:
+#   install -m 0755 tmplwatch_linux_amd64 /usr/local/bin/tmplwatch
+#   install -d /etc/tmplwatch && cp config/tmplwatch.json /etc/tmplwatch/
+#   cp -r templates /etc/tmplwatch/
+#   install -d -m 0750 /etc/tmplwatch/credentials
+#   printf %s "$TOKEN" > /etc/tmplwatch/credentials/github-token   # mode 0600, root
+#   systemctl daemon-reload && systemctl enable --now tmplwatch
+#
+# Relative paths in tmplwatch.json resolve against WorkingDirectory
+# (/var/lib/tmplwatch, the writable StateDirectory), so in production give
+# template sources as absolute paths ("/etc/tmplwatch/templates/x.tmpl").
+# "out/Caddyfile" then lands in /var/lib/tmplwatch/out/Caddyfile. For
+# destinations elsewhere (e.g. /etc/caddy) add them to ReadWritePaths.
+#
+# GitHub App instead of a token: uncomment the app-key credential and set
+#   "app_private_key_file": "/run/credentials/tmplwatch.service/app-key"
+# (DynamicUser cannot read root-owned files; LoadCredential copies them in.)
+#
+# Reload templates without restarting: systemctl reload tmplwatch.
+
+[Unit]
+Description=tmplwatch: render config files from a key/value source
+Documentation=https://github.com/CoolGitOrg/tmplwatch/blob/main/docs/OPERATIONS.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tmplwatch -c /etc/tmplwatch/tmplwatch.json
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+# Identity: a transient user, no home, no setuid.
+DynamicUser=yes
+StateDirectory=tmplwatch
+WorkingDirectory=/var/lib/tmplwatch
+# The GitHub token reaches the process as a file systemd passes in; it is
+# never in the unit, the environment of other units, or `systemctl show`.
+LoadCredential=github-token:/etc/tmplwatch/credentials/github-token
+Environment=GITHUB_TOKEN_FILE=%d/github-token
+# LoadCredential=app-key:/etc/tmplwatch/credentials/app.pem
+# Environment=APP_CLIENT_ID=Iv23liXXXXXXXXXXXXXX
+
+# File system: everything read-only except the state directory and
+# destinations listed here.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/tmplwatch
+# ReadWritePaths=/etc/caddy
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+
+# Privileges and syscalls.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+# @system-service already allows setrlimit, which the Go runtime calls at
+# start to raise RLIMIT_NOFILE; do not deny @resources. Denied calls fail
+# with EPERM instead of killing the process.
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+UMask=0027
+
+# Resources.
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

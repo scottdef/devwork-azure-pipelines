@@ -1,0 +1,25 @@
+{
+  "id": "edge-proxy/workflow/43",
+  "source_id": "edge-proxy",
+  "template_id": "workflow",
+  "phase": 1,
+  "issue": 43,
+  "issue_url": "https://github.com/CoolGitOrg/issueops-intake/issues/43",
+  "requested_by": "bob",
+  "published_at": "2026-10-19T12:00:00Z",
+  "artifact": "artifact.yml",
+  "payload_sha256": "9c6dd975ff523e7f051d90fcfb3ccf9765aad51967c0945fa987a870e206a444",
+  "template_sha256": "c4a666136a72f2bf7da0d9116337b44f60e1467fdef0b1571365ff7dc2791ca1",
+  "payload": {
+    "branches": [
+      "main",
+      "release/*"
+    ],
+    "go": "1.24.x",
+    "name": "edge-proxy",
+    "run": [
+      "go vet ./...",
+      "go test -race ./..."
+    ]
+  }
+}

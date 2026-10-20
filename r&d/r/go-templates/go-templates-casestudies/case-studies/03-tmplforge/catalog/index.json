@@ -1,0 +1,209 @@
+[
+  {
+    "name": "CHANGELOG.md",
+    "file": "CHANGELOG.md.tmpl",
+    "format": "md",
+    "description": "Keep-a-Changelog CHANGELOG from a list of releases and typed changes.",
+    "fixture": "fixtures/CHANGELOG.md.json",
+    "output": "CHANGELOG.md"
+  },
+  {
+    "name": "Caddyfile",
+    "file": "Caddyfile.tmpl",
+    "format": "txt",
+    "description": "Caddy v2 Caddyfile: one block per site with optional file server and reverse proxies.",
+    "fixture": "fixtures/Caddyfile.json",
+    "output": "Caddyfile"
+  },
+  {
+    "name": "Corefile",
+    "file": "Corefile.tmpl",
+    "format": "txt",
+    "description": "CoreDNS Corefile with a template plugin block; [[ ]] delimiters leave CoreDNS's own {{ }} alone.",
+    "fixture": "fixtures/Corefile.json",
+    "output": "Corefile",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "Dockerfile",
+    "file": "Dockerfile.tmpl",
+    "format": "txt",
+    "description": "Two-stage Go Dockerfile: golang builder to scratch, non-root, labels.",
+    "fixture": "fixtures/Dockerfile.json",
+    "output": "Dockerfile"
+  },
+  {
+    "name": "Makefile",
+    "file": "Makefile.tmpl",
+    "format": "txt",
+    "description": "POSIX make Makefile with a cross-compile target per GOOS/GOARCH (tabs preserved).",
+    "fixture": "fixtures/Makefile.json",
+    "output": "Makefile"
+  },
+  {
+    "name": "README.md",
+    "file": "README.md.tmpl",
+    "format": "md",
+    "description": "Project README with badges, install steps and a generated command table.",
+    "fixture": "fixtures/README.md.json",
+    "output": "README.md"
+  },
+  {
+    "name": "config.json",
+    "file": "config.json.tmpl",
+    "format": "json",
+    "description": "Application JSON config assembled with dict/list and printed with toPrettyJSON.",
+    "fixture": "fixtures/config.json.json",
+    "output": "config.json"
+  },
+  {
+    "name": "config.yml",
+    "file": "config.yml.tmpl",
+    "format": "yaml",
+    "description": "YAML config: hand-written header, then toYAML of a nested fixture section.",
+    "fixture": "fixtures/config.yml.json",
+    "output": "config.yml"
+  },
+  {
+    "name": "dispatch.yml",
+    "file": "dispatch.yml.tmpl",
+    "format": "yaml",
+    "description": "workflow_dispatch workflow with typed inputs passed through env, never run interpolation.",
+    "fixture": "fixtures/dispatch.yml.json",
+    "output": "dispatch.yml",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "email.html",
+    "file": "email.html.tmpl",
+    "format": "html",
+    "description": "HTML email rendered with html/template: hostile fixture strings are escaped.",
+    "fixture": "fixtures/email.html.json",
+    "output": "email.html"
+  },
+  {
+    "name": "email.txt",
+    "file": "email.txt.tmpl",
+    "format": "txt",
+    "description": "Plain-text email twin of email.html, wrapped at 72 columns.",
+    "fixture": "fixtures/email.txt.json",
+    "output": "email.txt"
+  },
+  {
+    "name": "hello.c",
+    "file": "hello.c.tmpl",
+    "format": "txt",
+    "description": "Plan 9 C program (u.h, libc.h, ARGBEGIN) printing a configurable greeting.",
+    "fixture": "fixtures/hello.c.json",
+    "output": "hello.c"
+  },
+  {
+    "name": "hello.go",
+    "file": "hello.go.tmpl",
+    "format": "txt",
+    "description": "Go command with flag package and single-dash flags; output is gofmt-clean.",
+    "fixture": "fixtures/hello.go.json",
+    "output": "hello.go"
+  },
+  {
+    "name": "htmx-partial.html",
+    "file": "htmx-partial.html.tmpl",
+    "format": "html",
+    "description": "htmx partial: rows that swap themselves, escaped by html/template.",
+    "fixture": "fixtures/htmx-partial.html.json",
+    "output": "htmx-partial.html"
+  },
+  {
+    "name": "issue-form.yml",
+    "file": "issue-form.yml.tmpl",
+    "format": "yaml",
+    "description": "GitHub issue form (ISSUE_TEMPLATE) with typed fields and dropdowns.",
+    "fixture": "fixtures/issue-form.yml.json",
+    "output": "issue-form.yml"
+  },
+  {
+    "name": "job.nomad.hcl",
+    "file": "job.nomad.hcl.tmpl",
+    "format": "txt",
+    "description": "Nomad service job; [[ ]] delimiters keep consul-template {{ }} blocks intact.",
+    "fixture": "fixtures/job.nomad.hcl.json",
+    "output": "job.nomad.hcl",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "main.tf",
+    "file": "main.tf.tmpl",
+    "format": "txt",
+    "description": "Terraform (integrations/github ~> 6.13): repositories with topics and a branch ruleset.",
+    "fixture": "fixtures/main.tf.json",
+    "output": "main.tf"
+  },
+  {
+    "name": "mkfile",
+    "file": "mkfile.tmpl",
+    "format": "txt",
+    "description": "Plan 9 mkfile for a C program (mkone), the native build of the Thompson-Pike world.",
+    "fixture": "fixtures/mkfile.json",
+    "output": "mkfile"
+  },
+  {
+    "name": "motd.txt",
+    "file": "motd.txt.tmpl",
+    "format": "txt",
+    "description": "Message of the day with aligned columns, indent and plural.",
+    "fixture": "fixtures/motd.txt.json",
+    "output": "motd.txt"
+  },
+  {
+    "name": "prometheus-rules.yml",
+    "file": "prometheus-rules.yml.tmpl",
+    "format": "yaml",
+    "description": "Prometheus alerting rules; [[ ]] delimiters preserve {{ $labels }} annotations.",
+    "fixture": "fixtures/prometheus-rules.yml.json",
+    "output": "prometheus-rules.yml",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "release.yml",
+    "file": "release.yml.tmpl",
+    "format": "yaml",
+    "description": "Tag-triggered release workflow: static binaries, SHA256SUMS, gh release create.",
+    "fixture": "fixtures/release.yml.json",
+    "output": "release.yml",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "repository-dispatch.yml",
+    "file": "repository-dispatch.yml.tmpl",
+    "format": "yaml",
+    "description": "repository_dispatch receiver; client_payload flows through env only.",
+    "fixture": "fixtures/repository-dispatch.yml.json",
+    "output": "repository-dispatch.yml",
+    "delims": "[[,]]"
+  },
+  {
+    "name": "sparkline.svg",
+    "file": "sparkline.svg.tmpl",
+    "format": "html",
+    "description": "Inline SVG sparkline computed in-template from a list of points.",
+    "fixture": "fixtures/sparkline.svg.json",
+    "output": "sparkline.svg"
+  },
+  {
+    "name": "sql-migration.sql",
+    "file": "sql-migration.sql.tmpl",
+    "format": "txt",
+    "description": "SQL migration (up/down) from a table spec, with index creation.",
+    "fixture": "fixtures/sql-migration.sql.json",
+    "output": "sql-migration.sql"
+  },
+  {
+    "name": "workflow.yml",
+    "file": "workflow.yml.tmpl",
+    "format": "yaml",
+    "description": "GitHub Actions CI workflow: Go matrix build with pinned action majors.",
+    "fixture": "fixtures/workflow.yml.json",
+    "output": "workflow.yml",
+    "delims": "[[,]]"
+  }
+]

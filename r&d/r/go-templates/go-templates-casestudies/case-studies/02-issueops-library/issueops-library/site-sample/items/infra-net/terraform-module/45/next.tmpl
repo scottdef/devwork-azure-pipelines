@@ -1,0 +1,16 @@
+{{- /*
+  next.tmpl for infra-net/terraform-module/45
+  Generated from templates/meta/next.tmpl.tmpl when phase 1 was published.
+  Borrow infra-net/terraform-module/45, then:
+    tpl -d mine.json -t next.tmpl -o payload.json
+  and file a request with source-id infra-net, template terraform-module,
+  phase 2, payload = payload.json. Keys you do not set keep their
+  phase 1 values.
+*/ -}}
+{
+  "phase_of": "infra-net/terraform-module/45",
+  "cidr": {{if hasKey . "cidr"}}{{toJSON (index . "cidr")}}{{else}}{{"\"10.20.0.0/16\""}}{{end}},
+  "name": {{if hasKey . "name"}}{{toJSON (index . "name")}}{{else}}{{"\"infra-net\""}}{{end}},
+  "subnets": {{if hasKey . "subnets"}}{{toJSON (index . "subnets")}}{{else}}{{"[1,2,3]"}}{{end}},
+  "tags": {{if hasKey . "tags"}}{{toJSON (index . "tags")}}{{else}}{{"{\"team\":\"platform\"}"}}{{end}}
+}

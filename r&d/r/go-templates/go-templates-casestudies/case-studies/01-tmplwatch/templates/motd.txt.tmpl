@@ -1,0 +1,9 @@
+{{- $n := len (ls "hosts") -}}
+================================================================
+ {{ key "site/env" | toUpper }} -- {{ key "site/domain" }}
+================================================================
+{{ key "motd/text" }}
+{{ with keyOrDefault "motd/maintenance" "" }}
+Maintenance window: {{ . }}
+{{ end }}
+Fleet: {{ $n }} {{ plural "host" "hosts" $n }}. Rendered {{ timestamp "2006-01-02 15:04 MST" }}.

@@ -1,0 +1,13 @@
+{{- /* html/template escapes per context: the id, the text, and the JSON in hx-vals are each escaped for where they land. */ -}}
+<table id="{{ .id }}">
+<thead><tr><th>Name</th><th>Format</th><th></th></tr></thead>
+<tbody>
+{{- range .rows }}
+<tr id="row-{{ .name | replace "." "-" }}">
+  <td>{{ .name }}</td>
+  <td>{{ .format }}</td>
+  <td><button hx-post="/builder/var" hx-vals="{{ dict "name" .name | toJSON }}" hx-target="closest tr" hx-swap="outerHTML">edit</button></td>
+</tr>
+{{- end }}
+</tbody>
+</table>

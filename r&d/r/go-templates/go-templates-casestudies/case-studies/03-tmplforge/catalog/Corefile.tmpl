@@ -1,0 +1,17 @@
+[[ .zone ]]:53 {
+    errors
+    log
+    template IN A [[ .zone ]] {
+        match "^ip-(?P<a>[0-9]*)-(?P<b>[0-9]*)-(?P<c>[0-9]*)-(?P<d>[0-9]*)[.]"
+        answer "{{ .Name }} [[ .ttl ]] IN A {{ .Group.a }}.{{ .Group.b }}.{{ .Group.c }}.{{ .Group.d }}"
+        fallthrough
+    }
+[[- range .hosts ]]
+    hosts {
+        [[ .ip ]] [[ .name ]]
+        fallthrough
+    }
+[[- end ]]
+    forward . [[ join " " .upstreams ]]
+    cache [[ .ttl ]]
+}

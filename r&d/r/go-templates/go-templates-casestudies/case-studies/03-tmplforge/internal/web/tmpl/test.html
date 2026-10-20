@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>Test {{with .Name}}<small>{{.}}</small>{{end}}</h1>
+<p class="lede">Render one template against two fixtures and diff the outputs line by line (LCS).</p>
+<form id="test" hx-post="/test" hx-target="#diff">
+<input type="hidden" name="name" value="{{or .Name "untitled"}}">
+<div class="row">
+<label>Format <select name="format">{{$f := .Format}}{{range .Formats}}<option{{if eq . $f}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+<label>Delimiters <input name="delims" value="{{.Delims}}" size="8"></label>
+</div>
+<textarea name="template" rows="14" spellcheck="false">{{.Template}}</textarea>
+<div class="cols">
+<label>Fixture A<textarea name="fixture_a" rows="12" spellcheck="false">{{.A}}</textarea></label>
+<label>Fixture B<textarea name="fixture_b" rows="12" spellcheck="false">{{.B}}</textarea></label>
+</div>
+<button type="submit">diff</button>
+</form>
+<div id="diff" aria-live="polite"></div>
+{{end}}

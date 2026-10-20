@@ -1,0 +1,30 @@
+:root { --fg: #1b1f23; --bg: #fff; --mut: #57606a; --line: #d0d7de; --acc: #0969da; --alt: #f6f8fa; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #e6edf3; --bg: #0d1117; --mut: #8b949e; --line: #30363d; --acc: #58a6ff; --alt: #161b22; --ok: #3fb950; --warn: #d29922; --bad: #ff7b72; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header, main, footer { max-width: 64rem; margin: 0 auto; padding: 0 16px; }
+header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); padding-top: 12px; padding-bottom: 8px; }
+header nav a { margin-left: 12px; }
+.brand { font-weight: 700; color: var(--fg); text-decoration: none; font-family: ui-monospace, monospace; }
+a { color: var(--acc); }
+code, pre, input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+pre { background: var(--alt); border: 1px solid var(--line); padding: 10px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr.odd { background: var(--alt); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+caption { text-align: left; color: var(--mut); padding: 4px 0; }
+.hash { font-size: 12px; word-break: break-all; white-space: normal; }
+.badge { display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 13px; border: 1px solid currentColor; }
+.badge.in { color: var(--ok); } .badge.out { color: var(--warn); } .badge.late { color: var(--bad); }
+.button { display: inline-block; padding: 6px 12px; margin: 4px 6px 4px 0; border: 1px solid var(--acc); background: var(--acc); color: #fff; border-radius: 4px; text-decoration: none; }
+.button.ghost { background: transparent; color: var(--acc); }
+.mut, .crumbs { color: var(--mut); font-size: 14px; }
+input[type=search] { width: 100%; max-width: 28rem; padding: 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
+dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+dl.meta dt { color: var(--mut); } dl.meta dd { margin: 0; overflow-wrap: anywhere; }
+tr[hidden] { display: none; }
+.htmx-request { opacity: .6; }
+footer { color: var(--mut); font-size: 13px; border-top: 1px solid var(--line); margin-top: 32px; }

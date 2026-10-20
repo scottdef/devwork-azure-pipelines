@@ -1,0 +1,4 @@
+{{define "sitemap.txt.tmpl"}}{{.BaseURL}}
+{{.BaseURL}}ledger/
+{{range .Entries}}{{.URL}}
+{{end}}{{end}}

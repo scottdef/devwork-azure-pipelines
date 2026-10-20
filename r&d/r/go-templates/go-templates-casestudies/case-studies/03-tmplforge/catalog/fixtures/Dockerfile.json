@@ -1,0 +1,16 @@
+{
+  "go": "1.24",
+  "binary": "tmplforge",
+  "ports": [
+    8088
+  ],
+  "labels": {
+    "org.opencontainers.image.source": "https://github.com/CoolGitOrg/tmplforge",
+    "org.opencontainers.image.licenses": "MIT"
+  },
+  "args": [
+    "serve",
+    "-a",
+    "0.0.0.0:8088"
+  ]
+}

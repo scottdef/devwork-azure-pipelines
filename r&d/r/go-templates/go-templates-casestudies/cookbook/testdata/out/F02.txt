@@ -1,0 +1,5 @@
+count=3 second=stage tail=[stage prod]
+mixed=[1 a true]
+- dev
+- stage
+- prod

@@ -1,0 +1,23 @@
+{
+  "service": "tmplforge",
+  "env": "prod",
+  "config": {
+    "listen": "127.0.0.1:8088",
+    "sandbox": {
+      "timeout": "2s",
+      "maxOutput": 1048576
+    },
+    "allowedOrigins": [],
+    "users": [
+      {
+        "name": "glenda",
+        "admin": true
+      },
+      {
+        "name": "rob",
+        "admin": false
+      }
+    ],
+    "motd": "yes"
+  }
+}

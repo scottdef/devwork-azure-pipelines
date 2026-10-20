@@ -1,0 +1,5 @@
+usage: cookbook [flags]
+  -a addr   listen on addr (default :8080)
+  -c file   read configuration from file
+  -n count  retry count for failed requests (default 3)
+  -v        print every formula as it runs

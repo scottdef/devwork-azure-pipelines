@@ -1,0 +1,16 @@
+{
+  "subject": "Your weekly forge digest",
+  "name": "Glenda <glenda@9front.org>",
+  "body": "3 templates changed. <script>alert(1)</script> stays text.",
+  "items": [
+    {
+      "url": "https://github.com/CoolGitOrg/tmplforge/pull/1",
+      "title": "Add mkfile catalog entry"
+    },
+    {
+      "url": "javascript:alert(1)",
+      "title": "Hostile link is neutralised"
+    }
+  ],
+  "unsubscribe": "https://forge.coolgitorg.example/unsubscribe?u=glenda&t=a b"
+}

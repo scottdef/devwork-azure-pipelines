@@ -1,0 +1,5 @@
+<tr id="row-11"><td>alpha</td></tr>
+<tr id="row-12"><td>beta &amp; co &lt;b&gt;</td></tr>
+<tr id="more"><td>
+  <button hx-get="/items?page=3" hx-target="#more" hx-swap="outerHTML" hx-vals="{&#34;q&#34;:&#34;go templates&#34;,&#34;sort&#34;:&#34;name&#34;}">Load more</button>
+</td></tr>

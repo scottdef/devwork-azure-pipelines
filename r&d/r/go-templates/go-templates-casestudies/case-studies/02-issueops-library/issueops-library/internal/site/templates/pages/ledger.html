@@ -1,0 +1,15 @@
+{{define "content"}}
+<h1>Ledger</h1>
+<p>The library card file. Source of truth: <a href="{{.GitHub}}/{{.Repo}}/blob/main/ledger/ledger.json"><code>ledger/ledger.json</code></a>;
+every change is a commit. Machine-readable open loans: <a href="open.json">open.json</a>.</p>
+<p class="mut">Rules: a borrow reserves an item's next phase for 7 or 14 days; a login holds at most 3;
+overdue loans get a warning on their borrow issue and are returned automatically 7 days after the due date.</p>
+<h2>Open</h2>
+<div hx-get="open.html" hx-trigger="every 120s" hx-swap="innerHTML">
+{{template "ledger-open" .}}
+</div>
+<h2>History</h2>
+<div hx-get="history.html" hx-trigger="revealed" hx-swap="innerHTML">
+<p><a href="history.html">Load loan history</a></p>
+</div>
+{{end}}

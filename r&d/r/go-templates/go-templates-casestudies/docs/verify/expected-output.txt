@@ -1,0 +1,44 @@
+range int                    "012"
+range int kv                 EXEC ERR: template: range int kv:1:18: executing "range int kv" at <3>: can't use 3 to iterate over more than one variable
+range seq                    "10 11 12 "
+range seq2                   "a=1 b=2 "
+range map sorted             "a=1 b=2 "
+range else                   "none"
+break                        "01"
+continue                     "02"
+eq multi                     "yes"
+lt mixed                     EXEC ERR: template: lt mixed:1:2: executing "lt mixed" at <lt 1 1.5>: error calling lt: incompatible types for comparison
+trim                         "a1b"
+reassign                     "6"
+method                       "hi bob from ann"
+method ptr                   "hi bob from ann"
+missing map key              "[<no value>]"
+missing struct               EXEC ERR: template: missing struct:1:3: executing "missing struct" at <.Nope>: can't evaluate field Nope in type main.U
+index map                    "v"
+slice                        "[1 2]"
+printf                       "00042|3.14|\"s\""
+html js urlquery             "&lt;a&amp;b&gt;|it\\'s|a+b%26c"
+and short                    "false"
+or                           "fallback"
+with else                    "empty"
+define/template              "<x>"
+block                        "default d"
+call                         "6"
+comment                      "ab"
+nested $                     "org/a org/b "
+len                          "6"
+print                        "1a2|x\n"
+pipeline last arg            "Hello, World"
+chained field                "7"
+not                          "false"
+ge                           "true"
+missingkey=error             template: mk:1:3: executing "mk" at <.nope>: map has no entry for key "nope"  isExecError=true
+missingkey=zero              "[0]"
+delims                       "{{ .Keep }} x"
+html contexts                <p>&lt;b&gt;&#34;x&#34; javascript:alert(1)&lt;/b&gt;</p><a href="#ZgotmplZ">x</a><script>var v = "\u003cb\u003e\"x\" javascript:alert(1)\u003c/b\u003e";</script><div title="&lt;b&gt;&#34;x&#34; javascript:alert(1)&lt;/b&gt;"></div>
+ZgotmplZ                     <a href="#ZgotmplZ">
+template.HTML                <b>trusted</b>
+parse error                  template: lint:3: unexpected EOF
+unknown func                 template: lint:1: function "nosuchfunc" not defined
+clone/block                  "[page p1]"  base-still="[base]"
+DefinedTemplates: ; defined templates are: "content", "layout"

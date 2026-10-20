@@ -1,0 +1,7 @@
+# Managed by tmplwatch. Do not edit by hand.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+10.0.4.1	db-1.example.internal db-1
+10.0.0.5	edge-1.example.internal edge-1
+10.0.1.10	web-1.example.internal web-1
+10.0.1.11	web-2.example.internal web-2

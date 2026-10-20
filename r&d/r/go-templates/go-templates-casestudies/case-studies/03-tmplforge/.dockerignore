@@ -1,0 +1,6 @@
+bin
+dist
+.git
+*.json.report
+loadtest.json
+results.bin

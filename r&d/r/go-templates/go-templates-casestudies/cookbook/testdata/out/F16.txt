@@ -1,0 +1,8 @@
+compact: {"app":"api","motd":"say \"hi\"","team":"platform"}
+pretty:
+{
+  "app": "api",
+  "motd": "say \"hi\"",
+  "team": "platform"
+}
+by hand: { "app": "api", "motd": "say \"hi\"", "team": "platform" }

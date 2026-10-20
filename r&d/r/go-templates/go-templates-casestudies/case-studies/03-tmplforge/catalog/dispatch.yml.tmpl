@@ -1,0 +1,29 @@
+name: [[ .name ]]
+
+on:
+  workflow_dispatch:
+    inputs:
+[[- range .inputs ]]
+      [[ .id ]]:
+        description: [[ .description | toJSON ]]
+        type: [[ .type ]]
+        required: [[ .required ]]
+[[- with .options ]]
+        options: [[ toJSON . ]]
+[[- end ]]
+[[- end ]]
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: run
+        env:
+[[- range .inputs ]]
+          INPUT_[[ upper .id ]]: ${{ inputs.[[ .id ]] }}
+[[- end ]]
+        run: [[ .run | toJSON ]]

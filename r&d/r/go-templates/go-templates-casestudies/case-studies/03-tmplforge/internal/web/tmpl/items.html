@@ -1,0 +1,74 @@
+{{define "card"}}
+<li class="card">
+<h2><a href="/builder?name={{.Name}}">{{.Name}}</a></h2>
+<p>{{.Description}}</p>
+<p class="meta"><span class="tag">{{.Format}}</span>{{with .Delims}} <span class="tag">{{.}}</span>{{end}} <a href="/test?name={{.Name}}">test</a></p>
+</li>
+{{end}}
+
+{{define "var-row"}}
+<tr>
+<td><input name="var_name" value="{{.V.Name}}" size="12"></td>
+<td><select name="var_type">{{$t := .V.Type}}{{range .Types}}<option{{if eq . $t}} selected{{end}}>{{.}}</option>{{end}}</select></td>
+<td><input name="var_default" value="{{.V.Default}}" size="16"></td>
+<td><button type="button" class="rm" title="remove">&times;</button></td>
+</tr>
+{{end}}
+
+{{define "var-error"}}
+<tr class="err"><td colspan="3">{{.}}</td><td><button type="button" class="rm" title="dismiss">&times;</button></td></tr>
+{{end}}
+
+{{define "error"}}
+<p class="err">{{.}}</p>
+{{end}}
+
+{{define "preview"}}
+{{- if .Err}}
+<p class="err">{{.Err}}</p>
+{{- with .Lines}}
+<pre class="src">{{range .}}<span class="{{if .Bad}}bad{{else}}ok{{end}}"><span class="ln">{{.N}}</span>{{.Text}}
+</span>{{end}}</pre>
+{{- end}}
+{{- else}}
+<p class="meta">{{.Bytes}} bytes in {{.Took}}</p>
+<pre class="out">{{.Out}}</pre>
+{{- end}}
+{{end}}
+
+{{define "lint"}}
+{{- if .}}
+<ul class="lint">{{range .}}<li class="{{if .Error}}err{{else}}warn{{end}}">{{.Text}}</li>{{end}}</ul>
+{{- else}}
+<p class="ok">lint: ok</p>
+{{- end}}
+{{end}}
+
+{{define "fixture"}}
+<label>Fixture (JSON object)
+<textarea name="fixture" rows="20" spellcheck="false" hx-post="/render" hx-trigger="keyup changed delay:300ms" hx-target="#preview">{{.JSON}}</textarea></label>
+{{- with .Refs}}
+<details><summary>{{len .}} referenced paths</summary>
+<table class="data">{{range .}}<tr><td><code>{{.Path}}</code></td><td>{{.Kind}}{{with .Type}} {{.}}{{end}}</td><td>line {{.Line}}</td></tr>{{end}}</table>
+</details>
+{{- end}}
+{{end}}
+
+{{define "diff"}}
+{{- if .Same}}
+<p class="ok">Outputs are identical.</p>
+{{- else}}
+<p class="meta">+{{.Adds}} -{{.Dels}}</p>
+<pre class="diff">{{range .Rows}}<span class="{{.Kind}}">{{.Text}}
+</span>{{end}}</pre>
+{{- end}}
+{{end}}
+
+{{define "files"}}
+{{- range .}}
+<section class="file">
+<h3><code>{{.Name}}</code></h3>
+<pre class="out">{{.Data}}</pre>
+</section>
+{{- end}}
+{{end}}

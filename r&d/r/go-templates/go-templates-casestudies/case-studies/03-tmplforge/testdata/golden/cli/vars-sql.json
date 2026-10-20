@@ -1,0 +1,21 @@
+{
+  "columns": [
+    {
+      "default": "",
+      "name": "",
+      "null": false,
+      "type": ""
+    }
+  ],
+  "description": "",
+  "indexes": [
+    {
+      "columns": [
+        ""
+      ],
+      "unique": false
+    }
+  ],
+  "table": "",
+  "version": ""
+}

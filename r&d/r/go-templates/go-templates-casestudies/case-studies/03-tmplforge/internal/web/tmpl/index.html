@@ -1,0 +1,10 @@
+{{define "content"}}
+<h1>Catalog</h1>
+<p class="lede">{{len .Entries}} starter templates. Each has a fixture and a golden output; open one in the builder, or start from nothing.</p>
+<p><a class="button" href="/builder">New blank template</a></p>
+<ul class="grid">
+{{- range .Entries}}
+{{template "card" .}}
+{{- end}}
+</ul>
+{{end}}

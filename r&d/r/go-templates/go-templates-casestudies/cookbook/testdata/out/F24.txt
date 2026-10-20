@@ -1,0 +1,10 @@
+resource "aws_instance" "web" {
+  ami   = "ami-0abc"
+  ports = [80, 443]
+  motd  = "cost is $${total}\n"
+
+  tags = {
+    env   = "prod"
+    owner = "platform"
+  }
+}

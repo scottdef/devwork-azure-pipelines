@@ -1,0 +1,1 @@
+{"host":"grafana.example.internal","upstreams":["10.0.2.20:3000"],"tls":"internal","headers":{"X-Frame-Options":"DENY"}}

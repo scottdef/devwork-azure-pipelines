@@ -1,0 +1,27 @@
+{{- /*
+  WireGuard wg-quick config. The server private key is never in KV: wg-quick
+  reads it with PostUp from a root-only file on the host. Peers come from
+  wg/peers/<name>, one JSON object each:
+    {"public_key": "...", "allowed_ips": [...], "endpoint": "host:port", "keepalive": 25}
+*/ -}}
+# Managed by tmplwatch. Do not edit by hand.
+[Interface]
+Address = {{ key "wg/interface/address" }}
+ListenPort = {{ key "wg/interface/listen_port" }}
+PostUp = wg set %i private-key {{ key "wg/interface/private_key_file" }}
+{{ range ls "wg/peers" }}
+{{- $name := .Key }}
+{{- with parseJSON .Value }}
+{{- if not (regexMatch "^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw480]=$" .public_key) }}{{ fail (printf "wg peer %s: malformed public_key" $name) }}{{ end }}
+# {{ $name }}
+[Peer]
+PublicKey = {{ .public_key }}
+AllowedIPs = {{ join ", " .allowed_ips }}
+{{- with index . "endpoint" }}
+Endpoint = {{ . }}
+{{- end }}
+{{- with index . "keepalive" }}
+PersistentKeepalive = {{ . }}
+{{- end }}
+{{ end }}
+{{- end -}}

@@ -1,0 +1,23 @@
+# Managed by tmplwatch. Do not edit by hand.
+example.internal:53 {
+    log
+    errors
+    hosts {
+        10.0.1.10 app.example.internal
+        10.0.2.20 grafana.example.internal
+        10.0.0.5 static.example.internal
+        fallthrough
+    }
+    template IN A ip.example.internal {
+        match "^(?P<a>[0-9]+)[-](?P<b>[0-9]+)[-](?P<c>[0-9]+)[-](?P<d>[0-9]+)[.]ip[.]example[.]internal[.]$"
+        answer "{{ .Name }} 60 IN A {{ .Group.a }}.{{ .Group.b }}.{{ .Group.c }}.{{ .Group.d }}"
+        fallthrough
+    }
+    cache 30
+}
+
+.:53 {
+    forward . 1.1.1.1 9.9.9.9
+    cache 30
+    errors
+}

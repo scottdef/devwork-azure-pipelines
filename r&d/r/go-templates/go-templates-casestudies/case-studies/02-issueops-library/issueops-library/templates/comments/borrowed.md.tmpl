@@ -1,0 +1,9 @@
+{{- /* Data: ledger borrow result JSON. */ -}}
+### Borrowed
+
+`{{.item}}` is reserved for @{{.by}} until **{{dateFmt "date" .loan.due}}**.
+You hold {{.held}} of {{.limit}} loans.
+
+Download `next.tmpl` from the item page, render it with
+`tpl -d mine.json -t next.tmpl -o payload.json`, and file a phase request with
+the result. Publishing the next phase returns this loan automatically.

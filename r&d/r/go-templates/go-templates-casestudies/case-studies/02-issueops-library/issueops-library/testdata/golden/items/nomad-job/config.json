@@ -1,0 +1,21 @@
+{
+  "id": "ledger-svc/nomad-job/44",
+  "source_id": "ledger-svc",
+  "template_id": "nomad-job",
+  "phase": 1,
+  "issue": 44,
+  "issue_url": "https://github.com/CoolGitOrg/issueops-intake/issues/44",
+  "requested_by": "carol",
+  "published_at": "2026-10-19T12:00:00Z",
+  "artifact": "artifact.nomad.hcl",
+  "payload_sha256": "9f4e25bd72b38faa599e76919ba3f25f09e410c6c44141478fd55b6a4f6a090f",
+  "template_sha256": "fb4465169e35981a6d4eda31421dc658aacec073c669997b547ef8dee0854159",
+  "payload": {
+    "count": 3,
+    "env": {
+      "LOG_LEVEL": "info"
+    },
+    "image": "ghcr.io/coolgitorg/ledger:1.4.2",
+    "name": "ledger-svc"
+  }
+}

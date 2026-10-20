@@ -1,0 +1,31 @@
+{{- /*
+  CoreDNS Corefile: a hosts block for dns/records/<name>, forwarding for
+  everything else, and a CoreDNS "template" plugin answering
+  <a>-<b>-<c>-<d>.ip.<zone>. CoreDNS's template plugin uses Go templates too:
+  its {{ .Name }} must reach the file literally, so it is printed as a
+  string here.
+*/ -}}
+# Managed by tmplwatch. Do not edit by hand.
+{{- $zone := key "dns/zone" }}
+{{ $zone }}:53 {
+    log
+    errors
+    hosts {
+{{- range ls "dns/records" }}
+        {{ .Value }} {{ .Key }}.{{ $zone }}
+{{- end }}
+        fallthrough
+    }
+    template IN A ip.{{ $zone }} {
+        match "^(?P<a>[0-9]+)[-](?P<b>[0-9]+)[-](?P<c>[0-9]+)[-](?P<d>[0-9]+)[.]ip[.]{{ $zone | replaceAll "." "[.]" }}[.]$"
+        answer "{{ "{{ .Name }}" }} 60 IN A {{ "{{ .Group.a }}.{{ .Group.b }}.{{ .Group.c }}.{{ .Group.d }}" }}"
+        fallthrough
+    }
+    cache 30
+}
+
+.:53 {
+    forward . {{ key "dns/forwarders" | parseJSON | join " " }}
+    cache 30
+    errors
+}

@@ -1,0 +1,4 @@
+APP=x
+HOME=/h
+ZONE=a
+keys: APP,HOME,ZONE

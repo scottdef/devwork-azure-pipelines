@@ -1,0 +1,35 @@
+#include <u.h>
+#include <libc.h>
+
+/* {{ .comment }} */
+
+static char *greetings[] = {
+{{- range .greetings }}
+	{{ printf "%q" . }},
+{{- end }}
+};
+
+void
+usage(void)
+{
+	fprint(2, "usage: %s [-n count]\n", argv0);
+	exits("usage");
+}
+
+void
+main(int argc, char *argv[])
+{
+	int i, n;
+
+	n = {{ .count }};
+	ARGBEGIN{
+	case 'n':
+		n = atoi(EARGF(usage()));
+		break;
+	default:
+		usage();
+	}ARGEND
+	for(i = 0; i < n; i++)
+		print("%s\n", greetings[i % nelem(greetings)]);
+	exits(nil);
+}

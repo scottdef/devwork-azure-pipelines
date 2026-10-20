@@ -1,0 +1,14 @@
+BIN := cookbook
+.PHONY: all build test clean
+
+all: build test
+
+build:
+	go build -o bin/$(BIN) ./cmd/$(BIN)
+
+test: build
+	go vet ./...
+	go test ./...
+
+clean:
+	rm -rf bin

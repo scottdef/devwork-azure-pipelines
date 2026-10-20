@@ -1,0 +1,1 @@
+{"loan": {"item": "a1/readme/1", "borrower": "bob", "borrow_issue": 11, "due": "2026-10-08T09:00:00Z"}, "action": "warn", "days_late": 2, "grace": "7d", "base": "https://coolgitorg.github.io/issueops-library/"}
