@@ -1,0 +1,6 @@
+// How much was delivered twice (crash between POST and checkpoint push).
+fetch logs, from: now() - 24h
+| filter log.source == "github-actions"
+| summarize copies = count(), by: { cicd.pipeline.task.run.id, gh.line }
+| filter copies > 1
+| summarize duplicated_lines = count(), extra_records = sum(copies - 1)

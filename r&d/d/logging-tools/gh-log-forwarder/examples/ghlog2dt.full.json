@@ -1,0 +1,47 @@
+{
+  "owner": "CoolGitOrg",
+  "targets": ["CoolGitOrg/app-a", "CoolGitOrg/app-b"],
+  "all": false,
+  "include": ["CoolGitOrg/*"],
+  "exclude": ["CoolGitOrg/gh-log-forwarder", "CoolGitOrg/*-archive"],
+  "workflows": ["CI", "Release", ".github/workflows/deploy-*.yml"],
+  "lookback": "90m",
+  "max_age": "23h45m",
+  "pending_ttl": "12h",
+  "shipped_ttl": "48h",
+  "state_dir": "state",
+  "github_api": "https://api.github.com",
+  "github_api_version": "2022-11-28",
+  "concurrency": 4,
+  "max_line_bytes": 65536,
+  "max_log_bytes": 33554432,
+  "stale": "drop",
+  "drop_noise": true,
+  "strip_ansi": true,
+  "self_log": true,
+  "attributes": {
+    "log.source": "github-actions",
+    "dt.security_context": "ci",
+    "team": "platform"
+  },
+  "redact": [
+    "gh[pousr]_[A-Za-z0-9]{36,255}",
+    "github_pat_[A-Za-z0-9_]{22,255}",
+    "(?i)dt0[a-z][0-9]{2}\\.[a-z0-9]{24}\\.[a-z0-9]{64}",
+    "(?:AKIA|ASIA)[0-9A-Z]{16}",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----",
+    "(?i)(?:authorization|x-api-key)\\s*[:=]\\s*(?:bearer\\s+|token\\s+|api-token\\s+)?[A-Za-z0-9._~+/=-]{16,}",
+    "xox[baprs]-[A-Za-z0-9-]{10,}",
+    "(?i)acme-internal-[a-z0-9]{32}"
+  ],
+  "dt": {
+    "url": "https://abc12345.live.dynatrace.com",
+    "auth_scheme": "Api-Token",
+    "batch_bytes": 4194304,
+    "batch_records": 5000,
+    "gzip": false,
+    "header_attrs": false,
+    "timeout": "60s",
+    "max_retries": 5
+  }
+}

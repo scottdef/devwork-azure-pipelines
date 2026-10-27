@@ -1,0 +1,6 @@
+// Error lines from failed jobs, newest first, one row per line.
+fetch logs, from: now() - 24h
+| filter log.source == "github-actions" and cicd.pipeline.result == "failure" and loglevel == "ERROR"
+| fields timestamp, vcs.repository.name, cicd.pipeline.name, cicd.pipeline.task.name, gh.step.name, content, gh.job.url
+| sort timestamp desc
+| limit 200

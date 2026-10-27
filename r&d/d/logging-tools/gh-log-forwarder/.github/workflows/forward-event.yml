@@ -1,0 +1,108 @@
+# forward-event: the optional low-latency path. A target repository's
+# notify-log-forwarder workflow sends repository_dispatch
+#   {event_type: ghlog-export, client_payload: {repo, run_id, run_attempt}}
+# when one of its workflow runs completes. This ships that one run and
+# merges the checkpoint, so the next scheduled sweep skips its jobs.
+name: forward-event
+run-name: forward-event ${{ github.event.client_payload.repo }} run ${{ github.event.client_payload.run_id }}
+
+on:
+  repository_dispatch:
+    types: [ghlog-export]
+
+permissions: {}
+
+jobs:
+  ship:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # read source + push checkpoint
+    # One job per run: never coalesce (a pending job in a shared group
+    # would be cancelled by the next event).
+    concurrency:
+      group: ghlog2dt-event-${{ github.event.client_payload.repo }}-${{ github.event.client_payload.run_id }}-${{ github.event.client_payload.run_attempt }}
+      cancel-in-progress: false
+    steps:
+      - name: Validate payload
+        id: payload
+        env:
+          REPO: ${{ github.event.client_payload.repo }}
+          RUN_ID: ${{ github.event.client_payload.run_id }}
+          ATTEMPT: ${{ github.event.client_payload.run_attempt }}
+          TARGETS: ${{ vars.GHLOG_TARGET_REPOS }}
+        run: |
+          set -euo pipefail
+          [[ "${REPO}" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$ && "${REPO}" != *..* ]] \
+            || { echo "::error::invalid repo in payload"; exit 2; }
+          [[ "${RUN_ID}" =~ ^[0-9]{1,20}$ ]] || { echo "::error::invalid run_id in payload"; exit 2; }
+          ATTEMPT="${ATTEMPT:-0}"
+          [[ "${ATTEMPT}" =~ ^[0-9]{1,4}$ ]] || { echo "::error::invalid run_attempt in payload"; exit 2; }
+          if [[ "${TARGETS}" != "*" ]]; then
+            hit=false
+            for t in $(tr ',' ' ' <<<"${TARGETS}"); do
+              [[ "${t,,}" == "${REPO,,}" ]] && hit=true
+            done
+            [[ "${hit}" == true ]] || { echo "::error::${REPO} is not in GHLOG_TARGET_REPOS"; exit 2; }
+          fi
+          {
+            echo "repo=${REPO}"
+            echo "run_id=${RUN_ID}"
+            echo "attempt=${ATTEMPT}"
+            echo "file=${REPO%%/*}__${REPO#*/}.json"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          path: src
+          persist-credentials: false
+
+      - name: Check out checkpoint branch (with push credentials)
+        uses: actions/checkout@v4
+        with:
+          ref: forwarder-state
+          path: state-branch
+
+      - name: Set up Go (only when building from source)
+        if: vars.GHLOG_VERSION == '' || vars.GHLOG_VERSION == 'source'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+
+      - name: Install ghlog2dt
+        env:
+          GHLOG_VERSION: ${{ vars.GHLOG_VERSION || 'source' }}
+          GH_TOKEN: ${{ github.token }}
+        run: src/scripts/install-ghlog2dt.sh
+
+      - name: Mint read-only installation token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GHLOG_APP_ID }}
+          private-key: ${{ secrets.GHLOG_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+
+      - name: Ship run
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          DT_URL: ${{ vars.DT_URL }}
+          DT_LOGS_TOKEN: ${{ secrets.DT_LOGS_TOKEN }}
+          GHLOG_CONFIG: src/ghlog2dt.json
+          GHLOG_STATE_DIR: work
+          FILE: ${{ steps.payload.outputs.file }}
+          REPO: ${{ steps.payload.outputs.repo }}
+          RUN_ID: ${{ steps.payload.outputs.run_id }}
+          ATTEMPT: ${{ steps.payload.outputs.attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          if [[ -f "state-branch/state/${FILE}" ]]; then cp "state-branch/state/${FILE}" work/; fi
+          src/scripts/run-forwarder.sh event "${REPO}" "${RUN_ID}" "${ATTEMPT}"
+
+      - name: Merge and push checkpoint
+        if: always() && !cancelled() && steps.payload.outcome == 'success'
+        working-directory: state-branch
+        run: ../src/scripts/commit-state.sh ../work state

@@ -1,0 +1,5 @@
+// Davis anomaly detector / workflow condition: heartbeat count per 15 min.
+// Fire when the count is 0 for 3 consecutive intervals.
+fetch logs, from: now() - 2h
+| filter log.source == "ghlog2dt.self"
+| makeTimeseries runs = count(), interval: 15m

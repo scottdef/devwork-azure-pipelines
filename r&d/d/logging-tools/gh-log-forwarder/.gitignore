@@ -1,0 +1,26 @@
+# build output
+/bin/
+/dist/
+coverage.out
+
+# local runs
+/state/
+/.state-dryrun/
+/state-branch/
+/incoming/
+/work/
+summary.json
+records.ndjson
+
+# terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl.bak
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+crash.log
+
+# secrets that must never land here
+*.pem
+.env

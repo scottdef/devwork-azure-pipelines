@@ -1,0 +1,7 @@
+// Lines per job in the last 2 hours: compare with gh run view --log | wc -l
+// (minus dropped ##[endgroup] / blank lines).
+fetch logs, from: now() - 2h
+| filter log.source == "github-actions"
+| summarize lines = count(), errors = countIf(loglevel == "ERROR"),
+    by: { vcs.repository.name, cicd.pipeline.name, cicd.pipeline.run.id, cicd.pipeline.task.run.id, gh.run_attempt }
+| sort lines desc

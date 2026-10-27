@@ -1,0 +1,112 @@
+# checkpoint: manual operations on a repository's checkpoint.
+#
+#   show    print it
+#   prune   expire old shipped IDs and abandoned pending runs
+#   mark    mark job IDs shipped (skip a poison job)        value: 123,456
+#   rewind  move the high-water mark back (new jobs only)   value: 6h | RFC 3339
+#   replay  rewind and forget jobs shipped since then       value: 6h | RFC 3339
+#
+# Shares the sweep's concurrency group so it never races a sweep, and
+# writes with replace (not merge) semantics: a rewind must be able to
+# lower the high-water mark, which a merge never does.
+name: checkpoint
+run-name: checkpoint ${{ inputs.action }} ${{ inputs.repo }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Repository (owner/name)"
+        required: true
+      action:
+        description: "Operation"
+        type: choice
+        options: [show, prune, mark, rewind, replay]
+        default: show
+      value:
+        description: "mark: comma-separated job IDs; rewind/replay: 6h or 2026-10-27T08:00:00Z"
+        required: false
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: ghlog2dt-sweep
+  cancel-in-progress: false
+
+jobs:
+  checkpoint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+          persist-credentials: false
+
+      - name: Check out checkpoint branch (with push credentials)
+        uses: actions/checkout@v4
+        with:
+          ref: forwarder-state
+          path: state-branch
+
+      - name: Set up Go (only when building from source)
+        if: vars.GHLOG_VERSION == '' || vars.GHLOG_VERSION == 'source'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+
+      - name: Install ghlog2dt
+        env:
+          GHLOG_VERSION: ${{ vars.GHLOG_VERSION || 'source' }}
+          GH_TOKEN: ${{ github.token }}
+        run: src/scripts/install-ghlog2dt.sh
+
+      - name: Run
+        env:
+          REPO: ${{ inputs.repo }}
+          ACTION: ${{ inputs.action }}
+          VALUE: ${{ inputs.value }}
+        run: |
+          set -euo pipefail
+          [[ "${REPO}" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$ && "${REPO}" != *..* ]] \
+            || { echo "::error::invalid repo"; exit 2; }
+          verb="${ACTION}"
+          [[ "${ACTION}" == replay ]] && verb=rewind
+          args=(checkpoint "${verb}" --repo "${REPO}" --state state-branch/state)
+          case "${ACTION}" in
+            show | prune) ;;
+            mark)
+              [[ "${VALUE}" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "::error::value must be job IDs: 1,2,3"; exit 2; }
+              IFS=',' read -r -a ids <<<"${VALUE}"
+              for id in "${ids[@]}"; do args+=(--job "${id}"); done
+              ;;
+            rewind | replay)
+              [[ "${VALUE}" =~ ^[0-9]+[hm]$|^[0-9T:Z+-]{20,25}$ ]] || { echo "::error::value must be like 6h or an RFC 3339 time"; exit 2; }
+              args+=(--to "${VALUE}")
+              [[ "${ACTION}" == replay ]] && args+=(--forget)
+              ;;
+            *) echo "::error::unknown action"; exit 2 ;;
+          esac
+          ghlog2dt "${args[@]}"
+          if [[ "${ACTION}" != show ]]; then
+            ghlog2dt checkpoint show --repo "${REPO}" --state state-branch/state | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Push (replace semantics)
+        if: inputs.action != 'show'
+        working-directory: state-branch
+        env:
+          REPO: ${{ inputs.repo }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          git config user.name "ghlog2dt[bot]"
+          git config user.email "ghlog2dt-bot@users.noreply.github.com"
+          git add -- state
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit --quiet -m "state: ${ACTION} ${REPO} by ${GITHUB_ACTOR}"
+          git push --quiet origin HEAD:refs/heads/forwarder-state

@@ -1,0 +1,6 @@
+// Fire on any stale drop (interval too long / backlog) or rejection.
+fetch logs, from: now() - 1h
+| filter log.source == "ghlog2dt.self"
+| summarize stale = sum(ghlog2dt.stale_dropped), rejected = sum(ghlog2dt.rejected),
+    errors = sum(ghlog2dt.errors), min_rate = min(ghlog2dt.gh_rate_remaining)
+| filter stale > 0 or rejected > 0 or errors > 0 or min_rate < 2000

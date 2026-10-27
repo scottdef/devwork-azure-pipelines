@@ -1,0 +1,8 @@
+// Forwarder health: one record per ghlog2dt run (log.source = ghlog2dt.self).
+// Alert when nothing arrives for 3 x interval (45 min at the 15-min default):
+// that catches disabled schedules, broken secrets and dropped ticks.
+fetch logs, from: now() - 6h
+| filter log.source == "ghlog2dt.self"
+| fields timestamp, loglevel, content, ghlog2dt.jobs, ghlog2dt.records, ghlog2dt.stale_dropped,
+    ghlog2dt.rejected, ghlog2dt.errors, ghlog2dt.pending, ghlog2dt.gh_rate_remaining, ghlog2dt.duration_ms
+| sort timestamp desc

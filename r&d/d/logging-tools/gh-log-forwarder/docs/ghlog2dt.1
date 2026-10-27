@@ -1,0 +1,250 @@
+.TH GHLOG2DT 1 2026-10-27 "ghlog2dt" "User Commands"
+.nh
+.SH NAME
+ghlog2dt \- ship GitHub Actions job logs to Dynatrace
+.SH SYNOPSIS
+.B ghlog2dt run
+.RB [ \-\-repo
+.IR owner/name ]...
+.RB [ \-\-all ]
+.RB [ \-\-run\-id
+.IR id
+.RB [ \-\-run\-attempt
+.IR n ]]
+.RB [ \-\-dry\-run ]
+.RI [ flags ]
+.br
+.B ghlog2dt list
+.RI [ flags ]
+.br
+.B ghlog2dt fetch
+.RI [ flags ]
+.RI < jobs.ndjson
+.br
+.B ghlog2dt ship
+.RB [ \-\-dry\-run ]
+.RI < records.ndjson
+.br
+.B ghlog2dt checkpoint
+.BR show | merge | prune | mark | rewind
+.I ...
+.br
+.B ghlog2dt token
+.B \-\-app\-id
+.I id
+.RB [ \-\-permission
+.IR name=level ]...
+.br
+.B ghlog2dt schedule
+.RB [ \-\-interval
+.IR minutes ]
+.RB [ \-\-offset
+.IR minutes ]
+.RB [ \-\-rewrite
+.IR workflow.yml ]
+.br
+.B ghlog2dt version
+.SH DESCRIPTION
+.I ghlog2dt
+reads the logs of completed GitHub Actions jobs through the REST API and
+posts them, one JSON record per line, to the Dynatrace Log Monitoring API v2
+.RB ( "POST /api/v2/logs/ingest" ).
+It keeps one checkpoint file per repository so that each job is shipped
+once, waits for unfinished runs, and drops lines older than
+.B max_age
+because Dynatrace refuses logs older than 24 hours.
+.PP
+.B run
+is the production path: for each target repository it lists runs created
+since the high\-water mark minus
+.BR \-\-lookback ,
+re\-polls pending runs, downloads and parses new job logs, batches and posts
+the records, and saves the checkpoint.
+With
+.B \-\-run\-id
+it ships one run (event mode) and leaves the high\-water mark alone.
+.PP
+.BR list ,
+.B fetch
+and
+.B ship
+are the same stages as filters over newline\-delimited JSON:
+.PP
+.RS
+.nf
+ghlog2dt list \-\-repo CoolGitOrg/app\-a | ghlog2dt fetch | ghlog2dt ship
+.fi
+.RE
+.PP
+.B list
+never writes the checkpoint; the pipeline is for inspection and repair.
+.PP
+.B checkpoint
+inspects and edits checkpoints:
+.B show
+prints one,
+.B merge
+combines files (latest high\-water mark, union of pending runs and shipped
+jobs),
+.B prune
+expires old entries,
+.B mark
+records job IDs as shipped,
+.B rewind \-\-to
+.I 6h
+lowers the high\-water mark, and with
+.B \-\-forget
+also forgets jobs shipped since then so they are sent again.
+.PP
+.B token
+mints a GitHub App installation token: an RS256 JWT, an installation
+lookup, and a POST to access_tokens.
+.PP
+.B schedule
+prints the cron expression and lookback for an export interval (5, 6, 10,
+12, 15, 20, 30 or 60 minutes) and can rewrite the line tagged
+.B "# ghlog2dt:cron"
+in a workflow file.
+.SH OPTIONS
+Options common to most commands:
+.TP
+.BI \-\-config " file"
+JSON configuration file (default
+.IR ghlog2dt.json ;
+an explicitly named file must exist).
+.TP
+.BI \-\-repo " owner/name"
+Target repository; repeatable or comma separated.
+.TP
+.B \-\-all
+Every repository the installation token can see, filtered by
+.B \-\-include
+and
+.B \-\-exclude
+globs.
+.TP
+.BI \-\-workflow " glob"
+Only runs whose workflow name or path matches.
+.TP
+.BI \-\-lookback " duration"
+Overlap window behind the high\-water mark (default 90m).
+.TP
+.BI \-\-max\-age " duration"
+Oldest line or window ever considered (default 23h45m, at most 24h).
+.TP
+.BI \-\-stale " drop|rewrite"
+What to do with lines older than max\-age.
+.TP
+.BI \-\-state " dir"
+Checkpoint directory (default
+.IR state ).
+.TP
+.BI \-\-dt\-url " url"
+Dynatrace environment, e.g.
+.IR https://abc12345.live.dynatrace.com .
+.TP
+.BI \-\-dt\-auth " Api\-Token|Bearer"
+Authorization scheme.
+.TP
+.BI \-\-batch\-bytes " n" "\fR, \fP\-\-batch\-records " n
+Request limits (defaults 4 MiB and 5000; Dynatrace allows 10 MB and 50000).
+.TP
+.B \-\-gzip
+Compress request bodies (not documented by Dynatrace; verify first).
+.TP
+.B \-\-header\-attrs
+Send job\-level attributes once per request in X\-Dynatrace\-Attr.
+.TP
+.B \-\-dry\-run
+Write records as NDJSON instead of posting; never save the checkpoint.
+.TP
+.BI \-\-summary " file"
+Where the JSON summary goes (default stdout).
+.TP
+.B \-\-print\-config
+Print the effective configuration with secrets elided.
+.TP
+.BI \-\-log\-format " json|text" "\fR, \fP\-\-log\-level " level
+Diagnostics on standard error.
+.SH ENVIRONMENT
+.TP
+.B GH_TOKEN
+GitHub token with Actions read access (fallback
+.BR GITHUB_TOKEN ).
+.TP
+.B DT_LOGS_TOKEN
+Dynatrace token with the
+.B logs.ingest
+scope.
+.TP
+.BR DT_URL ", " DT_AUTH_SCHEME
+Ingest endpoint and scheme.
+.TP
+.BR GHLOG_CONFIG ", " GHLOG_TARGET_REPOS ", " GHLOG_LOOKBACK ", " GHLOG_STATE_DIR ", " GHLOG_CONCURRENCY ", " GHLOG_GZIP
+Overrides for the corresponding configuration keys.
+.TP
+.B GITHUB_STEP_SUMMARY
+If set, a Markdown summary is appended to it.
+.PP
+Secrets are accepted only from the environment.
+.SH FILES
+.TP
+.I state/owner__name.json
+Checkpoint for one repository: high_water, pending_runs, shipped_jobs.
+.SH EXIT STATUS
+.TP
+0
+Success.
+.TP
+1
+A repository failed.
+.TP
+2
+Usage or configuration error.
+.TP
+3
+Partial success: Dynatrace refused some records or they were too old.
+.TP
+4
+Authentication failed (GitHub or Dynatrace).
+.TP
+5
+GitHub rate limit too far from reset, or Dynatrace budget exhausted (402).
+.TP
+6
+Checkpoint could not be read or written.
+.SH EXAMPLES
+Show what would be shipped for one repository:
+.PP
+.RS
+.nf
+GH_TOKEN=$(ghlog2dt token \-\-app\-id 123456 \-\-key\-file app.pem \e
+    \-\-permission actions=read)
+ghlog2dt run \-\-repo CoolGitOrg/app\-a \-\-dry\-run | jq \-c '{severity, content}'
+.fi
+.RE
+.PP
+Export every 10 minutes:
+.PP
+.RS
+.nf
+ghlog2dt schedule \-\-interval 10 \-\-rewrite .github/workflows/forward.yml
+.fi
+.RE
+.PP
+Replay the last six hours of one repository:
+.PP
+.RS
+.nf
+ghlog2dt checkpoint rewind \-\-repo CoolGitOrg/app\-a \-\-to 6h \-\-forget
+.fi
+.RE
+.SH SEE ALSO
+.BR gh (1),
+.BR jq (1)
+.PP
+Dynatrace Log Monitoring API v2; GitHub REST API "Workflow runs" and
+"Workflow jobs".
+.SH BUGS
+Pull mode finds runs by creation time, so a re-run of a run created before
+the window is not seen; use the event (push) mode for that.

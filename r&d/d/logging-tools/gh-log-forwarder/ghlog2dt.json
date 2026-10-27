@@ -1,0 +1,28 @@
+{
+  "owner": "CoolGitOrg",
+  "exclude": ["CoolGitOrg/gh-log-forwarder", "CoolGitOrg/*-archive"],
+  "lookback": "90m",
+  "max_age": "23h45m",
+  "pending_ttl": "12h",
+  "shipped_ttl": "48h",
+  "concurrency": 4,
+  "max_line_bytes": 65536,
+  "max_log_bytes": 33554432,
+  "stale": "drop",
+  "drop_noise": true,
+  "strip_ansi": true,
+  "self_log": true,
+  "attributes": {
+    "log.source": "github-actions",
+    "dt.security_context": "ci"
+  },
+  "dt": {
+    "auth_scheme": "Api-Token",
+    "batch_bytes": 4194304,
+    "batch_records": 5000,
+    "gzip": false,
+    "header_attrs": false,
+    "timeout": "60s",
+    "max_retries": 5
+  }
+}

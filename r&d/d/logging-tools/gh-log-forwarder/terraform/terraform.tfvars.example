@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars (git-ignored). Secrets go in the environment:
+#   GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PEM_FILE   (provider auth)
+#   TF_VAR_app_private_key                     (stored as GHLOG_APP_PRIVATE_KEY)
+#   DYNATRACE_API_TOKEN                        (apiTokens.read/write, settings.read/write)
+#   DT_CLIENT_ID, DT_CLIENT_SECRET, DT_ACCOUNT_ID, DYNATRACE_HTTP_OAUTH_PREFERENCE=true
+#   TF_VAR_dispatch_app_private_key            (push mode only)
+
+github_owner   = "CoolGitOrg"
+forwarder_repo = "gh-log-forwarder"
+
+target_repos = [
+  "CoolGitOrg/app-a",
+  "CoolGitOrg/app-b",
+  "CoolGitOrg/platform-api",
+]
+# target_repos = ["*"]   # every repo the app can see; filter in ghlog2dt.json
+
+interval_minutes = 15 # 5 6 10 12 15 20 30 60
+minute_offset    = 7
+shards           = 4
+ghlog_version    = "v1.0.0" # or "source" while bootstrapping
+
+app_id = "Iv23liExampleClientId" # issueops-autoadmin-app client ID
+
+dt_env_url               = "https://abc12345.live.dynatrace.com"
+manage_dt_token          = true
+dt_token_expiration      = "2027-01-31T00:00:00.000Z"
+manage_dt_bucket         = true
+dt_bucket_name           = "ci_github_actions_logs"
+dt_bucket_retention_days = 35
+
+manage_openpipeline_pipeline = false
+manage_openpipeline_routing  = false # replaces the WHOLE logs routing table
+
+# Low-latency push mode (optional). Needs a separate dispatch app.
+# push_mode_repos = {
+#   "app-a"        = ["CI", "Release"]
+#   "platform-api" = ["Build and test"]
+# }
+# dispatch_app_id = "Iv23liDispatchClientId"

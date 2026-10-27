@@ -1,0 +1,53 @@
+# release: tag vX.Y.Z -> static binaries for every platform, SHA256SUMS,
+# build-provenance attestations, and a GitHub release. The forwarder
+# workflows install a release by version and refuse a checksum mismatch.
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write     # create the release
+      id-token: write     # sigstore OIDC for attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify tag format
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad tag ${GITHUB_REF_NAME}"; exit 2; }
+      - name: Preflight, lint, test
+        run: make preflight lint test
+      - name: Build, checksum, verify
+        run: make release checksums verify VERSION="${GITHUB_REF_NAME}"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/ghlog2dt_*
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" dist/ghlog2dt_* dist/SHA256SUMS \
+            --verify-tag --generate-notes --title "ghlog2dt ${GITHUB_REF_NAME}"
+          {
+            echo "### ghlog2dt ${GITHUB_REF_NAME}"
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+            echo "Set the Actions variable GHLOG_VERSION=${GITHUB_REF_NAME} (terraform: var.ghlog_version) to roll out."
+          } >> "$GITHUB_STEP_SUMMARY"

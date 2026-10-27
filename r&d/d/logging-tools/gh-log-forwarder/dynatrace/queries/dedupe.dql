@@ -1,0 +1,5 @@
+// At-least-once delivery: collapse duplicates by job ID + line number.
+fetch logs, from: now() - 24h
+| filter log.source == "github-actions"
+| dedup { cicd.pipeline.task.run.id, gh.line }
+| summarize lines = count(), by: { vcs.repository.name }

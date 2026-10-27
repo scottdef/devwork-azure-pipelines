@@ -1,0 +1,5 @@
+// Billed log ingest (raw bytes sent, before enrichment), by day.
+// DPS documents the metric as builtin:billing.log.ingest.usage; its Grail
+// timeseries name below is an assumption - confirm it in the metrics
+// browser (phase-0 item). Compare with ghlog2dt.bytes from the heartbeat.
+timeseries bytes = sum(dt.billing.log.ingest.usage), interval: 1d, from: now() - 14d

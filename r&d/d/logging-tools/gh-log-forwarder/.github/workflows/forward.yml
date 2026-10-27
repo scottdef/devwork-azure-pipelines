@@ -1,0 +1,190 @@
+# forward-logs: the scheduled, authoritative export path.
+#
+# Every tick: plan shards -> each shard sweeps its repos with ghlog2dt
+# (list | fetch | ship, checkpointed) -> one job merges the shards'
+# checkpoints into the forwarder-state branch.
+#
+# The cron line below is managed. Change the cadence with Terraform
+# (var.interval_minutes) or `make schedule INTERVAL=n`; both rewrite only
+# the line tagged `# ghlog2dt:cron`.
+name: forward-logs
+run-name: forward-logs${{ github.event_name == 'workflow_dispatch' && ' (manual)' || '' }}
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"  # ghlog2dt:cron (managed by terraform / `make schedule`)
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: "Override targets: comma-separated owner/name, or * for every repo the app can see"
+        required: false
+        default: ""
+      lookback:
+        description: "Override the lookback window, e.g. 3h (Dynatrace refuses logs older than 24h)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run: records become an artifact; nothing is shipped or checkpointed"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One sweep at a time; a queued tick waits rather than racing the
+# checkpoint. Never cancel a sweep mid-ship.
+concurrency:
+  group: ghlog2dt-sweep
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - name: Split targets into shards
+        id: plan
+        env:
+          TARGETS: ${{ inputs.repos || vars.GHLOG_TARGET_REPOS }}
+          SHARDS: ${{ vars.GHLOG_SHARDS || '4' }}
+        run: |
+          set -euo pipefail
+          [[ -n "${TARGETS}" ]] || { echo "::error::GHLOG_TARGET_REPOS is empty (managed by terraform)"; exit 2; }
+          if ! [[ "${SHARDS}" =~ ^[0-9]+$ ]] || (( SHARDS < 1 || SHARDS > 32 )); then
+            echo "::error::GHLOG_SHARDS must be an integer in 1..32"; exit 2
+          fi
+          if [[ "${TARGETS}" == "*" ]]; then
+            shards='[{"shard":0,"repos":"*"}]'
+          else
+            shards="$(jq -cn --arg t "${TARGETS}" --argjson n "${SHARDS}" '
+              ($t | [splits("[,\\s]+")] | map(select(length > 0)) | unique) as $r
+              | ([$n, ($r | length)] | min) as $k
+              | [range(0; $k) as $i
+                 | {shard: $i, repos: ([$r | to_entries[] | select(.key % $k == $i) | .value] | join(","))}]')"
+          fi
+          [[ "${shards}" != "[]" ]] || { echo "::error::no target repositories"; exit 2; }
+          printf 'shards=%s\n' "${shards}" >> "$GITHUB_OUTPUT"
+          jq -r '.[] | "shard \(.shard): \(.repos)"' <<<"${shards}"
+
+  ship:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read # checkout, checkpoint branch, release download
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out checkpoint branch
+        uses: actions/checkout@v4
+        with:
+          ref: forwarder-state
+          path: state-branch
+          persist-credentials: false
+
+      - name: Set up Go (only when building from source)
+        if: vars.GHLOG_VERSION == '' || vars.GHLOG_VERSION == 'source'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install ghlog2dt (pinned release, SHA256-verified)
+        env:
+          GHLOG_VERSION: ${{ vars.GHLOG_VERSION || 'source' }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/install-ghlog2dt.sh
+
+      - name: Mint read-only installation token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GHLOG_APP_ID }}
+          private-key: ${{ secrets.GHLOG_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-actions: read
+          permission-metadata: read
+
+      - name: Forward logs (shard ${{ matrix.shard }})
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          DT_URL: ${{ vars.DT_URL }}
+          DT_LOGS_TOKEN: ${{ secrets.DT_LOGS_TOKEN }}
+          GHLOG_CONFIG: ghlog2dt.json
+          GHLOG_LOOKBACK: ${{ inputs.lookback || vars.GHLOG_LOOKBACK }}
+          GHLOG_STATE_DIR: state-branch/state
+          GHLOG_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          TARGETS: ${{ matrix.repos }}
+        run: scripts/run-forwarder.sh sweep "${TARGETS}"
+
+      - name: Upload checkpoint
+        if: always() && !cancelled() && !inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-shard-${{ matrix.shard }}
+          path: state-branch/state/*.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload dry-run records
+        if: inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: records-shard-${{ matrix.shard }}
+          path: |
+            records.ndjson
+            summary.json
+          retention-days: 3
+
+  commit-state:
+    needs: ship
+    # Commit whatever was shipped, even if a shard failed part-way:
+    # checkpoints only ever record flushed jobs.
+    if: always() && !cancelled() && needs.ship.result != 'skipped' && !inputs.dry_run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # push to forwarder-state only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+          persist-credentials: false
+
+      - name: Check out checkpoint branch (with push credentials)
+        uses: actions/checkout@v4
+        with:
+          ref: forwarder-state
+          path: state-branch
+
+      - name: Set up Go (only when building from source)
+        if: vars.GHLOG_VERSION == '' || vars.GHLOG_VERSION == 'source'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+
+      - name: Install ghlog2dt
+        env:
+          GHLOG_VERSION: ${{ vars.GHLOG_VERSION || 'source' }}
+          GH_TOKEN: ${{ github.token }}
+        run: src/scripts/install-ghlog2dt.sh
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: state-shard-*
+          path: incoming
+          merge-multiple: true
+
+      - name: Merge and push checkpoint
+        working-directory: state-branch
+        run: ../src/scripts/commit-state.sh ../incoming state

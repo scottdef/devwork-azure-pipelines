@@ -1,0 +1,47 @@
+# notify-log-forwarder: installed into target repositories (Terraform
+# github_repository_file) for low-latency export. When one of the listed
+# workflows completes, ask the central forwarder to ship that run now.
+# The scheduled sweep remains the safety net; double delivery is
+# deduplicated by job ID in the forwarder's checkpoint.
+#
+# The workflows line is managed: Terraform rewrites the line tagged
+# `# ghlog2dt:workflows` per repository. Never list this workflow itself.
+name: notify-log-forwarder
+
+on:
+  workflow_run:
+    workflows: ["CI"]  # ghlog2dt:workflows
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Mint dispatch token (forwarder repo only)
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GHLOG_APP_ID }}
+          private-key: ${{ secrets.GHLOG_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.GHLOG_FORWARDER_REPO || 'gh-log-forwarder' }}
+          permission-contents: write
+
+      - name: Dispatch ghlog-export
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          FORWARDER: ${{ github.repository_owner }}/${{ vars.GHLOG_FORWARDER_REPO || 'gh-log-forwarder' }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          [[ "${RUN_ID}" =~ ^[0-9]+$ && "${ATTEMPT}" =~ ^[0-9]+$ ]] || { echo "::error::unexpected workflow_run payload"; exit 2; }
+          gh api --method POST "repos/${FORWARDER}/dispatches" \
+            -f event_type=ghlog-export \
+            -f "client_payload[repo]=${GITHUB_REPOSITORY}" \
+            -F "client_payload[run_id]=${RUN_ID}" \
+            -F "client_payload[run_attempt]=${ATTEMPT}"
+          echo "dispatched ${GITHUB_REPOSITORY} run ${RUN_ID} attempt ${ATTEMPT} to ${FORWARDER}"
