@@ -1,0 +1,39 @@
+{{/* One app's state. cool-api serves it live; coolctl renders it into the portal. */}}
+<section class="app" id="app-{{.Team}}-{{.App}}">
+  <h2>{{.Team}} / {{.App}}</h2>
+  <p class="meta">
+    Source <a href="https://github.com/{{.Repo}}">{{.Repo}}</a> · chart <code>{{.Chart}}</code>
+  </p>
+  {{range .Environments}}
+  <article class="env env-{{.Environment}}">
+    <h3>{{.Environment}} <span class="badge health-{{.Health}}">{{.Health}}</span> <span class="badge sync-{{.Sync}}">{{.Sync}}</span></h3>
+    <p><a href="{{.URL}}">{{.URL}}</a></p>
+    <table>
+      <thead><tr><th>Release</th><th>Traffic</th><th>Image</th><th>Since</th></tr></thead>
+      <tbody>
+        {{range .Releases}}
+        <tr{{if .Standby}} class="standby"{{end}}>
+          <td><code>{{.ID}}</code></td>
+          <td><meter min="0" max="100" value="{{.Weight}}"></meter> {{.Weight}}%{{if .Standby}} standby{{end}}</td>
+          <td><code>{{short .Digest}}</code></td>
+          <td>{{day .At}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4">No release yet.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{if .Message}}<p class="note">{{.Message}}</p>{{end}}
+  </article>
+  {{else}}
+  <p>Registered, not deployed yet. Push to <code>main</code> to create the first release.</p>
+  {{end}}
+  {{if .Previews}}
+  <article class="previews">
+    <h3>Previews</h3>
+    <ul>
+      {{range .Previews}}<li>Pull request {{.PR}}: <a href="{{.URL}}">{{.URL}}</a> <code>{{.Release}}</code></li>{{end}}
+    </ul>
+  </article>
+  {{end}}
+</section>

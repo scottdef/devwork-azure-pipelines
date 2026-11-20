@@ -1,0 +1,47 @@
+<!--
+  The AI token budget of the calling app.
+
+  An app's budget is an app role on its managed identity: AI.Small, AI.Medium
+  or AI.Large. cool-infra assigns the role when a cool-addon request for "ai"
+  is approved and merged, so the budget arrives inside the caller's token and
+  there is no table of apps to keep here.
+
+  Needs the "jwt" variable that the cool-jwt fragment sets. The counter is per
+  calling identity, so apps do not spend each other's budget.
+-->
+<fragment>
+  <set-variable name="cool-ai-budget" value='@{
+    var roles = "," + ((Jwt)context.Variables["jwt"]).Claims.GetValueOrDefault("roles", "").Replace(" ", "") + ",";
+    if (roles.Contains(",AI.Large,")) { return "large"; }
+    if (roles.Contains(",AI.Medium,")) { return "medium"; }
+    if (roles.Contains(",AI.Small,")) { return "small"; }
+    return "none";
+  }' />
+  <set-variable name="cool-ai-caller" value='@(((Jwt)context.Variables["jwt"]).Claims.GetValueOrDefault("azp", ((Jwt)context.Variables["jwt"]).Subject))' />
+  <choose>
+    <when condition='@((string)context.Variables["cool-ai-budget"] == "large")'>
+      <llm-token-limit counter-key='@((string)context.Variables["cool-ai-caller"])'
+          tokens-per-minute="{{cool-ai-tpm-large}}" estimate-prompt-tokens="true"
+          remaining-tokens-header-name="X-Cool-AI-Remaining-Tokens" />
+    </when>
+    <when condition='@((string)context.Variables["cool-ai-budget"] == "medium")'>
+      <llm-token-limit counter-key='@((string)context.Variables["cool-ai-caller"])'
+          tokens-per-minute="{{cool-ai-tpm-medium}}" estimate-prompt-tokens="true"
+          remaining-tokens-header-name="X-Cool-AI-Remaining-Tokens" />
+    </when>
+    <when condition='@((string)context.Variables["cool-ai-budget"] == "small")'>
+      <llm-token-limit counter-key='@((string)context.Variables["cool-ai-caller"])'
+          tokens-per-minute="{{cool-ai-tpm-small}}" estimate-prompt-tokens="true"
+          remaining-tokens-header-name="X-Cool-AI-Remaining-Tokens" />
+    </when>
+    <otherwise>
+      <return-response>
+        <set-status code="403" reason="Forbidden" />
+        <set-header name="Content-Type" exists-action="override">
+          <value>application/json</value>
+        </set-header>
+        <set-body>{"error": "this app has no AI budget; ask for one with a cool-addon request"}</set-body>
+      </return-response>
+    </otherwise>
+  </choose>
+</fragment>

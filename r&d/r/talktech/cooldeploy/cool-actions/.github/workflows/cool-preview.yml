@@ -1,0 +1,86 @@
+# Put up or take down the preview of a pull request.
+#
+# A preview is the app in its own namespace on the dev cluster, with one
+# replica, reachable inside the network at
+# https://<app>-pr-<n>.preview.dev.<domain>. It gets no secrets and runs no
+# crons.
+name: cool-preview
+on:
+  workflow_call:
+    inputs:
+      action:
+        description: up or down.
+        type: string
+        required: true
+      digest:
+        description: Digest of the image to preview; needed for up.
+        type: string
+        default: ""
+      context:
+        type: string
+        default: "."
+    outputs:
+      url:
+        value: ${{ jobs.preview.outputs.url }}
+      release:
+        value: ${{ jobs.preview.outputs.release }}
+
+permissions: {}
+
+jobs:
+  preview:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 20
+    concurrency:
+      group: cool-preview-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      url: ${{ steps.up.outputs.url }}
+      release: ${{ steps.up.outputs.release }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.context }}
+    env:
+      COOL_API_URL: ${{ vars.COOL_API_URL }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+
+      - name: Deploy the preview
+        id: up
+        if: inputs.action == 'up'
+        env:
+          DIGEST: ${{ inputs.digest }}
+        run: |
+          set -euo pipefail
+          coolctl deploy -env dev -pr "$PR" -digest "$DIGEST" -wait 10m
+
+      - uses: CoolEngOrg/cool-actions/pr-comment@v1
+        if: inputs.action == 'up'
+        with:
+          pr: ${{ github.event.pull_request.number }}
+          marker: preview
+          body: |
+            **Preview** of `${{ github.event.pull_request.head.sha }}` is up: ${{ steps.up.outputs.url }}
+
+            Release `${{ steps.up.outputs.release }}`, one replica, reachable inside the network, no secrets, no crons. It goes away when this pull request closes.
+
+      - name: Remove the preview
+        if: inputs.action == 'down'
+        run: |
+          set -euo pipefail
+          coolctl preview down -pr "$PR"
+
+      - uses: CoolEngOrg/cool-actions/pr-comment@v1
+        if: inputs.action == 'down'
+        with:
+          pr: ${{ github.event.pull_request.number }}
+          marker: preview
+          body: The preview of this pull request has been removed.

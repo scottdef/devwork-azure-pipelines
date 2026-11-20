@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cool-platform
+description: What every app cluster needs once - shared gateways, mesh-wide mutual TLS, the image rule and metric scraping.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

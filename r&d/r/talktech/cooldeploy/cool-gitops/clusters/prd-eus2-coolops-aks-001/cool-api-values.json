@@ -1,0 +1,19 @@
+{
+  "image": "prdeus2coolopsacr001.azurecr.io/platform/cool-api:1",
+  "replicas": 2,
+  "identity": "00000000-0000-0000-0000-000000000000",
+  "tenantId": "00000000-0000-0000-0000-000000000000",
+  "keyVault": "prd-eus2-coolops-kv-001",
+  "github": {
+    "clientId": "Iv23liREPLACEME000000",
+    "installation": "00000000",
+    "keySecret": "cool-deploy-app-private-key",
+    "repo": "CoolEngOrg/cool-gitops",
+    "branch": "main"
+  },
+  "domain": "coolapps.example",
+  "chart": "cool-app-1.0.0",
+  "portalOrigin": "https://coolengorg.github.io",
+  "argo": {"enabled": true, "namespace": "argocd"},
+  "internalLoadBalancer": true
+}

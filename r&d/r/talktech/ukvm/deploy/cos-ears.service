@@ -1,0 +1,23 @@
+[Unit]
+Description=Chief of staff ears: microphone to orders
+After=cos.service sound.target
+Requires=cos.service
+
+[Service]
+User=cos
+Group=cos
+SupplementaryGroups=audio
+EnvironmentFile=/etc/cos/env
+# COS_MIC in /etc/cos/env names the ALSA device, e.g. COS_MIC=plughw:CARD=S330,DEV=0
+# The speakerphone's own mute button is the push-to-talk: muted means no
+# audio reaches this pipe at all.
+ExecStart=/bin/sh -c 'arecord -q -D "$COS_MIC" -t raw -f S16_LE -r 16000 -c 1 | /usr/local/bin/cos listen -addr http://10.77.0.1:8088'
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

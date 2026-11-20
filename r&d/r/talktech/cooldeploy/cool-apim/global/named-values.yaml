@@ -1,0 +1,25 @@
+# Named values every instance has. Policies refer to them as {{name}}.
+#
+# A plain named value takes its value from instances/<env>.yaml.
+# One with keyVaultSecret is a reference: API Management reads that secret
+# from the instance's Key Vault with its own identity, and the value never
+# appears in this repository or in a workflow log.
+namedValues:
+  - name: cool-tenant-id
+    description: Entra ID tenant whose tokens the gateway accepts.
+  - name: cool-api-audience
+    description: Audience a caller's token must carry for this environment.
+  - name: cool-portal-origin
+    description: Origin of the portal, allowed by CORS.
+  - name: cool-ai-tpm-small
+    description: Tokens per minute of the small AI budget.
+  - name: cool-ai-tpm-medium
+    description: Tokens per minute of the medium AI budget.
+  - name: cool-ai-tpm-large
+    description: Tokens per minute of the large AI budget.
+  # Declared for the Palantir outline and switched off: the secret does not
+  # exist until someone follows apis/partners/palantir-foundry/README.md.
+  - name: cool-palantir-token
+    description: Token of the Palantir Foundry service user.
+    keyVaultSecret: cool-palantir-token
+    enabled: false

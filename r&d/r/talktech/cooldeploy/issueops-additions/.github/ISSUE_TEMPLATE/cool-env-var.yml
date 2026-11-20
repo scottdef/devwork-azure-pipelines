@@ -1,0 +1,48 @@
+name: "CoolDeploy: Change environment variables"
+description: "Set or remove plain settings of an app in one environment. Secrets do not belong here: they live in the team Key Vault."
+title: "[cool-env-var] "
+labels: ["issueops", "issueops:cool-env-var"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Set or remove plain settings of an app in one environment. Secrets do not belong here: they live in the team Key Vault.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "The environment to change."
+      options:
+        - "dev"
+        - "tst"
+        - "prd"
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: set
+    attributes:
+      label: "Set"
+      description: "One KEY=VALUE per line."
+      placeholder: "LOG_LEVEL=warn"
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: unset
+    attributes:
+      label: "Unset"
+      description: "One KEY per line."
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: CoolDeploy AI
+  version: 1.0.0
+  description: >-
+    Chat completions from the Microsoft Foundry account of the environment,
+    in the OpenAI-compatible shape. Callers send their own Entra ID token.
+    The gateway applies the app's token budget and signs in to Foundry
+    itself, so apps hold no model key.
+paths:
+  /deployments/{deployment}/chat/completions:
+    post:
+      operationId: chatCompletions
+      summary: Create a chat completion
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Name of a model deployment in the Foundry account.
+          schema: {type: string}
+        - name: api-version
+          in: query
+          description: API version of the inference endpoint. The gateway supplies one when it is left out.
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: {type: string, enum: [system, user, assistant, tool]}
+                      content: {type: string}
+                max_tokens: {type: integer}
+                temperature: {type: number}
+                stream: {type: boolean}
+      responses:
+        "200":
+          description: The completion, or a stream of chunks when stream is true.
+          headers:
+            X-Cool-AI-Remaining-Tokens:
+              description: Tokens left in the caller's budget for this minute.
+              schema: {type: integer}
+          content:
+            application/json:
+              schema: {type: object}
+        "401":
+          description: The token is missing or not valid for this API.
+        "403":
+          description: The calling app has no AI budget.
+        "429":
+          description: The calling app has used its token budget for this minute.

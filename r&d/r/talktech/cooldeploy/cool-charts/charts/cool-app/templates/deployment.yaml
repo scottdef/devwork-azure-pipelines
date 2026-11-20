@@ -1,0 +1,96 @@
+{{- /* One Deployment per release that takes traffic or stands by. */ -}}
+{{- $keyvault := and .Values.secrets (eq .Values.platform.secrets.provider "keyvault") (eq (int .Values.preview) 0) -}}
+{{- range $r := .Values.releases }}
+{{- if or (gt (int $r.weight) 0) $r.standby }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.app }}-{{ $r.id }}
+  labels: {{ include "cool-app.releaseLabels" (dict "root" $ "release" $r) }}
+  annotations:
+    cool/commit: {{ default "" $r.sha | quote }}
+spec:
+  {{- if gt (int $.Values.preview) 0 }}
+  replicas: 1
+  {{- else if $r.standby }}
+  replicas: {{ int $.Values.platform.standbyReplicas }}
+  {{- end }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels: {{ include "cool-app.selector" (dict "root" $ "release" $r) }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {"maxSurge": "25%", "maxUnavailable": 0}
+  template:
+    metadata:
+      labels: {{ include "cool-app.releaseLabels" (dict "root" $ "release" $r) }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ int $.Values.port | quote }}
+        prometheus.io/path: "/metrics"
+        cool/config: {{ include "cool-app.env" $ | sha256sum | trunc 16 | quote }}
+    spec:
+      serviceAccountName: {{ $.Values.app }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: {{ include "cool-app.podSecurity" $ }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{ include "cool-app.selector" (dict "root" $ "release" $r) }}
+      containers:
+        - name: app
+          image: "{{ $.Values.platform.registry }}/{{ $.Values.team }}/{{ $.Values.app }}@{{ $r.digest }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {"name": "http", "containerPort": {{ int $.Values.port }}, "protocol": "TCP"}
+          env:
+            - {"name": "PORT", "value": {{ int $.Values.port | quote }}}
+            - {"name": "COOL_TEAM", "value": {{ $.Values.team | quote }}}
+            - {"name": "COOL_APP", "value": {{ $.Values.app | quote }}}
+            - {"name": "COOL_ENV", "value": {{ $.Values.environment | quote }}}
+            - {"name": "COOL_RELEASE", "value": {{ $r.id | quote }}}
+            - {"name": "COOL_URL", "value": {{ printf "https://%s" (include "cool-app.host" $) | quote }}}
+            - {"name": "COOL_FLAGS_FILE", "value": "/etc/cool/flags.json"}
+          envFrom:
+            - configMapRef: {"name": {{ printf "%s-env" $.Values.app | quote }}}
+            {{- if $.Values.secrets }}
+            - secretRef: {"name": {{ printf "%s-secrets" $.Values.app | quote }}, "optional": {{ not $keyvault }}}
+            {{- end }}
+          startupProbe:
+            httpGet: {"path": {{ $.Values.health | quote }}, "port": "http"}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {"path": {{ $.Values.health | quote }}, "port": "http"}
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {"path": {{ $.Values.health | quote }}, "port": "http"}
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: {"cpu": {{ $.Values.resources.cpu | quote }}, "memory": {{ $.Values.resources.memory | quote }}}
+            limits: {"memory": {{ $.Values.resources.memory | quote }}}
+          securityContext: {{ include "cool-app.containerSecurity" $ }}
+          volumeMounts:
+            - {"name": "tmp", "mountPath": "/tmp"}
+            - {"name": "flags", "mountPath": "/etc/cool", "readOnly": true}
+            {{- if $keyvault }}
+            - {"name": "secrets", "mountPath": "/mnt/secrets", "readOnly": true}
+            {{- end }}
+      volumes:
+        - {"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}}
+        - {"name": "flags", "configMap": {"name": {{ printf "%s-flags" $.Values.app | quote }}}}
+        {{- if $keyvault }}
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: {"secretProviderClass": {{ printf "%s-secrets" $.Values.app | quote }}}
+        {{- end }}
+{{- end }}
+{{- end }}

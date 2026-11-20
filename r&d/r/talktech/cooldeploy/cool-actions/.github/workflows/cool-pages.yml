@@ -1,0 +1,79 @@
+# Build the portal and publish it to GitHub Pages.
+#
+# The portal is static. Its app list and status fragments are rendered from
+# a checkout of cool-gitops, so the page shows what Git says is deployed
+# without the browser needing access to anything. Live health comes from
+# cool-api, for people who are signed in.
+name: cool-pages
+on:
+  workflow_call:
+    inputs:
+      site:
+        description: Directory of the static site.
+        type: string
+        default: site
+      gitops:
+        description: The GitOps repository to render from.
+        type: string
+        default: CoolEngOrg/cool-gitops
+      domain:
+        description: DNS zone of app hosts.
+        type: string
+        default: coolapps.example
+    secrets:
+      app-private-key:
+        description: Private key of a GitHub App that can read the GitOps repository.
+        required: true
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.COOL_READER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: CoolEngOrg
+          repositories: cool-gitops
+          permission-contents: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.gitops }}
+          token: ${{ steps.token.outputs.token }}
+          path: .gitops
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+      - name: Render the fragments
+        env:
+          SITE: ${{ inputs.site }}
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          set -euo pipefail
+          coolctl render portal -gitops .gitops -out "$SITE" -domain "$DOMAIN"
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ inputs.site }}
+
+  deploy:
+    needs: build
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: pages

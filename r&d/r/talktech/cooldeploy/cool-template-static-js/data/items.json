@@ -1,0 +1,8 @@
+{
+  "items": [
+    {"name": "Edit index.html"},
+    {"name": "Push to main to deploy to dev"},
+    {"name": "Open a pull request to get a preview"},
+    {"name": "Promote with a request in CoolEngOrg/issueops"}
+  ]
+}

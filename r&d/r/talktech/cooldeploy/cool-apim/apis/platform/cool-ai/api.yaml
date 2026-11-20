@@ -1,0 +1,9 @@
+# The AI gateway: OpenAI-compatible chat completions from Microsoft Foundry.
+# policy.xml holds the budget and the sign-in to Foundry.
+name: cool-ai
+displayName: CoolDeploy AI
+path: ai
+product: ai
+auth: entra-jwt
+backend: cool-foundry
+environments: [dev, tst, prd]

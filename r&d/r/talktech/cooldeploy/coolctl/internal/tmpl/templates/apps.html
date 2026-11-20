@@ -1,0 +1,25 @@
+{{/* The portal's app list. Data: {Apps []api.AppStatus, Built string, Issues string}. */}}
+<table class="apps">
+  <thead>
+    <tr><th>Team</th><th>App</th><th>dev</th><th>tst</th><th>prd</th><th>Previews</th><th></th></tr>
+  </thead>
+  <tbody>
+    {{range .Apps}}{{$a := .}}
+    <tr>
+      <td>{{.Team}}</td>
+      <td><a href="app.html?app={{.Team}}-{{.App}}" hx-get="fragments/app/{{.Team}}-{{.App}}.html" hx-target="#detail" hx-push-url="false">{{.App}}</a></td>
+      {{range $env := $.Columns}}
+      <td>{{with index $.Active (print $a.Team "/" $a.App "/" $env)}}<code>{{.}}</code>{{else}}<span class="none">none</span>{{end}}</td>
+      {{end}}
+      <td>{{len .Previews}}</td>
+      <td>
+        <a class="button" href="{{$.Issues}}/new?template=cool-deploy-promote.yml&amp;app={{.Team}}/{{.App}}">Promote</a>
+        <a class="button quiet" href="{{$.Issues}}/new?template=cool-deploy-rollback.yml&amp;app={{.Team}}/{{.App}}">Roll back</a>
+      </td>
+    </tr>
+    {{else}}
+    <tr><td colspan="7">No apps yet. Open a <a href="{{.Issues}}/new?template=cool-app-create.yml">cool-app-create</a> request.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+<p class="meta">Built {{.Built}} from <code>cool-gitops</code>.</p>

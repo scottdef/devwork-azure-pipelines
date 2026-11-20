@@ -1,0 +1,27 @@
+{
+  "prd-eus2-coolops-aks-001": {
+    "environment": "prd", "workload": "coolops", "role": "hub", "mesh": false,
+    "vnet_cidr": "10.10.0.0/16", "nodes_cidr": "10.10.0.0/20", "apim_cidr": "",
+    "nodes": {"size": "Standard_D4ds_v5", "min": 3, "max": 6}
+  },
+  "sbx-eus2-appsim-aks-001": {
+    "environment": "sbx", "workload": "appsim", "role": "apps", "mesh": true,
+    "vnet_cidr": "10.20.0.0/16", "nodes_cidr": "10.20.0.0/20", "apim_cidr": "",
+    "nodes": {"size": "Standard_D4ds_v5", "min": 2, "max": 4}
+  },
+  "dev-eus2-appdev-aks-001": {
+    "environment": "dev", "workload": "appdev", "role": "apps", "mesh": true,
+    "vnet_cidr": "10.30.0.0/16", "nodes_cidr": "10.30.0.0/20", "apim_cidr": "10.30.16.0/27",
+    "nodes": {"size": "Standard_D4ds_v5", "min": 3, "max": 10}
+  },
+  "tst-eus2-appdev-aks-001": {
+    "environment": "tst", "workload": "appdev", "role": "apps", "mesh": true,
+    "vnet_cidr": "10.40.0.0/16", "nodes_cidr": "10.40.0.0/20", "apim_cidr": "10.40.16.0/27",
+    "nodes": {"size": "Standard_D4ds_v5", "min": 3, "max": 10}
+  },
+  "prd-eus2-appdev-aks-001": {
+    "environment": "prd", "workload": "appdev", "role": "apps", "mesh": true,
+    "vnet_cidr": "10.50.0.0/16", "nodes_cidr": "10.50.0.0/20", "apim_cidr": "10.50.16.0/27",
+    "nodes": {"size": "Standard_D8ds_v5", "min": 3, "max": 20}
+  }
+}

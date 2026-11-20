@@ -1,0 +1,175 @@
+openapi: 3.0.3
+info:
+  title: Checkout API
+  version: 1.0.0
+  description: >-
+    Products and orders of the Cool Checkout sample app. Published through
+    Azure API Management by a cool-api-publish request; the paths below are
+    relative to the API's base path there.
+  contact:
+    name: payments team
+    url: https://github.com/CoolEngOrg/payments-checkout
+servers:
+  - url: https://checkout.prd.coolapps.example/api
+    description: The app itself. API Management replaces this with its own URL.
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products
+      parameters:
+        - name: q
+          in: query
+          description: Keep products whose name, category or SKU contains this text.
+          schema: {type: string, maxLength: 64}
+      responses:
+        "200":
+          description: The matching products, sorted by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [products]
+                properties:
+                  products:
+                    type: array
+                    items: {$ref: "#/components/schemas/Product"}
+  /products/{sku}:
+    get:
+      operationId: getProduct
+      summary: Get one product
+      parameters:
+        - {name: sku, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The product.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Product"}
+        "404": {$ref: "#/components/responses/Error"}
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List the newest orders
+      responses:
+        "200":
+          description: Up to 50 orders, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orders]
+                properties:
+                  orders:
+                    type: array
+                    items: {$ref: "#/components/schemas/Order"}
+    post:
+      operationId: createOrder
+      summary: Place an order
+      description: >-
+        Creates a pending order and reserves its items. A pending order
+        expires after 30 minutes unless it is paid.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NewOrder"}
+            example:
+              email: ada@example.com
+              items:
+                - {sku: CB-1001, qty: 2}
+                - {sku: CM-2001, qty: 1}
+      responses:
+        "201":
+          description: The order was placed.
+          headers:
+            Location:
+              description: Path of the new order.
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      summary: Get one order
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The order.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+        "404": {$ref: "#/components/responses/Error"}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      summary: Mark an order paid
+      description: Paying an order that is already paid succeeds and changes nothing.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The paid order.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+components:
+  responses:
+    Error:
+      description: The request could not be carried out.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: {type: string}
+  schemas:
+    Product:
+      type: object
+      required: [sku, name, category, price_cents, stock]
+      properties:
+        sku: {type: string, example: CB-1001}
+        name: {type: string, example: Cool Beans Coffee}
+        description: {type: string}
+        category: {type: string, example: Pantry}
+        price_cents: {type: integer, minimum: 1, description: Price in whole cents., example: 1450}
+        stock: {type: integer, minimum: 0}
+    Item:
+      type: object
+      required: [sku, qty]
+      properties:
+        sku: {type: string}
+        name: {type: string, readOnly: true}
+        qty: {type: integer, minimum: 1, maximum: 99}
+        unit_cents: {type: integer, readOnly: true}
+    NewOrder:
+      type: object
+      required: [email, items]
+      additionalProperties: false
+      properties:
+        email: {type: string, format: email}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: "#/components/schemas/Item"}
+    Order:
+      type: object
+      required: [id, email, items, total_cents, status, created]
+      properties:
+        id: {type: string, example: ord_5f2c9a1b3d4e}
+        email: {type: string, format: email}
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Item"}
+        total_cents: {type: integer}
+        status: {type: string, enum: [pending, paid, expired]}
+        created: {type: string, format: date-time}

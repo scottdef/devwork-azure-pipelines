@@ -1,0 +1,5 @@
+# APIs of the payments team. Callers sign in with Entra ID; no subscription key.
+name: payments
+displayName: Payments
+description: Checkout, orders and the other APIs of the payments team.
+subscriptionRequired: false

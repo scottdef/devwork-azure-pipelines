@@ -1,0 +1,33 @@
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
+<title>Hello from CoolDeploy</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>Hello from CoolDeploy</h1>
+  <p>The server renders this page. The form below posts with HTMX and swaps in the fragment it gets back: the form, empty again, and the list.</p>
+  <section id="notes" aria-live="polite">{{template "notes" .}}</section>
+</main>
+<footer>Release <code>{{.Release}}</code></footer>
+</body>
+</html>{{end}}
+
+{{define "notes"}}
+<form hx-post="/notes" hx-target="#notes">
+  <label for="text">Add a note</label>
+  <input id="text" name="text" maxlength="200" required autocomplete="off">
+  <button type="submit">Add</button>
+</form>
+{{- if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+<ul>
+{{- range .Notes}}
+  <li>{{.}}</li>
+{{- end}}
+</ul>
+{{end}}

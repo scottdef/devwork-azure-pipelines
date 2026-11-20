@@ -1,0 +1,47 @@
+name: Build in the registry
+description: >-
+  Build an image with `az acr build`, inside Azure Container Registry, and
+  report its digest. The runner needs no Docker daemon and holds no
+  registry password.
+inputs:
+  registry:
+    description: Registry name, without .azurecr.io.
+    required: true
+  image:
+    description: Repository of the image, such as payments/checkout.
+    required: true
+  tag:
+    description: Tag to give the build. The platform deploys by digest; the tag is for people.
+    required: true
+  dockerfile:
+    description: Path of the Dockerfile.
+    required: true
+  context:
+    description: Build context.
+    default: "."
+outputs:
+  digest:
+    description: The image digest, sha256:...
+    value: ${{ steps.build.outputs.digest }}
+runs:
+  using: composite
+  steps:
+    - id: build
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        IMAGE: ${{ inputs.image }}
+        TAG: ${{ inputs.tag }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        CONTEXT: ${{ inputs.context }}
+      run: |
+        set -euo pipefail
+        az acr build --registry "$REGISTRY" --image "$IMAGE:$TAG" --file "$DOCKERFILE" \
+          --platform linux/amd64 "$CONTEXT"
+        digest=$(az acr repository show --name "$REGISTRY" --image "$IMAGE:$TAG" --query digest --output tsv)
+        case "$digest" in
+          sha256:*) ;;
+          *) echo "::error::acr-build: the registry reported no digest for $IMAGE:$TAG"; exit 1 ;;
+        esac
+        echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        echo "Built \`$REGISTRY.azurecr.io/$IMAGE@$digest\`" >> "$GITHUB_STEP_SUMMARY"

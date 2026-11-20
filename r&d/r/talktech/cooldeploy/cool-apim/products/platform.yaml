@@ -1,0 +1,5 @@
+# The platform's own APIs: cool-api, read by the portal.
+name: platform
+displayName: CoolDeploy platform
+description: Status of apps and releases, for the portal and for tools.
+subscriptionRequired: false

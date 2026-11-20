@@ -1,0 +1,33 @@
+# Defaults of the cool-platform chart. README.md documents every key.
+#
+# YAML in JSON syntax, like every values file on the platform.
+{
+  "platform": {
+    "environment": "dev",
+    "registry": "registry.invalid",
+    "domain": "coolapps.example",
+    "extraHosts": [],
+    "extraRegistries": ["mcr.microsoft.com/"],
+    "mesh": {
+      "enabled": true,
+      "rootNamespace": "aks-istio-system",
+      "ingressNamespace": "aks-istio-ingress",
+      "internalSelector": "aks-istio-ingressgateway-internal",
+      "externalSelector": "aks-istio-ingressgateway-external"
+    },
+    "tls": {
+      "enabled": true,
+      "secretName": "cool-wildcard-tls",
+      "keyVault": "",
+      "certificate": "",
+      "identity": "",
+      "syncImage": "mcr.microsoft.com/oss/kubernetes/pause:3.10"
+    },
+    "tenantId": "",
+    "metrics": {
+      "manageSettings": true,
+      "clusterAlias": "",
+      "namespaceRegex": ".*"
+    }
+  }
+}

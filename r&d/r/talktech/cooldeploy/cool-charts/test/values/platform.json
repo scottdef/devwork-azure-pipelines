@@ -1,0 +1,14 @@
+{
+  "platform": {
+    "environment": "dev",
+    "registry": "prdeus2coolopsacr001.azurecr.io",
+    "domain": "coolapps.example",
+    "namePrefix": "dev-eus2",
+    "tenantId": "00000000-0000-0000-0000-000000000000",
+    "cronImage": "prdeus2coolopsacr001.azurecr.io/platform/coolctl:1",
+    "podSecurity": "privileged",
+    "mesh": {"enabled": true, "revision": "asm-1-30"},
+    "secrets": {"provider": "keyvault"},
+    "tls": {"keyVault": "dev-eus2-coolops-kv-001", "certificate": "wildcard-dev-coolapps", "identity": "33333333-4444-4555-8666-777777777777"}
+  }
+}

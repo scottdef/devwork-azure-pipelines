@@ -1,0 +1,29 @@
+# cool-api on the hub cluster, next to Argo CD.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cool-api
+  namespace: argocd
+spec:
+  project: cool-platform
+  sources:
+    - repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+      targetRevision: cool-api-1.0.0
+      path: charts/cool-api
+      helm:
+        releaseName: cool-api
+        valueFiles:
+          - "$values/clusters/prd-eus2-coolops-aks-001/cool-api-values.json"
+  destination:
+    name: in-cluster
+    namespace: cool-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,8 @@
+# Backends that are not one app. Each instance gives its URL for them in
+# instances/<env>.yaml. Apps need no entry here: an app's API goes to
+# https://<app>.<env>.coolapps.example, which apim-api.sh works out.
+backends:
+  - name: cool-api
+    description: The CoolDeploy control-plane API on the hub cluster.
+  - name: cool-foundry
+    description: The Microsoft Foundry account of this environment, OpenAI-compatible endpoint.

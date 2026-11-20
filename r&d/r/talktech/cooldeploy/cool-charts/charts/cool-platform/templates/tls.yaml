@@ -1,0 +1,73 @@
+{{- /*
+The wildcard certificate of the shared Gateways lives in Key Vault. Istio
+reads gateway certificates from Secrets in the ingress gateways' namespace,
+and the Secrets Store CSI driver only syncs a Secret while some pod mounts
+it. So: one SecretProviderClass, and one idle pod that mounts it.
+*/ -}}
+{{- $p := .Values.platform -}}
+{{- if and $p.mesh.enabled $p.tls.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cool-tls-sync
+  namespace: {{ $p.mesh.ingressNamespace }}
+  annotations:
+    azure.workload.identity/client-id: {{ required "platform.tls.identity is required: the client ID of the identity that may read the certificate" $p.tls.identity | quote }}
+automountServiceAccountToken: false
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: cool-wildcard-tls
+  namespace: {{ $p.mesh.ingressNamespace }}
+spec:
+  provider: azure
+  secretObjects:
+    - secretName: {{ $p.tls.secretName }}
+      type: kubernetes.io/tls
+      data:
+        - {"objectName": {{ $p.tls.certificate | quote }}, "key": "tls.key"}
+        - {"objectName": {{ $p.tls.certificate | quote }}, "key": "tls.crt"}
+  parameters:
+    usePodIdentity: "false"
+    clientID: {{ $p.tls.identity | quote }}
+    keyvaultName: {{ required "platform.tls.keyVault is required" $p.tls.keyVault | quote }}
+    tenantId: {{ $p.tenantId | quote }}
+    objects: |
+      array:
+        - |
+          objectName: {{ required "platform.tls.certificate is required" $p.tls.certificate }}
+          objectType: secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cool-tls-sync
+  namespace: {{ $p.mesh.ingressNamespace }}
+  labels: {"app.kubernetes.io/name": "cool-tls-sync", "app.kubernetes.io/managed-by": "cooldeploy"}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {"app.kubernetes.io/name": "cool-tls-sync"}
+  template:
+    metadata:
+      labels: {"app.kubernetes.io/name": "cool-tls-sync", "azure.workload.identity/use": "true", "sidecar.istio.io/inject": "false"}
+    spec:
+      serviceAccountName: cool-tls-sync
+      securityContext: {"runAsNonRoot": true, "runAsUser": 65532, "seccompProfile": {"type": "RuntimeDefault"}}
+      containers:
+        - name: pause
+          image: {{ $p.tls.syncImage | quote }}
+          resources:
+            requests: {"cpu": "5m", "memory": "8Mi"}
+            limits: {"memory": "16Mi"}
+          securityContext: {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}}
+          volumeMounts:
+            - {"name": "tls", "mountPath": "/mnt/tls", "readOnly": true}
+      volumes:
+        - name: tls
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: {"secretProviderClass": "cool-wildcard-tls"}
+{{- end }}

@@ -1,0 +1,16 @@
+# The simulator's project: appsim instances on the sandbox cluster, where the
+# platform team rehearses bad canaries, noisy neighbours and mesh upgrades.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: sim
+  namespace: argocd
+spec:
+  description: Simulated apps on the sandbox cluster
+  sourceRepos:
+    - https://github.com/CoolEngOrg/cool-charts.git
+    - https://github.com/CoolEngOrg/cool-gitops.git
+  destinations:
+    - {name: sbx-eus2-appsim-aks-001, namespace: "sim-*"}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}

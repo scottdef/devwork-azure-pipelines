@@ -1,0 +1,41 @@
+# Defaults of the cool-app chart. README.md documents every key.
+#
+# This file is YAML written in JSON syntax. JSON is valid YAML, so Helm and
+# Argo CD read it unchanged, and the Go tools read it with encoding/json.
+# Keep it that way: no YAML-only syntax below this header.
+{
+  "team": "",
+  "app": "",
+  "environment": "dev",
+  "chart": "",
+  "preview": 0,
+  "group": "",
+  "identity": "",
+  "expose": "internal",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {"min": 2, "max": 4, "cpu": 70},
+  "resources": {"cpu": "250m", "memory": "256Mi"},
+  "env": {},
+  "overrides": {},
+  "secrets": [],
+  "routes": [],
+  "crons": [],
+  "flags": {},
+  "domains": [],
+  "releases": [],
+  "platform": {
+    "registry": "registry.invalid",
+    "domain": "coolapps.example",
+    "namePrefix": "dev-eus2",
+    "tenantId": "",
+    "standbyReplicas": 1,
+    "cronImage": "registry.invalid/platform/coolctl:1",
+    "mesh": {
+      "enabled": true,
+      "internalGateway": "cool-system/cool-internal",
+      "externalGateway": "cool-system/cool-external"
+    },
+    "secrets": {"provider": "none"}
+  }
+}

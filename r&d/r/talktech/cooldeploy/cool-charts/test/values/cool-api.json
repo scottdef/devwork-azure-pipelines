@@ -1,0 +1,7 @@
+{
+  "image": "prdeus2coolopsacr001.azurecr.io/platform/cool-api:1.0.0",
+  "identity": "44444444-5555-4666-8777-888888888888",
+  "tenantId": "00000000-0000-0000-0000-000000000000",
+  "keyVault": "prd-eus2-coolops-kv-001",
+  "github": {"clientId": "Iv23liEXAMPLE0000000", "installation": "12345678"}
+}

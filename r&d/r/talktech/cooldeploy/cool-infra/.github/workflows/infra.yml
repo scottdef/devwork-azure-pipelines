@@ -1,0 +1,62 @@
+# Pull request: plan every stack. Main: plan, then apply each stack in order
+# after the reviewers of the cool-infra environment approve.
+#
+# The stacks run one after another, lowest number first, because each reads
+# what the one before it built.
+name: infra
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  network:
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/10-network, apply: "${{ github.event_name == 'push' }}"}
+  registry:
+    needs: network
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/20-registry, apply: "${{ github.event_name == 'push' }}"}
+  clusters:
+    needs: registry
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/30-clusters, apply: "${{ github.event_name == 'push' }}"}
+  dns:
+    needs: clusters
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/35-dns, apply: "${{ github.event_name == 'push' }}"}
+  observability:
+    needs: dns
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/40-observability, apply: "${{ github.event_name == 'push' }}"}
+  identity:
+    needs: observability
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/50-identity, apply: "${{ github.event_name == 'push' }}"}
+  vaults:
+    needs: identity
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/60-vaults, apply: "${{ github.event_name == 'push' }}"}
+  ai:
+    needs: vaults
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/65-ai, apply: "${{ github.event_name == 'push' }}"}
+  addons:
+    needs: ai
+    permissions: {contents: read, id-token: write}
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-terraform.yml@v1
+    with: {stack: stacks/70-addons, apply: "${{ github.event_name == 'push' }}"}

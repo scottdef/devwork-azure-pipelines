@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cool-api
+description: The CoolDeploy control-plane API - the single writer to cool-gitops. Runs on the hub cluster.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

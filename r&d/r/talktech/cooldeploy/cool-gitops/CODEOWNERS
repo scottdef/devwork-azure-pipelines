@@ -1,0 +1,6 @@
+# Everything outside apps/ changes by pull request, reviewed by the platform team.
+*            @CoolEngOrg/platform-admins
+
+# apps/ is written by the CoolDeploy GitHub App through cool-api. CI refuses
+# pull requests that touch it, apart from the simulator apps.
+/apps/sim/   @CoolEngOrg/platform-admins

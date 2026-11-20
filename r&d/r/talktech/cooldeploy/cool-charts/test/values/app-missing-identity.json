@@ -1,0 +1,5 @@
+{
+  "team": "payments", "app": "checkout", "environment": "dev",
+  "secrets": ["DATABASE_URL"],
+  "releases": [{"id": "raaaaaaa", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "weight": 100}]
+}

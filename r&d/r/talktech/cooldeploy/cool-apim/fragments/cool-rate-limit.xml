@@ -1,0 +1,9 @@
+<!--
+  Six hundred calls a minute per caller. A caller is the subject of its
+  token when it has one, and its address when it does not.
+-->
+<fragment>
+  <rate-limit-by-key calls="600" renewal-period="60"
+      counter-key='@(context.Variables.ContainsKey("jwt") ? ((Jwt)context.Variables["jwt"]).Subject : context.Request.IpAddress)'
+      remaining-calls-header-name="X-Cool-RateLimit-Remaining" />
+</fragment>

@@ -1,0 +1,55 @@
+{
+  "team": "sim",
+  "app": "appsim-steady",
+  "environment": "sbx",
+  "chart": "cool-app-1.0.0",
+  "group": "22222222-3333-4444-8555-666666666666",
+  "expose": "internal",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {
+    "min": 2,
+    "max": 4,
+    "cpu": 70
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "64Mi"
+  },
+  "env": {
+    "SIM_CPU_MS": "0",
+    "SIM_ERROR_RATE": "0",
+    "SIM_LATENCY_MS": "20"
+  },
+  "releases": [
+    {
+      "id": "reeeeeee",
+      "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "weight": 100,
+      "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "at": "2026-11-12T08:38:39Z"
+    }
+  ],
+  "manifest": {
+    "team": "sim",
+    "app": "appsim-steady",
+    "preset": "dockerfile",
+    "expose": "internal",
+    "port": 8080,
+    "health": "/healthz",
+    "scale": {
+      "min": 2,
+      "max": 4,
+      "cpu": 70
+    },
+    "resources": {
+      "cpu": "100m",
+      "memory": "64Mi"
+    },
+    "env": {
+      "SIM_CPU_MS": "0",
+      "SIM_ERROR_RATE": "0",
+      "SIM_LATENCY_MS": "20"
+    }
+  }
+}

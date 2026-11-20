@@ -1,0 +1,55 @@
+name: "CoolDeploy: Add-on"
+description: "A managed backing service for an app: Redis, PostgreSQL, blob storage or an AI token budget."
+title: "[cool-addon] "
+labels: ["issueops", "issueops:cool-addon"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A managed backing service for an app: Redis, PostgreSQL, blob storage or an AI token budget.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "The environment the add-on is for."
+      options:
+        - "dev"
+        - "tst"
+        - "prd"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: addon
+    attributes:
+      label: "Addon"
+      options:
+        - "redis"
+        - "postgres"
+        - "storage"
+        - "ai"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: "Size"
+      description: "large needs a second approval from FinOps."
+      options:
+        - "small"
+        - "medium"
+        - "large"
+      default: 0
+    validations:
+      required: true

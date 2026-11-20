@@ -1,0 +1,59 @@
+{
+  "self": "cos",
+  "doc_root": "/srv/cos/documents",
+  "settle_ms": 1500,
+  "voice_confirm": false,
+  "policy": {
+    "targets": ["server1", "server2", "server3", "nas"],
+    "commands": {
+      "uptime": "auto",
+      "df -h": "auto",
+      "free -m": "auto",
+      "ip -br addr": "auto",
+      "systemctl --failed": "auto",
+      "journalctl -p err -n 30 --no-pager": "auto",
+      "sudo systemctl restart nginx": "confirm",
+      "sudo reboot": "confirm"
+    },
+    "chords": {
+      "ctrl+l": "auto",
+      "enter": "confirm",
+      "escape": "confirm",
+      "tab": "confirm",
+      "up": "confirm",
+      "down": "confirm",
+      "left": "confirm",
+      "right": "confirm",
+      "ctrl+c": "confirm",
+      "ctrl+alt+t": "confirm",
+      "alt+tab": "confirm",
+      "ctrl+alt+f2": "confirm",
+      "ctrl+alt+delete": "confirm",
+      "delete": "confirm",
+      "f2": "confirm",
+      "f12": "confirm"
+    }
+  },
+  "nodes": [
+    {"name": "cos", "tier": "self",
+     "caps": ["stt", "ocr", "pdf", "hands:server1", "eyes:server1", "hands:server2", "eyes:server2"]},
+    {"name": "pi3", "tier": "staff", "addr": "10.77.0.3:8088", "ssh": "cos@10.77.0.3",
+     "caps": ["ocr", "pdf", "hands:server3", "eyes:server3"]},
+    {"name": "coral", "tier": "staff", "addr": "10.77.0.4:8088",
+     "caps": ["tpu", "hands:nas", "eyes:nas"]},
+    {"name": "server1-shell", "tier": "lender", "ssh": "cos@server1.lan",
+     "caps": ["exec:server1", "pdf", "ocr"]},
+    {"name": "nas-shell", "tier": "lender", "ssh": "cos@nas.lan",
+     "caps": ["exec:nas"]}
+  ],
+  "tethers": {
+    "server1": {"hands": "ch9329:/dev/ukvm/hands-server1", "eyes": "v4l2:/dev/ukvm/eyes-server1"},
+    "server2": {"hands": "ch9329:/dev/ukvm/hands-server2", "eyes": "v4l2:/dev/ukvm/eyes-server2"}
+  },
+  "cactus": {
+    "bin": "/opt/cactus/linux-arm64/cactus",
+    "needle": "/opt/cactus/models/needle3.cact",
+    "whistle": "/opt/cactus/models/whistle.cact",
+    "tools": "/etc/cos/tools.json"
+  }
+}

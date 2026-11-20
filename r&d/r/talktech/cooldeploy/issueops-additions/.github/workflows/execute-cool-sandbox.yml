@@ -1,0 +1,67 @@
+# The sandbox rehearsal: deploy a simulator scenario to the sandbox cluster.
+#
+# Not a request type and not for app teams. A platform engineer starts it by
+# hand, to try a chart version, a mesh upgrade or the release machinery on
+# apps that cannot hurt anyone. It runs in the environment cool-sbx, which
+# only members of platform-admins may deploy to.
+#
+# The file is named execute-cool-* because cool-api trusts jobs by that
+# name; the environment is what limits this one to the sandbox.
+name: execute-cool-sandbox
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Which simulator to deploy.
+        type: choice
+        options: [steady, flaky, noisy]
+        default: steady
+      tag:
+        description: Tag of the sim/appsim image in the platform registry.
+        type: string
+        default: "1"
+      weight:
+        description: Start a canary at this percent instead of replacing the live release. Empty replaces it.
+        type: string
+        default: ""
+
+permissions: {}
+
+jobs:
+  sandbox:
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON) }}
+    timeout-minutes: 30
+    environment: cool-sbx
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: execute-cool-sandbox-${{ inputs.scenario }}
+      cancel-in-progress: false
+    env:
+      COOL_API_URL: ${{ vars.COOL_API_URL }}
+      COOL_REGISTRY: ${{ vars.COOL_REGISTRY || 'prdeus2coolopsacr001' }}
+      SCENARIO: ${{ inputs.scenario }}
+      TAG: ${{ inputs.tag }}
+      WEIGHT: ${{ inputs.weight }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        with:
+          client-id: ${{ vars.COOL_MONITOR_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      - name: Deploy the scenario
+        run: |
+          set -euo pipefail
+          COOL_FIELDS=$(jq -nM --arg scenario "$SCENARIO" --arg tag "$TAG" --arg weight "$WEIGHT" \
+            '{scenario: $scenario, tag: $tag, weight: $weight}')
+          export COOL_FIELDS COOL_REPORT="$RUNNER_TEMP/report.md"
+          : > "$COOL_REPORT"
+          scripts/cool/sandbox.sh
+      - name: Summary
+        if: always()
+        run: cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"

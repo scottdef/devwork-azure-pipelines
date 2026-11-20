@@ -1,0 +1,46 @@
+# The cool-platform chart, once per app cluster: shared gateways, mesh-wide
+# mutual TLS, the image rule, metric scraping.
+#
+# The chart tag is per cluster on purpose. Move sbx first, then dev, tst, prd.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cool-platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - {cluster: sbx-eus2-appsim-aks-001, chart: cool-platform-1.0.0}
+          - {cluster: dev-eus2-appdev-aks-001, chart: cool-platform-1.0.0}
+          - {cluster: tst-eus2-appdev-aks-001, chart: cool-platform-1.0.0}
+          - {cluster: prd-eus2-appdev-aks-001, chart: cool-platform-1.0.0}
+  template:
+    metadata:
+      name: "cool-platform-{{ .cluster }}"
+      namespace: argocd
+    spec:
+      project: cool-platform
+      sources:
+        - repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+          targetRevision: "{{ .chart }}"
+          path: charts/cool-platform
+          helm:
+            releaseName: cool-platform
+            valueFiles:
+              - "$values/clusters/{{ .cluster }}/platform-values.json"
+      destination:
+        name: "{{ .cluster }}"
+        namespace: cool-system
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

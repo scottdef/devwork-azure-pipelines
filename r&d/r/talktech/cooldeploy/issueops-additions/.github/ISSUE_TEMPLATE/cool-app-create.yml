@@ -1,0 +1,58 @@
+name: "CoolDeploy: Create an app"
+description: "A new repository from a template, registered on CoolDeploy, with a first deploy to dev."
+title: "[cool-app-create] "
+labels: ["issueops", "issueops:cool-app-create"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A new repository from a template, registered on CoolDeploy, with a first deploy to dev.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: team
+    attributes:
+      label: "Team"
+      description: "Team slug: 2 to 8 lower-case letters and digits. The team must already be onboarded."
+      placeholder: "payments"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "App slug: 2 to 20 characters, lower-case letters, digits and hyphens."
+      placeholder: "ledger"
+    validations:
+      required: true
+  - type: dropdown
+    id: preset
+    attributes:
+      label: "Preset"
+      description: "What kind of app the template should be."
+      options:
+        - "go-htmx"
+        - "go-server"
+        - "static"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: expose
+    attributes:
+      label: "Expose"
+      description: "internal: reachable inside the network. public: also through the external gateway."
+      options:
+        - "internal"
+        - "public"
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: description
+    attributes:
+      label: "Description"
+      description: "One line for the repository description."
+      placeholder: "Ledger service of the payments team"
+    validations:
+      required: false

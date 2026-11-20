@@ -1,0 +1,33 @@
+{{- /*
+Quota and defaults. The quota counts requests, not limits: the mesh sidecar
+carries large limits of its own and would eat a limits quota.
+*/ -}}
+{{- $name := default "small" .Values.quota -}}
+{{- if gt (int .Values.preview) 0 -}}{{- $name = "preview" -}}{{- end -}}
+{{- $q := index .Values.platform.quotas $name -}}
+{{- if not $q -}}{{- fail (printf "quota %q is not one of platform.quotas" $name) -}}{{- end -}}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: cool-quota
+  namespace: {{ .Release.Namespace }}
+  labels: {"cool/team": {{ .Values.team | quote }}, "cool/quota": {{ $name | quote }}}
+spec:
+  hard:
+    requests.cpu: {{ $q.cpu | quote }}
+    requests.memory: {{ $q.memory | quote }}
+    pods: {{ int $q.pods | quote }}
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cool-defaults
+  namespace: {{ .Release.Namespace }}
+  labels: {"cool/team": {{ .Values.team | quote }}}
+spec:
+  limits:
+    - type: Container
+      defaultRequest: {"cpu": "50m", "memory": "64Mi"}
+      default: {"memory": "256Mi"}

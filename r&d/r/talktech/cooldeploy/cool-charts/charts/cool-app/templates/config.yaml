@@ -1,0 +1,54 @@
+{{- /* Plain configuration: environment variables and feature flags. */ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app }}-env
+  labels: {{ include "cool-app.labels" . }}
+data: {{ include "cool-app.env" . }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app }}-flags
+  labels: {{ include "cool-app.labels" . }}
+data:
+  flags.json: {{ toJson .Values.flags | quote }}
+{{- if and .Values.secrets (eq .Values.platform.secrets.provider "keyvault") (eq (int .Values.preview) 0) }}
+---
+{{- /*
+Secrets come from the team's Key Vault. The CSI driver mounts them and also
+syncs them into a Kubernetes Secret, which the pods read as environment
+variables. A Key Vault name may not contain "_", so DATABASE_URL is stored
+as <app>-DATABASE-URL.
+
+A preview gets no secrets. Its namespace is not one the app's identity is
+federated with, and a pull request should not hold production-shaped
+credentials anyway. The pods start with the secret reference optional.
+*/}}
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: {{ .Values.app }}-secrets
+  labels: {{ include "cool-app.labels" . }}
+spec:
+  provider: azure
+  secretObjects:
+    - secretName: {{ .Values.app }}-secrets
+      type: Opaque
+      data:
+        {{- range .Values.secrets }}
+        - {"objectName": {{ printf "%s-%s" $.Values.app (replace "_" "-" .) | quote }}, "key": {{ . | quote }}}
+        {{- end }}
+  parameters:
+    usePodIdentity: "false"
+    clientID: {{ required "identity is required when secrets come from Key Vault; set it with a cool-env-var request" .Values.identity | quote }}
+    keyvaultName: {{ printf "%s-%s-kv-001" .Values.platform.namePrefix .Values.team | quote }}
+    tenantId: {{ .Values.platform.tenantId | quote }}
+    objects: |
+      array:
+        {{- range .Values.secrets }}
+        - |
+          objectName: {{ printf "%s-%s" $.Values.app (replace "_" "-" .) }}
+          objectType: secret
+        {{- end }}
+{{- end }}

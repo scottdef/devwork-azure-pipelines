@@ -1,0 +1,102 @@
+# Build an app's image in the platform registry and report its digest.
+#
+# The image is built from the commit that triggered the workflow. For the Go
+# and static presets the Dockerfile comes from coolctl, so a team cannot get
+# the base image, the user or the build flags wrong. A repository that needs
+# its own sets "preset": "dockerfile" and commits one.
+name: cool-build
+on:
+  workflow_call:
+    inputs:
+      main:
+        type: string
+        default: "."
+      context:
+        type: string
+        default: "."
+    outputs:
+      digest:
+        description: Digest of the built image.
+        value: ${{ jobs.build.outputs.digest }}
+      app:
+        description: team/app, from cool.json.
+        value: ${{ jobs.build.outputs.app }}
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+      app: ${{ steps.manifest.outputs.app }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.context }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+
+      - name: Read and check cool.json
+        id: manifest
+        run: |
+          set -euo pipefail
+          coolctl validate
+          {
+            echo "app=$(jq -rM '"\(.team)/\(.app)"' cool.json)"
+            echo "preset=$(jq -rM .preset cool.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: startsWith(steps.manifest.outputs.preset, 'go-')
+        with:
+          go-version-file: ${{ inputs.context }}/go.mod
+          cache: false
+
+      - name: Vet and test
+        if: startsWith(steps.manifest.outputs.preset, 'go-')
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l .)" || { echo "::error::gofmt needed"; gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+
+      - name: Choose the Dockerfile
+        id: dockerfile
+        env:
+          PRESET: ${{ steps.manifest.outputs.preset }}
+          MAIN: ${{ inputs.main }}
+          CONTEXT: ${{ inputs.context }}
+          REGISTRY: ${{ vars.COOL_REGISTRY || 'prdeus2coolopsacr001' }}
+        run: |
+          set -euo pipefail
+          if [ "$PRESET" = dockerfile ]; then
+            test -f Dockerfile || { echo "::error::preset dockerfile needs a Dockerfile"; exit 1; }
+            # The build step runs from the repository root, not from here.
+            echo "path=$CONTEXT/Dockerfile" >> "$GITHUB_OUTPUT"
+          else
+            coolctl render dockerfile -registry "$REGISTRY.azurecr.io" -main "$MAIN" -o "$RUNNER_TEMP/Dockerfile"
+            echo "path=$RUNNER_TEMP/Dockerfile" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        with:
+          client-id: ${{ vars.COOL_BUILD_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+
+      - uses: CoolEngOrg/cool-actions/acr-build@v1
+        id: image
+        with:
+          registry: ${{ vars.COOL_REGISTRY || 'prdeus2coolopsacr001' }}
+          image: ${{ steps.manifest.outputs.app }}
+          tag: ${{ github.sha }}
+          dockerfile: ${{ steps.dockerfile.outputs.path }}
+          context: ${{ inputs.context }}

@@ -1,0 +1,220 @@
+# Carries out any approved CoolDeploy request: gate, execute, finish.
+#
+#   gate     the engine checks that the approvals still cover the issue as it
+#            stands, and hands over the fields it verified
+#   execute  scripts/cool/<type>.sh, in the GitHub environment cool-<env>
+#   finish   the engine posts the report and closes or fails the request
+#
+# The execute job is the only one that can change anything, and what lets it
+# is not a secret. cool-api accepts its GitHub OIDC token because the token
+# says two things the job cannot choose: that the job is defined by a file
+# named execute-cool-* on main of this repository, and that it runs in the
+# environment cool-<env>, which GitHub grants only after that environment's
+# protection rules pass.
+#
+# INTEGRATION: the two places marked below assume the inputs and outputs
+# of this repository's gate and finish actions. README.md lists them.
+name: execute-cool-request
+on:
+  workflow_call:
+    inputs:
+      type:
+        description: Request type without its cool- prefix; names the script to run.
+        type: string
+        required: true
+      issue-number:
+        type: number
+        required: true
+      repositories:
+        description: >-
+          Other repositories the execute job's token may reach: none, org
+          (every repository the App is installed on; needed to create one),
+          or a comma-separated list.
+        type: string
+        default: none
+      azure:
+        description: Which Azure identity the execute job signs in as - none, provision or monitor.
+        type: string
+        default: none
+
+permissions: {}
+
+jobs:
+  gate:
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON) }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      proceed: ${{ steps.gate.outputs.proceed }}
+      fields: ${{ steps.gate.outputs.fields }}
+      environment: ${{ steps.environment.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: write
+      - uses: ./.github/actions/setup-issueops
+      # INTEGRATION 1 of 2: the gate. Assumed outputs: proceed ("true" when
+      # the request may run) and fields (the form fields as a JSON object,
+      # for the digest the gate verified).
+      - uses: ./.github/actions/gate
+        id: gate
+        with:
+          issue-number: ${{ inputs.issue-number }}
+          token: ${{ steps.token.outputs.token }}
+      # The GitHub environment is cool-<environment field>. Requests with no
+      # such field act on the whole app: creating one is approved for dev,
+      # retiring one for prd.
+      - name: Choose the environment
+        id: environment
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          FIELDS: ${{ steps.gate.outputs.fields }}
+          TYPE: ${{ inputs.type }}
+        run: |
+          set -euo pipefail
+          name=$(jq -rM '.environment // ""' <<<"$FIELDS")
+          case "$TYPE:$name" in
+            app-create:) name=dev ;;
+            app-retire:) name=prd ;;
+          esac
+          case "$name" in
+            dev | tst | prd) echo "name=$name" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::the request names no environment this platform has: \"$name\""; exit 1 ;;
+          esac
+
+  execute:
+    needs: gate
+    if: needs.gate.outputs.proceed == 'true'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON) }}
+    timeout-minutes: 120
+    environment: cool-${{ needs.gate.outputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    # One request at a time per issue: a .retry waits for the run before it.
+    concurrency:
+      group: execute-cool-${{ inputs.issue-number }}
+      cancel-in-progress: false
+    outputs:
+      report: ${{ steps.report.outputs.markdown }}
+    env:
+      COOL_API_URL: ${{ vars.COOL_API_URL }}
+      COOL_PROM_URL: ${{ vars.COOL_PROM_URL }}
+      COOL_ISSUE_URL: ${{ github.server_url }}/${{ github.repository }}/issues/${{ inputs.issue-number }}
+      COOL_FIELDS: ${{ needs.gate.outputs.fields }}
+      TYPE: ${{ inputs.type }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+
+      # A token for other repositories, for the request types that need one:
+      # creating a repository, or opening a pull request on cool-infra or
+      # cool-apim. Narrowed to the repositories named by the caller.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: org-token
+        if: inputs.repositories == 'org'
+        with:
+          client-id: ${{ vars.COOL_PROVISION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COOL_PROVISION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: repo-token
+        if: inputs.repositories != 'org' && inputs.repositories != 'none'
+        with:
+          client-id: ${{ vars.COOL_PROVISION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COOL_PROVISION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.repositories }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        if: inputs.azure == 'provision'
+        with:
+          client-id: ${{ vars.COOL_PROVISION_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        if: inputs.azure == 'monitor'
+        with:
+          client-id: ${{ vars.COOL_MONITOR_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+
+      - name: Carry out the request
+        env:
+          GH_TOKEN: ${{ steps.org-token.outputs.token || steps.repo-token.outputs.token }}
+          COOL_REPORT: ${{ runner.temp }}/report.md
+        run: |
+          set -euo pipefail
+          case "$TYPE" in
+            app-create | deploy-promote | deploy-rollback | rolling-release | env-var | domain | addon | api-publish | app-retire) ;;
+            *) echo "::error::unknown request type \"$TYPE\""; exit 1 ;;
+          esac
+          if [ -n "${GH_TOKEN:-}" ]; then gh auth setup-git; fi
+          : > "$COOL_REPORT"
+          "scripts/cool/$TYPE.sh"
+
+      # The report reaches the finish job as a job output. The delimiter is
+      # random so that nothing in the report can end the value early.
+      - name: Hand over the report
+        id: report
+        if: always()
+        env:
+          COOL_REPORT: ${{ runner.temp }}/report.md
+        run: |
+          set -euo pipefail
+          delimiter=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+          {
+            echo "markdown<<$delimiter"
+            head -c 60000 "$COOL_REPORT" 2>/dev/null || true
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+  finish:
+    needs: [gate, execute]
+    if: always() && needs.gate.outputs.proceed == 'true'
+    runs-on: ${{ fromJSON(vars.ISSUEOPS_RUNS_ON) }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.ISSUEOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ISSUEOPS_APP_PRIVATE_KEY }}
+          permission-issues: write
+      - name: Write the report to a file
+        env:
+          REPORT: ${{ needs.execute.outputs.report }}
+          RESULT: ${{ needs.execute.result }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REPORT" ]; then
+            printf '%s\n' "$REPORT" > "$RUNNER_TEMP/report.md"
+          else
+            echo "The request ended as \`$RESULT\` and left no report. The workflow run has the details." > "$RUNNER_TEMP/report.md"
+          fi
+      - uses: ./.github/actions/setup-issueops
+      # INTEGRATION 2 of 2: finish. Assumed inputs: outcome (completed or
+      # failed) and report-file (Markdown to post on the issue).
+      - uses: ./.github/actions/finish
+        with:
+          issue-number: ${{ inputs.issue-number }}
+          token: ${{ steps.token.outputs.token }}
+          outcome: ${{ needs.execute.result == 'success' && 'completed' || 'failed' }}
+          report-file: ${{ runner.temp }}/report.md

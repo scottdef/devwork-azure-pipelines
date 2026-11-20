@@ -1,0 +1,75 @@
+# Values for the argo/argo-cd Helm chart on prd-eus2-coolops-aks-001.
+# install.sh adds the workload identity client ID with --set-string.
+#
+# This file is ordinary YAML: only Helm reads it.
+global:
+  domain: argocd.prd.coolops.example
+
+configs:
+  params:
+    # TLS ends at the gateway in front of the server.
+    server.insecure: true
+    # Applications live in the argocd namespace only.
+    application.namespaces: ""
+  cm:
+    # Track resources by annotation, so that app labels stay the app's.
+    application.resourceTrackingMethod: annotation
+    # Git is polled every minute; cool-api also asks for a refresh on commit.
+    timeout.reconciliation: 60s
+    # Sign in with Entra ID. Fill in the application registration.
+    # oidc.config: |
+    #   name: Entra ID
+    #   issuer: https://login.microsoftonline.com/<tenant-id>/v2.0
+    #   clientID: <application-id>
+    #   azure:
+    #     useWorkloadIdentity: true
+    #   requestedIDTokenClaims: {groups: {essential: true}}
+    #   requestedScopes: [openid, profile, email]
+  rbac:
+    policy.default: role:readonly
+    # The platform admins group administers Argo CD.
+    policy.csv: |
+      g, 00000000-0000-0000-0000-000000000000, role:admin
+
+# The pods that talk to the app clusters sign in with workload identity.
+controller:
+  replicas: 1
+  podLabels:
+    azure.workload.identity/use: "true"
+  resources:
+    requests: {cpu: 500m, memory: 1Gi}
+    limits: {memory: 2Gi}
+  metrics:
+    enabled: true
+
+server:
+  replicas: 2
+  podLabels:
+    azure.workload.identity/use: "true"
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+repoServer:
+  replicas: 2
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {memory: 1Gi}
+
+applicationSet:
+  replicas: 1
+  podLabels:
+    azure.workload.identity/use: "true"
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+# One hub, a handful of clusters: Redis without HA is enough to start.
+redis-ha:
+  enabled: false
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

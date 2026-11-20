@@ -1,0 +1,24 @@
+{
+  "team": "payments", "app": "checkout", "environment": "prd", "chart": "cool-app-1.0.0",
+  "group": "11111111-2222-4333-8444-555555555555", "quota": "medium",
+  "identity": "99999999-aaaa-4bbb-8ccc-dddddddddddd",
+  "expose": "public", "port": 8080, "health": "/healthz",
+  "scale": {"min": 3, "max": 10, "cpu": 60},
+  "resources": {"cpu": "250m", "memory": "256Mi"},
+  "env": {"LOG_LEVEL": "info", "CURRENCY": "USD"},
+  "overrides": {"LOG_LEVEL": "warn"},
+  "secrets": ["CRON_SECRET", "DATABASE_URL"],
+  "routes": [
+    {"prefix": "/api/", "timeout": "10s"},
+    {"prefix": "/static/", "headers": {"Cache-Control": "public, max-age=3600"}},
+    {"redirect": {"from": "/cart", "to": "/", "code": 308}}
+  ],
+  "crons": [{"path": "/internal/cron/expire-orders", "schedule": "*/15 * * * *"}],
+  "flags": {"express-checkout": true},
+  "domains": ["pay.coolshop.example"],
+  "releases": [
+    {"id": "rccccccc", "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "weight": 10, "sha": "ccccccc", "at": "2026-11-12T09:00:00Z"},
+    {"id": "rbbbbbbb", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "weight": 90, "sha": "bbbbbbb", "at": "2026-11-11T09:00:00Z"},
+    {"id": "raaaaaaa", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "weight": 0, "sha": "aaaaaaa", "at": "2026-11-10T09:00:00Z"}
+  ]
+}

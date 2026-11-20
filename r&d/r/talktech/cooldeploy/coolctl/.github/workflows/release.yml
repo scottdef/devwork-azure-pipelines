@@ -1,0 +1,49 @@
+# A tag v1.2.3 builds the four images in the platform registry and attaches
+# the coolctl binaries to a GitHub release. The cool-actions repository
+# copies the linux binary into its own bin/ on its next release.
+name: release
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  release:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 30
+    environment: cool-platform
+    env:
+      VERSION: ${{ github.ref_name }}
+      REGISTRY: ${{ vars.COOL_REGISTRY || 'prdeus2coolopsacr001' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.24"
+          cache: false
+      - run: make check
+      - name: Build binaries
+        run: |
+          set -euo pipefail
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            os=${target%/*} arch=${target#*/} ext=""
+            [ "$os" = windows ] && ext=.exe
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath \
+              -ldflags="-s -w -X main.version=${VERSION#v}" \
+              -o "dist/coolctl-$os-$arch$ext" ./cmd/coolctl
+          done
+          (cd dist && sha256sum coolctl-* > SHA256SUMS)
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.COOL_BUILD_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      - name: Build images
+        run: make images VERSION="${VERSION#v}" REGISTRY="$REGISTRY"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$VERSION" dist/* --title "$VERSION" --generate-notes

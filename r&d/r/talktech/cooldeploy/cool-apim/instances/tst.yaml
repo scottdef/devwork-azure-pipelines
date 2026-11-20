@@ -1,0 +1,36 @@
+# The API Management instance of the tst environment.
+# scripts/apim-instance.sh creates it; the other scripts configure it.
+name: tst-eus2-coolapi-apim-001
+resourceGroup: tst-eus2-coolapi-rg-001
+location: eastus2
+environment: tst
+sku: StandardV2
+capacity: 1
+publisherName: CoolEngOrg Platform
+publisherEmail: platform@coolengorg.example
+
+# Hosts of apps in this environment are <app>.tst.coolapps.example.
+backendDomain: tst.coolapps.example
+
+# Key Vault that named values marked keyVaultSecret are read from, with the
+# instance's own identity.
+keyVault: tst-eus2-coolops-kv-001
+
+# Outbound VNet integration: how the instance reaches the internal gateways.
+# The subnet is delegated to Microsoft.Web/serverFarms; cool-infra creates it.
+vnet:
+  outboundSubnetId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/tst-eus2-coolnet-rg-001/providers/Microsoft.Network/virtualNetworks/tst-eus2-coolnet-vnet-001/subnets/apim-outbound
+
+# This instance's values for the named values in global/named-values.yaml.
+namedValues:
+  cool-tenant-id: 00000000-0000-0000-0000-000000000000
+  cool-api-audience: api://00000000-0000-0000-0000-000000000000/cool-tst
+  cool-portal-origin: https://coolengorg.github.io
+  cool-ai-tpm-small: "20000"
+  cool-ai-tpm-medium: "60000"
+  cool-ai-tpm-large: "200000"
+
+# This instance's URLs for the backends in global/backends.yaml.
+backends:
+  cool-api: http://cool-api.prd.coolops.example
+  cool-foundry: https://tst-eus2-coolai-fdry-001.cognitiveservices.azure.com/openai

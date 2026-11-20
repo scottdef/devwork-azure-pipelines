@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cool-app
+description: The one chart every CoolDeploy app is installed with. Teams supply values, never templates.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

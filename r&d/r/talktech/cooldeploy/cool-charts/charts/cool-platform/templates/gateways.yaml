@@ -1,0 +1,66 @@
+{{- /*
+cool-system holds what apps share. The two Gateways bind to the ingress
+gateways the AKS Istio add-on runs: apps attach VirtualServices to them and
+never own a Gateway of their own.
+*/ -}}
+{{- $p := .Values.platform -}}
+{{- $apps := printf "*.%s.%s" $p.environment $p.domain -}}
+{{- $previews := printf "*.preview.%s.%s" $p.environment $p.domain -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cool-system
+  labels: {"app.kubernetes.io/managed-by": "cooldeploy", "pod-security.kubernetes.io/enforce": "restricted"}
+{{- if $p.mesh.enabled }}
+---
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: cool-internal
+  namespace: cool-system
+spec:
+  selector: {"istio": {{ $p.mesh.internalSelector | quote }}}
+  servers:
+    - port: {"number": 80, "name": "http", "protocol": "HTTP"}
+      hosts: {{ toJson (list $apps $previews) }}
+      {{- if $p.tls.enabled }}
+      tls: {"httpsRedirect": true}
+    - port: {"number": 443, "name": "https", "protocol": "HTTPS"}
+      hosts: {{ toJson (list $apps $previews) }}
+      tls: {"mode": "SIMPLE", "credentialName": {{ $p.tls.secretName | quote }}}
+      {{- end }}
+---
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: cool-external
+  namespace: cool-system
+spec:
+  selector: {"istio": {{ $p.mesh.externalSelector | quote }}}
+  servers:
+    - port: {"number": 80, "name": "http", "protocol": "HTTP"}
+      hosts:
+        - {{ $apps | quote }}
+        {{- range $p.extraHosts }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- if $p.tls.enabled }}
+      tls: {"httpsRedirect": true}
+    - port: {"number": 443, "name": "https", "protocol": "HTTPS"}
+      hosts:
+        - {{ $apps | quote }}
+        {{- range $p.extraHosts }}
+        - {{ . | quote }}
+        {{- end }}
+      tls: {"mode": "SIMPLE", "credentialName": {{ $p.tls.secretName | quote }}}
+      {{- end }}
+---
+{{- /* Every workload in the mesh speaks mutual TLS, or it is not heard. */}}
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: {{ $p.mesh.rootNamespace }}
+spec:
+  mtls: {"mode": "STRICT"}
+{{- end }}

@@ -1,0 +1,14 @@
+<!--
+  Require an Entra ID token for this environment's audience. The validated
+  token is kept in the variable "jwt" for policies that need its claims.
+-->
+<fragment>
+  <validate-azure-ad-token tenant-id="{{cool-tenant-id}}" header-name="Authorization"
+      failed-validation-httpcode="401"
+      failed-validation-error-message="A valid Entra ID token for this API is required."
+      output-token-variable-name="jwt">
+    <audiences>
+      <audience>{{cool-api-audience}}</audience>
+    </audiences>
+  </validate-azure-ad-token>
+</fragment>

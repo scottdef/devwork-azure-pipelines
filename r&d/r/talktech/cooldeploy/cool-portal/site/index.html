@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https: http://127.0.0.1:*; frame-ancestors 'none'">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "selfRequestsOnly": true}'>
+<title>CoolDeploy</title>
+<link rel="stylesheet" href="css/portal.css">
+<script src="js/htmx.min.js" defer></script>
+</head>
+<body>
+<header>
+  <h1><a href="index.html">CoolDeploy</a></h1>
+  <nav aria-label="Requests">
+    <a class="button" href="https://github.com/CoolEngOrg/issueops/issues/new?template=cool-app-create.yml">New app</a>
+    <a class="button quiet" href="https://github.com/CoolEngOrg/issueops/issues/new/choose">All requests</a>
+    <a class="button quiet" href="https://github.com/CoolEngOrg/issueops/issues?q=is%3Aissue+is%3Aopen+label%3Aissueops">Open requests</a>
+  </nav>
+</header>
+
+<main>
+  <section aria-labelledby="apps-title">
+    <h2 id="apps-title">Apps</h2>
+    <p class="lead">What Git says is deployed. The list is rebuilt whenever <code>cool-gitops</code> changes; pick an app for its releases.</p>
+    <!-- The list and each app's detail are HTML fragments that the Pages
+         build renders from cool-gitops with `coolctl render portal`. -->
+    <div id="apps" hx-get="fragments/apps.html" hx-trigger="load" hx-swap="innerHTML">
+      <p class="none">Loading the app list…</p>
+    </div>
+  </section>
+
+  <section id="detail" aria-live="polite"></section>
+
+  <section aria-labelledby="how-title" class="how">
+    <h2 id="how-title">How things change</h2>
+    <ol>
+      <li><strong>Push to <code>main</code></strong> of an app repository: the pipeline builds an image and deploys it to dev.</li>
+      <li><strong>Open a pull request</strong>: it gets a preview of its own, removed when it closes.</li>
+      <li><strong>Everything else is a request</strong> in <a href="https://github.com/CoolEngOrg/issueops/issues/new/choose">CoolEngOrg/issueops</a>: promote, rolling release, roll back, settings, domains, add-ons, publishing an API, retiring an app.</li>
+    </ol>
+    <p>Nothing on this page changes anything. It reads; requests write.</p>
+  </section>
+</main>
+
+<footer>
+  <a href="https://github.com/CoolEngOrg/cool-gitops/commits/main/apps">Deployment history</a> ·
+  <a href="https://github.com/CoolEngOrg/cool-portal/tree/main/docs">Guides and labs</a>
+</footer>
+</body>
+</html>

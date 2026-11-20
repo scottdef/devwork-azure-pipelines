@@ -1,0 +1,115 @@
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
+<title>Cool Checkout</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Cool Checkout</h1>
+  <input type="search" name="q" placeholder="Search products" aria-label="Search products"
+         hx-get="/products" hx-trigger="input changed delay:300ms, search" hx-target="#products">
+</header>
+<main>
+  <section id="products" aria-label="Products">{{template "products" .}}</section>
+  <aside>
+    <section id="cart" aria-label="Cart">{{template "cart" .}}</section>
+    <section id="orders" aria-label="Recent orders"
+             hx-get="/orders" hx-trigger="order-changed from:body">{{template "orders" .}}</section>
+  </aside>
+</main>
+<footer>
+  Served by release <code>{{.Release}}</code> in <code>{{.Env}}</code>.
+  A sample app on CoolDeploy: its data is made up and its orders live in memory.
+</footer>
+</body>
+</html>{{end}}
+
+{{define "products"}}
+{{- if not .Products}}<p class="empty">No product matches “{{.Query}}”.</p>{{end}}
+<ul class="grid">
+{{- range .Products}}
+  <li class="card">
+    <p class="category">{{.Category}}</p>
+    <h2>{{.Name}}</h2>
+    <p>{{.Description}}</p>
+    <p class="price">{{money .PriceCents}}</p>
+    {{- if gt .Stock 0}}
+    <form hx-post="/cart" hx-target="#cart">
+      <input type="hidden" name="sku" value="{{.SKU}}">
+      <input type="hidden" name="qty" value="1">
+      <button type="submit">Add to cart</button>
+      <span class="stock">{{.Stock}} in stock</span>
+    </form>
+    {{- else}}
+    <p class="stock out">Out of stock</p>
+    {{- end}}
+  </li>
+{{- end}}
+</ul>
+{{end}}
+
+{{define "cart"}}
+<h2>Cart</h2>
+{{- if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{- if .Order}}
+<div class="confirmation" role="status">
+  <p><strong>Order {{.Order.ID}} placed.</strong></p>
+  <p>{{money .Order.TotalCents}} · {{.Order.Status}}</p>
+  {{- if eq .Order.Status "pending"}}<p>Pay it from the list below within 30 minutes.</p>{{end}}
+</div>
+{{- else if not .Cart}}
+<p class="empty">Your cart is empty.</p>
+{{- else}}
+<table>
+  {{- range .Cart}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="qty">
+      <form hx-post="/cart" hx-target="#cart">
+        <input type="hidden" name="sku" value="{{.SKU}}"><input type="hidden" name="qty" value="-1">
+        <button type="submit" aria-label="One less {{.Name}}">−</button>
+      </form>
+      {{.Qty}}
+      <form hx-post="/cart" hx-target="#cart">
+        <input type="hidden" name="sku" value="{{.SKU}}"><input type="hidden" name="qty" value="1">
+        <button type="submit" aria-label="One more {{.Name}}">+</button>
+      </form>
+    </td>
+    <td class="num">{{money .UnitCents}}</td>
+  </tr>
+  {{- end}}
+  <tr class="total"><td colspan="2">Total</td><td class="num">{{money .Total}}</td></tr>
+</table>
+<form hx-post="/checkout" hx-target="#cart">
+  <label for="email">Email for the receipt</label>
+  <input id="email" type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+  <button type="submit">Place order</button>
+  {{- if .Express}}
+  <button type="submit" name="express" value="1" class="express">Express checkout</button>
+  {{- end}}
+</form>
+<button type="button" class="link" hx-delete="/cart" hx-target="#cart">Empty the cart</button>
+{{- end}}
+{{end}}
+
+{{define "orders"}}
+<h2>Recent orders</h2>
+{{- if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{- if not .Orders}}<p class="empty">No orders yet.</p>{{end}}
+<ul class="orders">
+{{- range .Orders}}
+  <li>
+    <span><code>{{.ID}}</code> · {{money .TotalCents}}</span>
+    <span class="status {{.Status}}">{{.Status}}</span>
+    {{- if eq .Status "pending"}}
+    <button type="button" hx-post="/orders/{{.ID}}/pay" hx-target="#orders">Pay</button>
+    {{- end}}
+  </li>
+{{- end}}
+</ul>
+{{end}}

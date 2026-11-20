@@ -1,0 +1,87 @@
+# The pipeline every app repository calls, and the only workflow an app needs:
+#
+#   jobs:
+#     cool:
+#       uses: CoolEngOrg/cool-actions/.github/workflows/cool-pipeline.yml@v1
+#
+#   push to the default branch   build, deploy to dev, wait until healthy
+#   pull request opened/updated  build, deploy a preview, comment its URL
+#   pull request closed          remove the preview
+#
+# It takes no secrets. Azure and cool-api both trust the jobs below by the
+# workflow file that defines them, which GitHub states in the job's OIDC
+# token and which an app repository cannot forge.
+name: cool-pipeline
+on:
+  workflow_call:
+    inputs:
+      main:
+        description: Go package to build, for the go-server and go-htmx presets.
+        type: string
+        default: "."
+      context:
+        description: Directory that holds cool.json, relative to the repository root.
+        type: string
+        default: "."
+    outputs:
+      url:
+        description: URL of what was deployed.
+        value: ${{ jobs.deploy.outputs.url || jobs.preview.outputs.url }}
+      release:
+        description: ID of the release that was deployed.
+        value: ${{ jobs.deploy.outputs.release || jobs.preview.outputs.release }}
+
+permissions: {}
+
+jobs:
+  build:
+    # A pull request from a fork gets no OIDC token, so it cannot build in
+    # the registry. Its checks still run in the repository's own workflows.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'closed' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-build.yml@v1
+    with:
+      main: ${{ inputs.main }}
+      context: ${{ inputs.context }}
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-deploy.yml@v1
+    with:
+      digest: ${{ needs.build.outputs.digest }}
+      context: ${{ inputs.context }}
+
+  preview:
+    needs: build
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-preview.yml@v1
+    with:
+      action: up
+      digest: ${{ needs.build.outputs.digest }}
+      context: ${{ inputs.context }}
+
+  preview-down:
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-preview.yml@v1
+    with:
+      action: down
+      context: ${{ inputs.context }}

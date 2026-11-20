@@ -1,0 +1,52 @@
+# Build, test and release cos for every board in the system.
+# Repository: CoolGitOrg/ukvm (enterprise CoolGitEnterprise).
+# Releases are published with a token minted for the issueops-autoadmin-app
+# GitHub App, so no long-lived personal token is stored.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"   # project ceiling; go.mod floor is 1.22
+      - name: Converters used by the intake tests
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils
+      - run: make preflight test race
+      - run: make demo
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: make checksums VERSION="${GITHUB_REF_NAME}"
+      - id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.ISSUEOPS_AUTOADMIN_APP_ID }}
+          private-key: ${{ secrets.ISSUEOPS_AUTOADMIN_APP_KEY }}
+          owner: CoolGitOrg
+          repositories: ukvm
+      - name: Publish binaries and checksums
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" dist/cos-linux-* dist/SHA256SUMS \
+            --repo CoolGitOrg/ukvm --title "${GITHUB_REF_NAME}" --generate-notes

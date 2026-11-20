@@ -1,0 +1,15 @@
+# Rendered by coolctl for the [[.Preset]] preset.
+# Commit your own Dockerfile and set "preset": "dockerfile" to take control.
+FROM [[.Registry]]/base/golang:1.24 AS build
+WORKDIR /src
+COPY go.mod go.su[m] ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/app [[.Main]]
+
+FROM [[.Registry]]/base/distroless-static:nonroot
+COPY --from=build /out/app /app
+USER 65532:65532
+ENV PORT=[[.Port]]
+EXPOSE [[.Port]]
+ENTRYPOINT ["/app"]

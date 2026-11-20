@@ -1,0 +1,29 @@
+{
+  "team": "payments",
+  "app": "checkout",
+  "preset": "go-htmx",
+  "expose": "public",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {"min": 2, "max": 6, "cpu": 70},
+  "resources": {"cpu": "250m", "memory": "256Mi"},
+  "env": {
+    "LOG_LEVEL": "info",
+    "CURRENCY": "USD"
+  },
+  "secrets": ["CRON_SECRET"],
+  "routes": [
+    {"prefix": "/api/", "timeout": "10s"},
+    {"prefix": "/static/", "headers": {"Cache-Control": "public, max-age=3600"}},
+    {"redirect": {"from": "/cart", "to": "/", "code": 308}}
+  ],
+  "crons": [
+    {"path": "/internal/cron/expire-orders", "schedule": "*/15 * * * *"}
+  ],
+  "flags": {"express-checkout": false},
+  "api": {"openapi": "openapi.yaml", "product": "payments", "auth": "entra-jwt"},
+  "environments": {
+    "dev": {"scale": {"min": 1, "max": 2, "cpu": 70}, "env": {"LOG_LEVEL": "debug"}},
+    "prd": {"scale": {"min": 3, "max": 10, "cpu": 60}}
+  }
+}

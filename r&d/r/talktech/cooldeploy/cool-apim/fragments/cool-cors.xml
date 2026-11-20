@@ -1,0 +1,23 @@
+<!--
+  Browsers may call from the portal and from nowhere else. Apps that serve
+  their own pages call their own APIs from the same origin and need no CORS.
+-->
+<fragment>
+  <cors allow-credentials="false">
+    <allowed-origins>
+      <origin>{{cool-portal-origin}}</origin>
+    </allowed-origins>
+    <allowed-methods preflight-result-max-age="600">
+      <method>GET</method>
+      <method>POST</method>
+      <method>OPTIONS</method>
+    </allowed-methods>
+    <allowed-headers>
+      <header>Authorization</header>
+      <header>Content-Type</header>
+    </allowed-headers>
+    <expose-headers>
+      <header>X-Cool-Request-Id</header>
+    </expose-headers>
+  </cors>
+</fragment>

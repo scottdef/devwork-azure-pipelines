@@ -1,0 +1,67 @@
+# One Argo CD Application per pull-request preview, on the dev cluster.
+#
+# A preview is a values file at apps/<team>/<app>/previews/pr-<n>/values.json
+# with "preview": <n> in it. The charts read that number and render a
+# single-replica, internal-only install in its own namespace. Closing the
+# pull request deletes the file, and Argo CD deletes the namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cool-previews
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+        revision: main
+        files:
+          - path: "apps/*/*/previews/*/values.json"
+        requeueAfterSeconds: 30
+  template:
+    metadata:
+      name: "{{ .team }}-{{ .app }}-pr-{{ .preview }}"
+      namespace: argocd
+      labels:
+        cool/team: "{{ .team }}"
+        cool/app: "{{ .app }}"
+        cool/env: dev
+        cool/preview: "{{ .preview }}"
+    spec:
+      project: "{{ .team }}"
+      sources:
+        - repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+          targetRevision: "{{ .chart }}"
+          path: charts/cool-namespace
+          helm:
+            releaseName: "{{ .app }}-namespace"
+            valueFiles:
+              - "$values/teams/{{ .team }}/team.json"
+              - "$values/{{ .path.path }}/values.json"
+              - "$values/clusters/dev-eus2-appdev-aks-001/platform-values.json"
+        - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+          targetRevision: "{{ .chart }}"
+          path: charts/cool-app
+          helm:
+            releaseName: "{{ .app }}"
+            valueFiles:
+              - "$values/teams/{{ .team }}/team.json"
+              - "$values/{{ .path.path }}/values.json"
+              - "$values/clusters/dev-eus2-appdev-aks-001/platform-values.json"
+      destination:
+        name: dev-eus2-appdev-aks-001
+        namespace: "{{ .team }}-{{ .app }}-pr-{{ .preview }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 3
+          backoff: {duration: 10s, factor: 2, maxDuration: 1m}

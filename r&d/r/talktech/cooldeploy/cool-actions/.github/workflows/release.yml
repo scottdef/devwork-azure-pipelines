@@ -1,0 +1,38 @@
+# A tag v1.2.3 moves the major tag v1 to the same commit.
+#
+# App repositories call these workflows at @v1, and cool-api and Azure trust
+# jobs whose workflow reference ends in @refs/tags/v1. Moving v1 is therefore
+# a privileged act: the tag is protected by a ruleset, and only this job, in
+# an environment with required reviewers, may move it.
+name: release
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+permissions: {}
+jobs:
+  move-major:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 10
+    environment: cool-actions-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make check
+      - name: The bundled coolctl matches its checksums
+        run: |
+          set -euo pipefail
+          if ls bin/coolctl-linux-* >/dev/null 2>&1; then
+            (cd bin && sha256sum --check --quiet SHA256SUMS)
+          else
+            echo "No bundled coolctl: runners must carry it on their image."
+          fi
+      - name: Move the major tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          major=${TAG%%.*}
+          git tag --force "$major" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$major"
+          echo "Moved \`$major\` to \`$TAG\` (\`$GITHUB_SHA\`)." >> "$GITHUB_STEP_SUMMARY"

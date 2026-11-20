@@ -1,0 +1,11 @@
+{
+  "team": "sim",
+  "app": "appsim-flaky",
+  "preset": "dockerfile",
+  "expose": "internal",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {"min": 2, "max": 4, "cpu": 70},
+  "resources": {"cpu": "100m", "memory": "64Mi"},
+  "env": {"SIM_LATENCY_MS": "120", "SIM_ERROR_RATE": "0.05", "SIM_CPU_MS": "0"}
+}

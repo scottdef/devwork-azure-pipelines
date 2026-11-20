@@ -1,0 +1,30 @@
+# Rebuild the portal when it changes, when cool-gitops says something was
+# deployed, and every hour in case a notification was missed.
+name: pages
+on:
+  push:
+    branches: [main]
+  # cool-gitops sends this event from its own workflow after each commit.
+  repository_dispatch:
+    types: [cool-gitops-changed]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  pages:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-pages.yml@v1
+    with:
+      site: site
+    secrets:
+      app-private-key: ${{ secrets.COOL_READER_APP_PRIVATE_KEY }}

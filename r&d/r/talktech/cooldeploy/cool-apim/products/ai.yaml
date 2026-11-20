@@ -1,0 +1,5 @@
+# The AI gateway. Access is by app role on the caller's identity, not by key.
+name: ai
+displayName: CoolDeploy AI
+description: Chat completions from Microsoft Foundry, with a token budget per app.
+subscriptionRequired: false

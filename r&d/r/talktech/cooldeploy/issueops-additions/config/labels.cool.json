@@ -1,0 +1,11 @@
+[
+  {"name": "issueops:cool-app-create", "color": "0b6bcb", "description": "CoolDeploy: create an app"},
+  {"name": "issueops:cool-deploy-promote", "color": "0b6bcb", "description": "CoolDeploy: promote a release"},
+  {"name": "issueops:cool-deploy-rollback", "color": "b3261e", "description": "CoolDeploy: roll back"},
+  {"name": "issueops:cool-rolling-release", "color": "0b6bcb", "description": "CoolDeploy: rolling release"},
+  {"name": "issueops:cool-env-var", "color": "5b6b7a", "description": "CoolDeploy: environment variables"},
+  {"name": "issueops:cool-domain", "color": "5b6b7a", "description": "CoolDeploy: custom domain"},
+  {"name": "issueops:cool-addon", "color": "17794a", "description": "CoolDeploy: add-on"},
+  {"name": "issueops:cool-api-publish", "color": "17794a", "description": "CoolDeploy: publish an API"},
+  {"name": "issueops:cool-app-retire", "color": "b3261e", "description": "CoolDeploy: retire an app"}
+]

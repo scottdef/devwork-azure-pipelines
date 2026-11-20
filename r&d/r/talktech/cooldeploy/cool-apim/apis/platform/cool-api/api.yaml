@@ -1,0 +1,9 @@
+# cool-api's read routes, for the portal. Writes do not come this way: they
+# carry a GitHub OIDC token and reach cool-api from the runners directly.
+name: cool-api
+displayName: CoolDeploy API
+path: cool
+product: platform
+auth: entra-jwt
+backend: cool-api
+environments: [prd]

@@ -1,0 +1,58 @@
+name: "CoolDeploy: Publish an API"
+description: "Publish an app's OpenAPI description through API Management."
+title: "[cool-api-publish] "
+labels: ["issueops", "issueops:cool-api-publish"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Publish an app's OpenAPI description through API Management.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "The API Management instance to publish to."
+      options:
+        - "dev"
+        - "tst"
+        - "prd"
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: product
+    attributes:
+      label: "Product"
+      description: "The API Management product to put the API in."
+      placeholder: "payments"
+    validations:
+      required: true
+  - type: input
+    id: path
+    attributes:
+      label: "Path"
+      description: "Base path of the API. Leave empty for team/app."
+    validations:
+      required: false
+  - type: dropdown
+    id: auth
+    attributes:
+      label: "Auth"
+      description: "How callers prove who they are."
+      options:
+        - "entra-jwt"
+        - "subscription"
+        - "none"
+      default: 0
+    validations:
+      required: true

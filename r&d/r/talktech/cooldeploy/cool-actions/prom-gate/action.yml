@@ -1,0 +1,57 @@
+name: Error-budget gate
+description: >-
+  Ask Azure Monitor managed Prometheus whether a release is inside its error
+  budget. Fails the step when it is not, or when the release has had no
+  traffic to judge. Needs an Azure login with Monitoring Data Reader on the
+  Azure Monitor workspace.
+inputs:
+  endpoint:
+    description: Query endpoint of the Azure Monitor workspace.
+    required: true
+  namespace:
+    description: Namespace of the release, <team>-<app>.
+    required: true
+  workload:
+    description: Deployment of the release, <app>-<release>.
+    required: true
+  window:
+    description: PromQL range to judge.
+    default: 5m
+  max-error-rate:
+    description: Error budget as a fraction; 0.01 is one percent.
+    default: "0.01"
+  max-p95-ms:
+    description: Latency budget in milliseconds; 0 disables it.
+    default: "0"
+  settle:
+    description: Seconds to wait before asking, so that the window fills with traffic at the new weight.
+    default: "0"
+outputs:
+  verdict:
+    description: The gate's verdict as JSON.
+    value: ${{ steps.gate.outputs.verdict }}
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      env:
+        COOL_PROM_URL: ${{ inputs.endpoint }}
+        NAMESPACE: ${{ inputs.namespace }}
+        WORKLOAD: ${{ inputs.workload }}
+        WINDOW: ${{ inputs.window }}
+        MAX_ERROR_RATE: ${{ inputs.max-error-rate }}
+        MAX_P95_MS: ${{ inputs.max-p95-ms }}
+        SETTLE: ${{ inputs.settle }}
+      run: |
+        set -euo pipefail
+        sleep "$SETTLE"
+        COOL_PROM_TOKEN=$(az account get-access-token --resource https://prometheus.monitor.azure.com --query accessToken --output tsv)
+        echo "::add-mask::$COOL_PROM_TOKEN"
+        export COOL_PROM_TOKEN
+        status=0
+        coolctl gate -namespace "$NAMESPACE" -workload "$WORKLOAD" -window "$WINDOW" \
+          -max-error-rate "$MAX_ERROR_RATE" -max-p95-ms "$MAX_P95_MS" > "$RUNNER_TEMP/verdict.json" || status=$?
+        cat "$RUNNER_TEMP/verdict.json"
+        echo "verdict=$(jq -cM . "$RUNNER_TEMP/verdict.json")" >> "$GITHUB_OUTPUT"
+        exit "$status"

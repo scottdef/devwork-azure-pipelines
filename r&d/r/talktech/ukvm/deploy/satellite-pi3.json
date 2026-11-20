@@ -1,0 +1,41 @@
+{
+  "self": "pi3",
+  "settle_ms": 1500,
+  "policy": {
+    "targets": ["server1", "server2", "server3", "nas"],
+    "commands": {
+      "uptime": "auto",
+      "df -h": "auto",
+      "free -m": "auto",
+      "ip -br addr": "auto",
+      "systemctl --failed": "auto",
+      "journalctl -p err -n 30 --no-pager": "auto",
+      "sudo systemctl restart nginx": "confirm",
+      "sudo reboot": "confirm"
+    },
+    "chords": {
+      "ctrl+l": "auto",
+      "enter": "confirm",
+      "escape": "confirm",
+      "tab": "confirm",
+      "up": "confirm",
+      "down": "confirm",
+      "left": "confirm",
+      "right": "confirm",
+      "ctrl+c": "confirm",
+      "ctrl+alt+t": "confirm",
+      "alt+tab": "confirm",
+      "ctrl+alt+f2": "confirm",
+      "ctrl+alt+delete": "confirm",
+      "delete": "confirm",
+      "f2": "confirm",
+      "f12": "confirm"
+    }
+  },
+  "nodes": [
+    {"name": "pi3", "tier": "self", "caps": ["ocr", "pdf", "hands:server3", "eyes:server3"]}
+  ],
+  "tethers": {
+    "server3": {"hands": "ch9329:/dev/ukvm/hands-server3", "eyes": "v4l2:/dev/ukvm/eyes-server3"}
+  }
+}

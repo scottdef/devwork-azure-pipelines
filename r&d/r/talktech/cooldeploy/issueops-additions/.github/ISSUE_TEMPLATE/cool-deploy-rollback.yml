@@ -1,0 +1,38 @@
+name: "CoolDeploy: Roll back"
+description: "Swap the live release with the standby. Rolling back twice returns to where you were."
+title: "[cool-deploy-rollback] "
+labels: ["issueops", "issueops:cool-deploy-rollback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Swap the live release with the standby. Rolling back twice returns to where you were.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "The environment to roll back."
+      options:
+        - "prd"
+        - "tst"
+        - "dev"
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Reason"
+      description: "What went wrong. It is recorded in the commit."
+    validations:
+      required: true

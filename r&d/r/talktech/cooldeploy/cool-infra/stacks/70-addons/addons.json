@@ -1,0 +1,4 @@
+[
+  {"team": "payments", "app": "checkout", "environment": "dev", "addon": "redis", "size": "small"},
+  {"team": "payments", "app": "checkout", "environment": "dev", "addon": "ai", "size": "small"}
+]

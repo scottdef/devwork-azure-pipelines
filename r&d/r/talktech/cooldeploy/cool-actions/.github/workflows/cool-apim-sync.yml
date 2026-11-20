@@ -1,0 +1,82 @@
+# Bring one API Management instance in line with cool-apim.
+#
+#   pull request   show what would change (the scripts' dry run)
+#   main           apply, after the environment's reviewers approve
+#
+# API Management v2 is managed with bash and the Azure CLI from YAML
+# configuration and OpenAPI files. No Terraform.
+name: cool-apim-sync
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: sbx, dev, tst or prd.
+        type: string
+        required: true
+      apply:
+        description: Apply the changes. Without it the run only reports.
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  diff:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      COOL_ENV: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the configuration
+        run: |
+          set -euo pipefail
+          make check
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        with:
+          client-id: ${{ vars.COOL_APIM_READ_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      - name: What would change
+        run: |
+          set -euo pipefail
+          scripts/apim-sync.sh --env "$COOL_ENV" --dry-run | tee "$RUNNER_TEMP/plan.txt"
+          {
+            echo "### API Management plan for \`$COOL_ENV\`"
+            echo '```'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    needs: diff
+    if: inputs.apply
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 60
+    environment: cool-apim-${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: cool-apim-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      COOL_ENV: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/azure-login@v1
+        with:
+          client-id: ${{ vars.COOL_APIM_WRITE_CLIENT_ID }}
+          tenant-id: ${{ vars.COOL_TENANT_ID }}
+          subscription-id: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      - name: Apply
+        run: |
+          set -euo pipefail
+          scripts/apim-sync.sh --env "$COOL_ENV"

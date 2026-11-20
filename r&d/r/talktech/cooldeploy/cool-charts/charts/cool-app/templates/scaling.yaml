@@ -1,0 +1,37 @@
+{{- /*
+Autoscaling and disruption budgets, for releases that take traffic.
+A preview and a standby have a fixed replica count instead.
+*/ -}}
+{{- if eq (int .Values.preview) 0 }}
+{{- range $r := .Values.releases }}
+{{- if gt (int $r.weight) 0 }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $.Values.app }}-{{ $r.id }}
+  labels: {{ include "cool-app.releaseLabels" (dict "root" $ "release" $r) }}
+spec:
+  scaleTargetRef: {"apiVersion": "apps/v1", "kind": "Deployment", "name": {{ printf "%s-%s" $.Values.app $r.id | quote }}}
+  minReplicas: {{ int $.Values.scale.min }}
+  maxReplicas: {{ int $.Values.scale.max }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {"type": "Utilization", "averageUtilization": {{ int $.Values.scale.cpu }}}
+{{- if gt (int $.Values.scale.min) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Values.app }}-{{ $r.id }}
+  labels: {{ include "cool-app.releaseLabels" (dict "root" $ "release" $r) }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {{ include "cool-app.selector" (dict "root" $ "release" $r) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

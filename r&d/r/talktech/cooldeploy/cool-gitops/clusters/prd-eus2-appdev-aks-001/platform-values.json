@@ -1,0 +1,42 @@
+{
+  "platform": {
+    "cluster": "prd-eus2-appdev-aks-001",
+    "environment": "prd",
+    "registry": "prdeus2coolopsacr001.azurecr.io",
+    "domain": "coolapps.example",
+    "namePrefix": "prd-eus2",
+    "tenantId": "00000000-0000-0000-0000-000000000000",
+    "standbyReplicas": 1,
+    "cronImage": "prdeus2coolopsacr001.azurecr.io/platform/coolctl:1",
+    "podSecurity": "privileged",
+    "extraHosts": ["pay.coolshop.example"],
+    "extraRegistries": ["mcr.microsoft.com/"],
+    "monitoringNamespaces": ["kube-system"],
+    "mesh": {
+      "enabled": true,
+      "revision": "asm-1-30",
+      "rootNamespace": "aks-istio-system",
+      "ingressNamespace": "aks-istio-ingress",
+      "internalSelector": "aks-istio-ingressgateway-internal",
+      "externalSelector": "aks-istio-ingressgateway-external",
+      "internalGateway": "cool-system/cool-internal",
+      "externalGateway": "cool-system/cool-external"
+    },
+    "secrets": {"provider": "keyvault"},
+    "tls": {
+      "enabled": true,
+      "secretName": "cool-wildcard-tls",
+      "keyVault": "prd-eus2-coolops-kv-001",
+      "certificate": "wildcard-prd-coolapps",
+      "identity": "00000000-0000-0000-0000-000000000000",
+      "syncImage": "mcr.microsoft.com/oss/kubernetes/pause:3.10"
+    },
+    "metrics": {"manageSettings": true, "clusterAlias": "prd-eus2-appdev-aks-001", "namespaceRegex": ".*"},
+    "quotas": {
+      "preview": {"cpu": "1", "memory": "2Gi", "pods": 6},
+      "small": {"cpu": "4", "memory": "8Gi", "pods": 20},
+      "medium": {"cpu": "8", "memory": "16Gi", "pods": 40},
+      "large": {"cpu": "16", "memory": "32Gi", "pods": 80}
+    }
+  }
+}

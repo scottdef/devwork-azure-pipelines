@@ -1,0 +1,20 @@
+# /etc/udev/rules.d/90-ukvm-tethers.rules
+#
+# Name each tether by the physical USB port it is plugged into, so that
+# "server1" always means the same pair of cables no matter what order the
+# kernel enumerates them in. Label the ports to match.
+#
+# Find the port path of a device with:
+#   udevadm info -a /dev/ttyUSB0 | grep -m1 'KERNELS=="[0-9]'
+#   udevadm info -a /dev/video0  | grep -m1 'KERNELS=="[0-9]'
+# then replace the KERNELS values below. Reload with:
+#   udevadm control --reload && udevadm trigger
+
+# Hands: CH9329 cables (their serial end is a CH340 USB UART).
+SUBSYSTEM=="tty", KERNELS=="1-1.1", SYMLINK+="ukvm/hands-server1", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", KERNELS=="1-1.2", SYMLINK+="ukvm/hands-server2", GROUP="dialout", MODE="0660"
+
+# Eyes: UVC HDMI capture dongles. A UVC device exposes two video nodes;
+# index 0 is the one that carries frames.
+SUBSYSTEM=="video4linux", ATTR{index}=="0", KERNELS=="2-1", SYMLINK+="ukvm/eyes-server1", GROUP="video", MODE="0660"
+SUBSYSTEM=="video4linux", ATTR{index}=="0", KERNELS=="2-2", SYMLINK+="ukvm/eyes-server2", GROUP="video", MODE="0660"

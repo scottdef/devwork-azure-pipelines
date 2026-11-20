@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cool-app values",
+  "type": "object",
+  "required": ["team", "app", "environment", "port", "health", "scale", "resources", "releases", "platform"],
+  "properties": {
+    "team": {"type": "string", "pattern": "^[a-z][a-z0-9]{1,7}$"},
+    "app": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,18}[a-z0-9]$"},
+    "environment": {"enum": ["sbx", "dev", "tst", "prd"]},
+    "chart": {"type": "string"},
+    "preview": {"type": "integer", "minimum": 0},
+    "group": {"type": "string"},
+    "identity": {"type": "string"},
+    "expose": {"enum": ["internal", "public"]},
+    "port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+    "health": {"type": "string", "pattern": "^/"},
+    "scale": {
+      "type": "object",
+      "required": ["min", "max", "cpu"],
+      "properties": {
+        "min": {"type": "integer", "minimum": 1},
+        "max": {"type": "integer", "minimum": 1},
+        "cpu": {"type": "integer", "minimum": 10, "maximum": 95}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {"type": "string", "pattern": "^[1-9][0-9]{1,4}m$"},
+        "memory": {"type": "string", "pattern": "^[1-9][0-9]{1,4}(Mi|Gi)$"}
+      }
+    },
+    "env": {"type": "object", "additionalProperties": {"type": "string"}},
+    "overrides": {"type": "object", "additionalProperties": {"type": "string"}},
+    "secrets": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$"}},
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "prefix": {"type": "string", "pattern": "^/"},
+          "timeout": {"type": "string", "pattern": "^[0-9]+(ms|s|m)$"},
+          "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+          "redirect": {
+            "type": "object",
+            "required": ["from", "to", "code"],
+            "properties": {
+              "from": {"type": "string", "pattern": "^/"},
+              "to": {"type": "string", "pattern": "^/"},
+              "code": {"enum": [301, 302, 307, 308]}
+            }
+          }
+        }
+      }
+    },
+    "crons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "schedule"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^/"},
+          "schedule": {"type": "string"}
+        }
+      }
+    },
+    "flags": {"type": "object"},
+    "domains": {"type": "array", "items": {"type": "string"}},
+    "releases": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "digest", "weight"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^r[0-9a-f]{7}$"},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "weight": {"type": "integer", "minimum": 0, "maximum": 100},
+          "standby": {"type": "boolean"},
+          "sha": {"type": "string"},
+          "at": {"type": "string"}
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "required": ["registry", "domain", "namePrefix", "mesh", "secrets"],
+      "properties": {
+        "registry": {"type": "string", "minLength": 1},
+        "domain": {"type": "string", "minLength": 1},
+        "namePrefix": {"type": "string", "pattern": "^(sbx|dev|tst|prd)-[a-z0-9]+$"},
+        "tenantId": {"type": "string"},
+        "standbyReplicas": {"type": "integer", "minimum": 0},
+        "cronImage": {"type": "string"},
+        "mesh": {
+          "type": "object",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "internalGateway": {"type": "string"},
+            "externalGateway": {"type": "string"}
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "required": ["provider"],
+          "properties": {"provider": {"enum": ["none", "keyvault"]}}
+        }
+      }
+    }
+  }
+}

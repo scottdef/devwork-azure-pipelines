@@ -1,0 +1,141 @@
+{
+  "team": "payments",
+  "app": "checkout",
+  "environment": "dev",
+  "chart": "cool-app-1.0.0",
+  "preview": 42,
+  "group": "11111111-2222-4333-8444-555555555555",
+  "identity": "aaaaaaaa-0000-4000-8000-00000000d0e1",
+  "expose": "public",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {
+    "min": 1,
+    "max": 2,
+    "cpu": 70
+  },
+  "resources": {
+    "cpu": "250m",
+    "memory": "256Mi"
+  },
+  "env": {
+    "CURRENCY": "USD",
+    "LOG_LEVEL": "debug"
+  },
+  "secrets": [
+    "CRON_SECRET"
+  ],
+  "routes": [
+    {
+      "prefix": "/api/",
+      "timeout": "10s"
+    },
+    {
+      "prefix": "/static/",
+      "headers": {
+        "Cache-Control": "public, max-age=3600"
+      }
+    },
+    {
+      "redirect": {
+        "from": "/cart",
+        "to": "/",
+        "code": 308
+      }
+    }
+  ],
+  "crons": [
+    {
+      "path": "/internal/cron/expire-orders",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "flags": {
+    "express-checkout": false
+  },
+  "releases": [
+    {
+      "id": "rddddddd",
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "weight": 100,
+      "sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "at": "2026-11-12T08:38:38Z"
+    }
+  ],
+  "manifest": {
+    "team": "payments",
+    "app": "checkout",
+    "preset": "go-htmx",
+    "expose": "public",
+    "port": 8080,
+    "health": "/healthz",
+    "scale": {
+      "min": 2,
+      "max": 6,
+      "cpu": 70
+    },
+    "resources": {
+      "cpu": "250m",
+      "memory": "256Mi"
+    },
+    "env": {
+      "CURRENCY": "USD",
+      "LOG_LEVEL": "info"
+    },
+    "secrets": [
+      "CRON_SECRET"
+    ],
+    "routes": [
+      {
+        "prefix": "/api/",
+        "timeout": "10s"
+      },
+      {
+        "prefix": "/static/",
+        "headers": {
+          "Cache-Control": "public, max-age=3600"
+        }
+      },
+      {
+        "redirect": {
+          "from": "/cart",
+          "to": "/",
+          "code": 308
+        }
+      }
+    ],
+    "crons": [
+      {
+        "path": "/internal/cron/expire-orders",
+        "schedule": "*/15 * * * *"
+      }
+    ],
+    "flags": {
+      "express-checkout": false
+    },
+    "api": {
+      "openapi": "openapi.yaml",
+      "product": "payments",
+      "auth": "entra-jwt"
+    },
+    "environments": {
+      "dev": {
+        "scale": {
+          "min": 1,
+          "max": 2,
+          "cpu": 70
+        },
+        "env": {
+          "LOG_LEVEL": "debug"
+        }
+      },
+      "prd": {
+        "scale": {
+          "min": 3,
+          "max": 10,
+          "cpu": 60
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# The API Management instance of the sbx environment.
+# scripts/apim-instance.sh creates it; the other scripts configure it.
+name: sbx-eus2-coolapi-apim-001
+resourceGroup: sbx-eus2-coolapi-rg-001
+location: eastus2
+environment: sbx
+sku: BasicV2
+capacity: 1
+publisherName: CoolEngOrg Platform
+publisherEmail: platform@coolengorg.example
+
+# Hosts of apps in this environment are <app>.sbx.coolapps.example.
+backendDomain: sbx.coolapps.example
+
+# Key Vault that named values marked keyVaultSecret are read from, with the
+# instance's own identity.
+keyVault: sbx-eus2-coolops-kv-001
+
+# Basic v2 has no VNet integration: the sandbox instance reaches its cluster
+# through the sandbox gateway's private endpoint, or stays a control-plane rehearsal.
+vnet:
+  outboundSubnetId: ""
+
+# This instance's values for the named values in global/named-values.yaml.
+namedValues:
+  cool-tenant-id: 00000000-0000-0000-0000-000000000000
+  cool-api-audience: api://00000000-0000-0000-0000-000000000000/cool-sbx
+  cool-portal-origin: https://coolengorg.github.io
+  cool-ai-tpm-small: "20000"
+  cool-ai-tpm-medium: "60000"
+  cool-ai-tpm-large: "200000"
+
+# This instance's URLs for the backends in global/backends.yaml.
+backends:
+  cool-api: http://cool-api.prd.coolops.example
+  cool-foundry: https://sbx-eus2-coolai-fdry-001.cognitiveservices.azure.com/openai

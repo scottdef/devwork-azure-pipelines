@@ -1,0 +1,54 @@
+{{- /*
+Who may talk to the app. Two layers say the same thing: a NetworkPolicy at
+the packet level, and with the mesh an AuthorizationPolicy at the identity
+level. Callers are the namespace itself and the ingress gateways. Other
+namespaces, including the same team's other apps, come in through the
+gateway like everyone else.
+
+The monitoring namespaces may reach pods so that managed Prometheus can
+scrape them. With the mesh it scrapes the sidecar's merged-metrics port,
+which is outside mutual TLS by design.
+*/ -}}
+{{- $allowed := list .Release.Namespace -}}
+{{- if .Values.platform.mesh.enabled -}}
+{{- $allowed = list .Release.Namespace .Values.platform.mesh.ingressNamespace -}}
+{{- end -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cool-ingress
+  namespace: {{ .Release.Namespace }}
+  labels: {"cool/team": {{ .Values.team | quote }}}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: {}
+        {{- if .Values.platform.mesh.enabled }}
+        - namespaceSelector: {"matchLabels": {"kubernetes.io/metadata.name": {{ .Values.platform.mesh.ingressNamespace | quote }}}}
+        {{- end }}
+        {{- range .Values.platform.monitoringNamespaces }}
+        - namespaceSelector: {"matchLabels": {"kubernetes.io/metadata.name": {{ . | quote }}}}
+        {{- end }}
+{{- if .Values.platform.mesh.enabled }}
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: {{ .Release.Namespace }}
+spec:
+  mtls: {"mode": "STRICT"}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: cool-callers
+  namespace: {{ .Release.Namespace }}
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source: {"namespaces": {{ toJson $allowed }}}
+{{- end }}

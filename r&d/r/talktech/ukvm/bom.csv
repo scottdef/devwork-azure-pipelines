@@ -1,0 +1,21 @@
+phase,item,qty,unit_usd,basis,purpose
+1,Raspberry Pi 5 (4 GB),1,110.00,list price Oct 2026,Chief of staff: intake + gate + broker + ledger
+1,Raspberry Pi 27 W USB-C power supply,1,12.95,PiShop Oct 2026,Power for the Pi 5
+1,Raspberry Pi 5 case with fan,1,10.95,PiShop Oct 2026,Cooling and protection
+1,microSD card 64 GB A2,2,12.00,estimate,OS for the Pi 5 and a fresh OS for the Pi 3 B+
+1,USB 3.0 HDMI capture dongle (UVC; MS2130 class),2,20.00,estimate,Eyes for the two targets tethered to the Pi 5
+1,CH9329 USB-to-USB HID cable,4,12.00,estimate,Hands: one hardware keyboard+mouse per target
+1,HDMI cable 0.5-1 m,4,5.00,estimate,Target display output to capture dongle
+1,USB speakerphone with echo cancellation and mute button,1,45.00,estimate,Ears and voice; mute button is push-to-talk
+1,Powered USB 3.0 hub (7 port),1,30.00,estimate,Tethers + speakerphone + uplink NIC on the Pi 5
+2,USB 2.0 HDMI capture dongle (UVC; MS2109 class),2,12.00,estimate,Eyes for targets tethered to the USB 2.0 satellites
+2,USB 3.0 Gigabit Ethernet adapter,1,15.00,estimate,Pi 5 uplink so the staff LAN stays isolated
+2,Cat6 patch cables (5 pack),1,12.00,estimate,Staff LAN on the existing 5-port switch
+2,60 W 6-port USB charger with short cables,1,30.00,estimate,One power brick for the Pi 3 B+ / Coral / Pico / Screen Crab
+2,Latching arm switch with LED and jumper wires,1,10.00,estimate,Physical arm / kill switch
+2,microSD card 64 GB (Screen Crab),1,10.00,estimate,Independent console recording
+2,Mounting board + standoffs + velcro + port labels,1,20.00,estimate,One tidy carryable unit
+3,Raspberry Pi Zero 2 W,1,15.00,list price Oct 2026,Optional pod: USB keyboard + pointer + virtual installer drive
+3,microSD card 32 GB + micro-USB data cable (pod),1,13.00,estimate,Pod storage and target link
+3,5-inch touch display for the Pi 5 (fallback),1,40.00,estimate,Only if the Pico kit's LCD will not come up under Linux
+3,USB-C hub with Ethernet (Coral Dev Board Mini only),1,15.00,estimate,Only if your Coral is the Mini (no Ethernet jack; one data port)

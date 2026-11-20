@@ -1,0 +1,22 @@
+name: Azure login
+description: >-
+  Sign in to Azure with the job's GitHub OIDC token. No secret is involved:
+  the managed identity trusts jobs by the workflow that defines them.
+inputs:
+  client-id:
+    description: Client ID of the managed identity to sign in as.
+    required: true
+  tenant-id:
+    description: Entra ID tenant.
+    required: true
+  subscription-id:
+    description: Azure subscription.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}

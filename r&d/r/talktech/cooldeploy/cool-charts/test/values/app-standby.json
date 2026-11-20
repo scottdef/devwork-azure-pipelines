@@ -1,0 +1,10 @@
+{
+  "team": "sim", "app": "appsim-steady", "environment": "sbx", "chart": "cool-app-1.0.0",
+  "expose": "internal", "port": 8080, "health": "/healthz",
+  "scale": {"min": 2, "max": 4, "cpu": 70},
+  "resources": {"cpu": "100m", "memory": "64Mi"},
+  "releases": [
+    {"id": "rbbbbbbb", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "weight": 100},
+    {"id": "raaaaaaa", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "weight": 0, "standby": true}
+  ]
+}

@@ -1,0 +1,31 @@
+name: Wait until healthy
+description: >-
+  Wait until Argo CD reports that an app's release is synced and healthy in
+  an environment. Fails when the time runs out or the sync fails.
+inputs:
+  api-url:
+    description: Base URL of cool-api.
+    required: true
+  app:
+    description: team/app.
+    required: true
+  environment:
+    description: dev, tst, prd or sbx.
+    required: true
+  release:
+    description: The release that must be the active one. Empty accepts any.
+    default: ""
+  timeout:
+    description: How long to wait, as a Go duration.
+    default: 10m
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        COOL_API_URL: ${{ inputs.api-url }}
+        APP: ${{ inputs.app }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        RELEASE: ${{ inputs.release }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: coolctl wait -app "$APP" -env "$ENVIRONMENT" -release "$RELEASE" -timeout "$TIMEOUT"

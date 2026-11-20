@@ -1,0 +1,8 @@
+# Rendered by coolctl for the static preset: your files plus the platform's
+# file server. There is nothing to build.
+FROM [[.Registry]]/platform/cool-static:1
+COPY --chown=65532:65532 . /site
+USER 65532:65532
+ENV PORT=[[.Port]] COOL_STATIC_DIR=/site
+EXPOSE [[.Port]]
+ENTRYPOINT ["/cool-static"]

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: yaml2json
+description: Prints its values as JSON. The fallback YAML reader of cool-apim's scripts on machines with Helm and no yq.
+version: 1.0.0

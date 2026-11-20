@@ -1,0 +1,27 @@
+# Defaults of the cool-namespace chart. README.md documents every key.
+#
+# YAML in JSON syntax, like every values file on the platform: Helm and
+# Argo CD read it as YAML, the Go tools read it as JSON.
+{
+  "team": "",
+  "app": "",
+  "environment": "dev",
+  "preview": 0,
+  "group": "",
+  "quota": "small",
+  "platform": {
+    "podSecurity": "privileged",
+    "mesh": {
+      "enabled": true,
+      "revision": "asm-1-30",
+      "ingressNamespace": "aks-istio-ingress"
+    },
+    "monitoringNamespaces": ["kube-system"],
+    "quotas": {
+      "preview": {"cpu": "1", "memory": "2Gi", "pods": 6},
+      "small": {"cpu": "4", "memory": "8Gi", "pods": 20},
+      "medium": {"cpu": "8", "memory": "16Gi", "pods": 40},
+      "large": {"cpu": "16", "memory": "32Gi", "pods": 80}
+    }
+  }
+}

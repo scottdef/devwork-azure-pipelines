@@ -1,0 +1,160 @@
+{{- /*
+cool-api: the only identity that writes to cool-gitops.
+
+It holds one secret, the private key of the CoolDeploy GitHub App, read from
+Key Vault with the pod's workload identity. Callers bring no secret at all:
+they prove who they are with a GitHub Actions OIDC token.
+
+Two replicas are safe. Each write names the revision it read, GitHub refuses
+a stale one, and the caller retries.
+*/ -}}
+{{- $labels := dict "app.kubernetes.io/name" "cool-api" "app.kubernetes.io/managed-by" "cooldeploy" -}}
+{{- $pod := dict "app.kubernetes.io/name" "cool-api" "azure.workload.identity/use" "true" -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cool-api
+  labels: {{ toJson $labels }}
+  annotations:
+    azure.workload.identity/client-id: {{ required "identity is required: the client ID of cool-api's managed identity" .Values.identity | quote }}
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: cool-api
+  labels: {{ toJson $labels }}
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    clientID: {{ .Values.identity | quote }}
+    keyvaultName: {{ required "keyVault is required" .Values.keyVault | quote }}
+    tenantId: {{ .Values.tenantId | quote }}
+    objects: |
+      array:
+        - |
+          objectName: {{ .Values.github.keySecret }}
+          objectType: secret
+          objectAlias: github-app.pem
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cool-api
+  labels: {{ toJson $labels }}
+spec:
+  replicas: {{ int .Values.replicas }}
+  selector:
+    matchLabels: {"app.kubernetes.io/name": "cool-api"}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {"maxSurge": 1, "maxUnavailable": 0}
+  template:
+    metadata:
+      labels: {{ toJson $pod }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cool-api
+      automountServiceAccountToken: {{ .Values.argo.enabled }}
+      securityContext: {"runAsNonRoot": true, "runAsUser": 65532, "runAsGroup": 65532, "fsGroup": 65532, "seccompProfile": {"type": "RuntimeDefault"}}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {"app.kubernetes.io/name": "cool-api"}
+      containers:
+        - name: cool-api
+          image: {{ .Values.image | quote }}
+          ports:
+            - {"name": "http", "containerPort": 8080}
+          env:
+            - {"name": "COOL_ADDR", "value": ":8080"}
+            - {"name": "COOL_STORE", "value": {{ printf "github:%s@%s" .Values.github.repo .Values.github.branch | quote }}}
+            - {"name": "COOL_GH_CLIENT_ID", "value": {{ required "github.clientId is required" .Values.github.clientId | quote }}}
+            - {"name": "COOL_GH_INSTALLATION", "value": {{ required "github.installation is required" .Values.github.installation | toString | quote }}}
+            - {"name": "COOL_GH_KEY_FILE", "value": "/mnt/secrets/github-app.pem"}
+            - {"name": "COOL_OIDC_ISSUER", "value": {{ .Values.oidc.issuer | quote }}}
+            - {"name": "COOL_OIDC_AUDIENCE", "value": {{ .Values.oidc.audience | quote }}}
+            - {"name": "COOL_ACTIONS_REPO", "value": {{ .Values.oidc.actionsRepo | quote }}}
+            - {"name": "COOL_ACTIONS_REF", "value": {{ .Values.oidc.actionsRef | quote }}}
+            - {"name": "COOL_ISSUEOPS_REPO", "value": {{ .Values.oidc.issueopsRepo | quote }}}
+            - {"name": "COOL_ISSUEOPS_REF", "value": {{ .Values.oidc.issueopsRef | quote }}}
+            - {"name": "COOL_ARGO", "value": {{ ternary "incluster" "none" .Values.argo.enabled | quote }}}
+            - {"name": "COOL_DOMAIN", "value": {{ .Values.domain | quote }}}
+            - {"name": "COOL_CHART", "value": {{ .Values.chart | quote }}}
+            - {"name": "COOL_PORTAL_ORIGIN", "value": {{ .Values.portalOrigin | quote }}}
+          startupProbe:
+            httpGet: {"path": "/healthz", "port": "http"}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {"path": "/healthz", "port": "http"}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {"path": "/healthz", "port": "http"}
+            periodSeconds: 10
+          resources:
+            requests: {"cpu": {{ .Values.resources.cpu | quote }}, "memory": {{ .Values.resources.memory | quote }}}
+            limits: {"memory": {{ .Values.resources.memory | quote }}}
+          securityContext: {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}}
+          volumeMounts:
+            - {"name": "secrets", "mountPath": "/mnt/secrets", "readOnly": true}
+            - {"name": "tmp", "mountPath": "/tmp"}
+      volumes:
+        - {"name": "tmp", "emptyDir": {"sizeLimit": "16Mi"}}
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: {"secretProviderClass": "cool-api"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cool-api
+  labels: {{ toJson $labels }}
+  {{- if .Values.internalLoadBalancer }}
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  {{- end }}
+spec:
+  type: {{ ternary "LoadBalancer" "ClusterIP" .Values.internalLoadBalancer }}
+  selector: {"app.kubernetes.io/name": "cool-api"}
+  ports:
+    - {"name": "http", "port": 80, "targetPort": "http", "protocol": "TCP"}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cool-api
+  labels: {{ toJson $labels }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {"app.kubernetes.io/name": "cool-api"}
+{{- if .Values.argo.enabled }}
+---
+{{- /* cool-api reads the health of Applications and may ask for a refresh. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cool-api
+  namespace: {{ .Values.argo.namespace }}
+  labels: {{ toJson $labels }}
+rules:
+  - {"apiGroups": ["argoproj.io"], "resources": ["applications"], "verbs": ["get", "list", "patch"]}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cool-api
+  namespace: {{ .Values.argo.namespace }}
+  labels: {{ toJson $labels }}
+roleRef: {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "cool-api"}
+subjects:
+  - {"kind": "ServiceAccount", "name": "cool-api", "namespace": {{ .Release.Namespace | quote }}}
+{{- end }}

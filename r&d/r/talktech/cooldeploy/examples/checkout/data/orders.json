@@ -1,0 +1,41 @@
+[
+  {
+    "id": "ord_a1b2c3d4e5f6", "email": "ada@example.com", "status": "paid", "created": "2026-11-02T09:12:00Z",
+    "items": [
+      {"sku": "CB-1001", "name": "Cool Beans Coffee", "qty": 2, "unit_cents": 1450},
+      {"sku": "CM-2001", "name": "Chill Pill Mints", "qty": 1, "unit_cents": 395}
+    ],
+    "total_cents": 3295
+  },
+  {
+    "id": "ord_b2c3d4e5f6a1", "email": "grace@example.com", "status": "paid", "created": "2026-11-02T14:40:00Z",
+    "items": [
+      {"sku": "IP-3001", "name": "Ice Pack Backpack", "qty": 1, "unit_cents": 7900},
+      {"sku": "IP-3002", "name": "Frost Line Water Bottle", "qty": 1, "unit_cents": 2800}
+    ],
+    "total_cents": 10700
+  },
+  {
+    "id": "ord_c3d4e5f6a1b2", "email": "linus@example.com", "status": "expired", "created": "2026-11-03T08:05:00Z",
+    "items": [
+      {"sku": "DK-5003", "name": "Aurora Desk Lamp", "qty": 1, "unit_cents": 5400}
+    ],
+    "total_cents": 5400
+  },
+  {
+    "id": "ord_d4e5f6a1b2c3", "email": "margaret@example.com", "status": "pending", "created": "2026-11-03T16:30:00Z",
+    "items": [
+      {"sku": "SN-4002", "name": "Polar Fleece Hoodie", "qty": 1, "unit_cents": 6400},
+      {"sku": "SN-4003", "name": "Cool Runnings Socks", "qty": 2, "unit_cents": 1600}
+    ],
+    "total_cents": 9600
+  },
+  {
+    "id": "ord_e5f6a1b2c3d4", "email": "dennis@example.com", "status": "pending", "created": "2026-11-04T07:55:00Z",
+    "items": [
+      {"sku": "DK-5001", "name": "Breeze Desk Fan", "qty": 1, "unit_cents": 3200},
+      {"sku": "DK-5002", "name": "Permafrost Mouse Mat", "qty": 1, "unit_cents": 1900}
+    ],
+    "total_cents": 5100
+  }
+]

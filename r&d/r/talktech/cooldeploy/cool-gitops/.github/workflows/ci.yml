@@ -1,0 +1,44 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  check:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: CoolEngOrg/cool-charts
+          path: .charts
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+
+      # apps/ belongs to cool-api. A pull request may not change it, with one
+      # exception: the simulator apps, which the platform team uses to try a
+      # new chart version.
+      - name: Refuse hand edits under apps/
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only "$BASE"...HEAD -- apps/ | grep -v '^apps/sim/' || true)
+          if [ -n "$changed" ]; then
+            echo "::error::apps/ is written by cool-api only. Open a request in CoolEngOrg/issueops instead."
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Check the repository
+        run: CHARTS=.charts test/check.sh

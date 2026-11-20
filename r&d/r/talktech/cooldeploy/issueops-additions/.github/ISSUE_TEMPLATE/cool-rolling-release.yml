@@ -1,0 +1,72 @@
+name: "CoolDeploy: Rolling release"
+description: "Move traffic to a new release in stages, checking its error budget between stages."
+title: "[cool-rolling-release] "
+labels: ["issueops", "issueops:cool-rolling-release"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Move traffic to a new release in stages, checking its error budget between stages.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: dropdown
+    id: from
+    attributes:
+      label: "From"
+      description: "The environment the new release is live in."
+      options:
+        - "tst"
+        - "dev"
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "The environment to roll the release out in."
+      options:
+        - "prd"
+        - "tst"
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: stages
+    attributes:
+      label: "Stages"
+      description: "Percent of traffic at each stage, ending in 100."
+      placeholder: "10, 50, 100"
+    validations:
+      required: true
+  - type: input
+    id: settle
+    attributes:
+      label: "Settle"
+      description: "Minutes to wait at each stage before judging it."
+      placeholder: "5"
+    validations:
+      required: true
+  - type: input
+    id: error_budget
+    attributes:
+      label: "Error budget"
+      description: "Largest share of failed requests the new release may have, in percent."
+      placeholder: "1"
+    validations:
+      required: true
+  - type: input
+    id: release
+    attributes:
+      label: "Release"
+      description: "Leave empty for the live release of the source environment."
+    validations:
+      required: false

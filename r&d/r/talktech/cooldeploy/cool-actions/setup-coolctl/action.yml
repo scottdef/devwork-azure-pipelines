@@ -1,0 +1,36 @@
+name: Set up coolctl
+description: >-
+  Put coolctl on the PATH. Uses the one on the runner image if there is one;
+  otherwise the binary bundled in this repository, after checking its checksum.
+outputs:
+  version:
+    description: What `coolctl version` printed.
+    value: ${{ steps.setup.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: setup
+      shell: bash
+      env:
+        BUNDLE: ${{ github.action_path }}/../bin
+      run: |
+        set -euo pipefail
+        if ! command -v coolctl >/dev/null; then
+          case "$(uname -m)" in
+            x86_64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "::error::setup-coolctl: no coolctl for $(uname -m)"; exit 1 ;;
+          esac
+          bin="$BUNDLE/coolctl-linux-$arch"
+          if [ ! -f "$bin" ]; then
+            echo "::error::setup-coolctl: coolctl is neither on the runner nor bundled at bin/coolctl-linux-$arch. Add it to the runner image, or run 'make bundle' in cool-actions before tagging."
+            exit 1
+          fi
+          (cd "$BUNDLE" && sha256sum --check --quiet --ignore-missing SHA256SUMS)
+          mkdir -p "$RUNNER_TEMP/coolctl"
+          install -m 0755 "$bin" "$RUNNER_TEMP/coolctl/coolctl"
+          echo "$RUNNER_TEMP/coolctl" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/coolctl:$PATH"
+        fi
+        echo "version=$(coolctl version)" >> "$GITHUB_OUTPUT"
+        coolctl version

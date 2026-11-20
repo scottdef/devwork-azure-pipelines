@@ -1,0 +1,36 @@
+[Unit]
+Description=Chief of staff: voice and vision universal KVM orchestrator
+Documentation=file:///usr/local/share/doc/cos/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cos
+Group=cos
+# dialout: CH9329 serial tethers.  video: HDMI capture devices.
+SupplementaryGroups=dialout video
+# /etc/cos/env holds COS_TOKEN=... (mode 0600, at least 24 characters).
+EnvironmentFile=/etc/cos/env
+# API on the staff LAN only; front panel on loopback for the local kiosk.
+ExecStart=/usr/local/bin/cos serve -config /etc/cos/cos.json \
+    -listen 10.77.0.1:8088 -panel 127.0.0.1:8089 \
+    -state /var/lib/cos -armed-file /run/cos/armed
+Restart=on-failure
+RestartSec=2
+
+StateDirectory=cos
+# /run/cos disappears when the service stops, so a restart always comes back
+# disarmed: the arm file has to be put there again on purpose.
+RuntimeDirectory=cos
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=-/srv/cos/documents
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,69 @@
+# Deploy a built image to dev and wait until it is healthy.
+#
+# The job does not touch a cluster or the GitOps repository. It tells
+# cool-api the digest; cool-api checks the job's OIDC token, commits, and
+# Argo CD does the rest. Later environments are IssueOps requests.
+name: cool-deploy
+on:
+  workflow_call:
+    inputs:
+      digest:
+        type: string
+        required: true
+      context:
+        type: string
+        default: "."
+      timeout:
+        description: How long to wait for Argo CD to report the release healthy.
+        type: string
+        default: 10m
+    outputs:
+      url:
+        value: ${{ jobs.deploy.outputs.url }}
+      release:
+        value: ${{ jobs.deploy.outputs.release }}
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 20
+    # One deploy to dev at a time per repository, in the order they were pushed.
+    concurrency:
+      group: cool-deploy-${{ github.repository }}-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      release: ${{ steps.deploy.outputs.release }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.context }}
+    env:
+      COOL_API_URL: ${{ vars.COOL_API_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+      - name: Deploy to dev
+        id: deploy
+        env:
+          DIGEST: ${{ inputs.digest }}
+          TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          set -euo pipefail
+          coolctl deploy -env dev -digest "$DIGEST" -wait "$TIMEOUT"
+      - name: Summary
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          RELEASE: ${{ steps.deploy.outputs.release }}
+        run: |
+          {
+            echo "### Deployed to dev"
+            echo "Release \`$RELEASE\` is live at <$URL>."
+            echo "To take it further, open a **Promote** request in CoolEngOrg/issueops."
+          } >> "$GITHUB_STEP_SUMMARY"

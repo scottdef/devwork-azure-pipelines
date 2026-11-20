@@ -1,0 +1,7 @@
+# Outbound APIs to partners, behind a subscription key that a person approves.
+name: partners
+displayName: Partner integrations
+description: Palantir Foundry and other systems the platform fronts for apps.
+subscriptionRequired: true
+approvalRequired: true
+subscriptionsLimit: 1

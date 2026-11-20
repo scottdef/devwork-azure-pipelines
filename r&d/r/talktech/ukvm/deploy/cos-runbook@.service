@@ -1,0 +1,13 @@
+[Unit]
+Description=Chief of staff: run runbook %i
+After=cos.service
+Requires=cos.service
+
+[Service]
+Type=oneshot
+User=cos
+Group=cos
+EnvironmentFile=/etc/cos/env
+# An approved, unchanged runbook runs. An unapproved or edited one is left
+# awaiting confirmation on the panel and this unit exits 0 without acting.
+ExecStart=/usr/local/bin/cos order -addr http://10.77.0.1:8088 -source timer "runbook run %i"

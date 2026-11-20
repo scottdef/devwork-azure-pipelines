@@ -1,0 +1,9 @@
+# Outline of the Palantir Foundry integration. Not published anywhere yet:
+# the environments list is empty, so the sync skips it. See README.md here.
+name: palantir-foundry
+displayName: Palantir Foundry (outline)
+path: partners/palantir
+product: partners
+auth: subscription
+backend: cool-palantir
+environments: []

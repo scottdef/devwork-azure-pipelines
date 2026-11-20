@@ -1,0 +1,40 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # coolctl, helm and kubeconform are part of the runner image. The test
+      # says which of the optional two it found.
+      - uses: CoolEngOrg/cool-actions/setup-coolctl@v1
+      - run: make check
+      - name: Version bumped when a chart changed
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE"
+          for chart in charts/*/; do
+            name=$(basename "$chart")
+            if ! git diff --quiet "$BASE" -- "$chart"; then
+              old=$(git show "$BASE:$chart/Chart.yaml" 2>/dev/null | awk '$1 == "version:" {print $2}' || true)
+              new=$(awk '$1 == "version:" {print $2}' "$chart/Chart.yaml")
+              if [ "$old" = "$new" ]; then
+                echo "::error file=$chart/Chart.yaml::$name changed but its version is still $new"
+                exit 1
+              fi
+            fi
+          done

@@ -1,0 +1,185 @@
+{
+  "request_types": [
+    {
+      "id": "cool-app-create",
+      "title": "CoolDeploy: Create an app",
+      "form": "cool-app-create.yml",
+      "label": "issueops:cool-app-create",
+      "workflow": "execute-cool-app-create.yml",
+      "environment": "cool-dev",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "rules": [
+        {"name": "platform", "min": 1, "any_of": {"teams": ["platform-admins"]}}
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-deploy-promote",
+      "title": "CoolDeploy: Promote a release",
+      "form": "cool-deploy-promote.yml",
+      "label": "issueops:cool-deploy-promote",
+      "workflow": "execute-cool-deploy-promote.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "auto_approve": {"all": [{"field": "environment", "op": "eq", "value": "tst"}]},
+      "rules": [],
+      "escalations": [
+        {
+          "name": "production",
+          "when": {"all": [{"field": "environment", "op": "eq", "value": "prd"}]},
+          "rules": [
+            {"name": "release approver", "min": 1, "any_of": {"teams": ["cool-release-approvers"]}}
+          ],
+          "environment": "cool-prd"
+        }
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-deploy-rollback",
+      "title": "CoolDeploy: Roll back",
+      "form": "cool-deploy-rollback.yml",
+      "label": "issueops:cool-deploy-rollback",
+      "workflow": "execute-cool-deploy-rollback.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "auto_approve": {"all": [{"field": "environment", "op": "in", "value": ["dev", "tst"]}]},
+      "rules": [],
+      "escalations": [
+        {
+          "name": "production",
+          "when": {"all": [{"field": "environment", "op": "eq", "value": "prd"}]},
+          "rules": [
+            {"name": "on call", "min": 1, "any_of": {"teams": ["cool-release-approvers", "platform-admins"]}}
+          ],
+          "environment": "cool-prd"
+        }
+      ],
+      "allow_self_approval": true,
+      "distinct_approvers": false
+    },
+    {
+      "id": "cool-rolling-release",
+      "title": "CoolDeploy: Rolling release",
+      "form": "cool-rolling-release.yml",
+      "label": "issueops:cool-rolling-release",
+      "workflow": "execute-cool-rolling-release.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "auto_approve": {"all": [{"field": "environment", "op": "eq", "value": "tst"}]},
+      "rules": [],
+      "escalations": [
+        {
+          "name": "production",
+          "when": {"all": [{"field": "environment", "op": "eq", "value": "prd"}]},
+          "rules": [
+            {"name": "release approver", "min": 1, "any_of": {"teams": ["cool-release-approvers"]}}
+          ],
+          "environment": "cool-prd"
+        }
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-env-var",
+      "title": "CoolDeploy: Change environment variables",
+      "form": "cool-env-var.yml",
+      "label": "issueops:cool-env-var",
+      "workflow": "execute-cool-env-var.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "auto_approve": {"all": [{"field": "environment", "op": "eq", "value": "dev"}]},
+      "rules": [],
+      "escalations": [
+        {
+          "name": "beyond dev",
+          "when": {"all": [{"field": "environment", "op": "in", "value": ["tst", "prd"]}]},
+          "rules": [
+            {"name": "release approver", "min": 1, "any_of": {"teams": ["cool-release-approvers"]}}
+          ],
+          "environment": "cool-{environment}"
+        }
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-domain",
+      "title": "CoolDeploy: Custom domain",
+      "form": "cool-domain.yml",
+      "label": "issueops:cool-domain",
+      "workflow": "execute-cool-domain.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "rules": [
+        {"name": "platform", "min": 1, "any_of": {"teams": ["platform-admins"]}}
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-addon",
+      "title": "CoolDeploy: Add-on",
+      "form": "cool-addon.yml",
+      "label": "issueops:cool-addon",
+      "workflow": "execute-cool-addon.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "rules": [
+        {"name": "platform", "min": 1, "any_of": {"teams": ["platform-admins"]}}
+      ],
+      "escalations": [
+        {
+          "name": "large",
+          "when": {"all": [{"field": "size", "op": "eq", "value": "large"}]},
+          "rules": [
+            {"name": "finops", "min": 1, "any_of": {"teams": ["finops-approvers"]}}
+          ],
+          "environment": "cool-{environment}"
+        },
+        {
+          "name": "ai budget",
+          "when": {"all": [{"field": "addon", "op": "eq", "value": "ai"}]},
+          "rules": [
+            {"name": "ai governance", "min": 1, "any_of": {"teams": ["ai-governance"]}}
+          ],
+          "environment": "cool-{environment}"
+        }
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-api-publish",
+      "title": "CoolDeploy: Publish an API",
+      "form": "cool-api-publish.yml",
+      "label": "issueops:cool-api-publish",
+      "workflow": "execute-cool-api-publish.yml",
+      "environment": "cool-{environment}",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "rules": [
+        {"name": "platform", "min": 1, "any_of": {"teams": ["platform-admins"]}}
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    },
+    {
+      "id": "cool-app-retire",
+      "title": "CoolDeploy: Retire an app",
+      "form": "cool-app-retire.yml",
+      "label": "issueops:cool-app-retire",
+      "workflow": "execute-cool-app-retire.yml",
+      "environment": "cool-prd",
+      "requestors": {"any_of": {"teams": ["cool-developers"]}},
+      "rules": [
+        {"name": "release approver", "min": 1, "any_of": {"teams": ["cool-release-approvers"]}},
+        {"name": "platform", "min": 1, "any_of": {"teams": ["platform-admins"]}}
+      ],
+      "allow_self_approval": false,
+      "distinct_approvers": true
+    }
+  ]
+}

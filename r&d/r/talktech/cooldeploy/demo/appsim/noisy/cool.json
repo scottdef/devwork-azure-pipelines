@@ -1,0 +1,11 @@
+{
+  "team": "sim",
+  "app": "appsim-noisy",
+  "preset": "dockerfile",
+  "expose": "internal",
+  "port": 8080,
+  "health": "/healthz",
+  "scale": {"min": 1, "max": 6, "cpu": 50},
+  "resources": {"cpu": "100m", "memory": "64Mi"},
+  "env": {"SIM_LATENCY_MS": "5", "SIM_ERROR_RATE": "0", "SIM_CPU_MS": "40"}
+}

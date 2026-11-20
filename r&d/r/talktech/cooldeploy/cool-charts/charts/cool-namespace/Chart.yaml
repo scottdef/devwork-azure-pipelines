@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cool-namespace
+description: The namespace an app lives in, with its quota, network policy, mesh policy and team access.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

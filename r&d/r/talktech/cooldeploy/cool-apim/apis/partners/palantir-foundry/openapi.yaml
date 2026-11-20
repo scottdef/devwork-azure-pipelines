@@ -1,0 +1,58 @@
+openapi: 3.0.3
+info:
+  title: Palantir Foundry (outline)
+  version: 0.1.0
+  description: >-
+    A starting point, not a complete description. Two operations that show
+    the shape of the integration: read objects from an ontology, and ask an
+    AIP agent a question. Check both against Palantir's API reference before
+    publishing.
+paths:
+  /v2/ontologies/{ontology}/objects/{objectType}:
+    get:
+      operationId: listObjects
+      summary: List objects of a type in an ontology
+      parameters:
+        - {name: ontology, in: path, required: true, schema: {type: string}}
+        - {name: objectType, in: path, required: true, schema: {type: string}}
+        - {name: pageSize, in: query, schema: {type: integer, maximum: 1000}}
+        - {name: pageToken, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: A page of objects.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {type: object}
+                  nextPageToken: {type: string}
+  /v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/blockingContinue:
+    post:
+      operationId: askAgent
+      summary: Send one message to an AIP agent session and wait for the answer
+      parameters:
+        - {name: agentRid, in: path, required: true, schema: {type: string}}
+        - {name: sessionRid, in: path, required: true, schema: {type: string}}
+        - {name: preview, in: query, schema: {type: boolean}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userInput]
+              properties:
+                userInput:
+                  type: object
+                  required: [text]
+                  properties:
+                    text: {type: string}
+      responses:
+        "200":
+          description: The agent's answer.
+          content:
+            application/json:
+              schema: {type: object}

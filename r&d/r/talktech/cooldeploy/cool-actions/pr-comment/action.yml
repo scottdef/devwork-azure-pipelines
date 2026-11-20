@@ -1,0 +1,38 @@
+name: Pull-request comment
+description: >-
+  Write a comment on a pull request, or update the one this action wrote
+  before. A hidden marker tells its own comment from everyone else's.
+inputs:
+  pr:
+    description: Pull-request number.
+    required: true
+  marker:
+    description: A short name for this kind of comment, such as preview.
+    required: true
+  body:
+    description: The comment, in Markdown.
+    required: true
+  token:
+    description: Token with pull-requests write on the repository.
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ inputs.pr }}
+        MARKER: ${{ inputs.marker }}
+        BODY: ${{ inputs.body }}
+      run: |
+        set -euo pipefail
+        tag="<!-- cool:$MARKER -->"
+        payload=$(jq -nM --arg body "$tag"$'\n'"$BODY" '{body: $body}')
+        id=$(gh api --paginate "repos/$REPO/issues/$PR/comments" |
+          jq -rM --arg tag "$tag" '[.[] | select(.body | startswith($tag))][0].id // empty' | head -1)
+        if [ -n "$id" ]; then
+          gh api --method PATCH "repos/$REPO/issues/comments/$id" --input - <<<"$payload" >/dev/null
+        else
+          gh api --method POST "repos/$REPO/issues/$PR/comments" --input - <<<"$payload" >/dev/null
+        fi

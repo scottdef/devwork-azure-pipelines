@@ -1,0 +1,80 @@
+# One Argo CD Application per app per environment.
+#
+# The generator finds every apps/<team>/<app>/<env>/values.json that cool-api
+# has written and installs two charts with it, in one Application: the
+# namespace and the app. Deleting the file deletes the Application, and with
+# it the namespace and everything inside.
+#
+# The keys of values.json become template parameters, which is where .team,
+# .app and .chart come from. The list parameters are named coolEnv and
+# cluster so that they cannot collide with a key of values.json.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cool-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - {coolEnv: sbx, cluster: sbx-eus2-appsim-aks-001}
+                - {coolEnv: dev, cluster: dev-eus2-appdev-aks-001}
+                - {coolEnv: tst, cluster: tst-eus2-appdev-aks-001}
+                - {coolEnv: prd, cluster: prd-eus2-appdev-aks-001}
+          - git:
+              repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+              revision: main
+              files:
+                - path: "apps/*/*/{{ .coolEnv }}/values.json"
+              # Look for new apps twice a minute. cool-api asks Argo CD to
+              # refresh an existing Application right after it commits.
+              requeueAfterSeconds: 30
+  template:
+    metadata:
+      name: "{{ .team }}-{{ .app }}-{{ .coolEnv }}"
+      namespace: argocd
+      labels:
+        cool/team: "{{ .team }}"
+        cool/app: "{{ .app }}"
+        cool/env: "{{ .coolEnv }}"
+    spec:
+      project: "{{ .team }}"
+      sources:
+        - repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+          targetRevision: "{{ .chart }}"
+          path: charts/cool-namespace
+          helm:
+            releaseName: "{{ .app }}-namespace"
+            valueFiles:
+              - "$values/teams/{{ .team }}/team.json"
+              - "$values/{{ .path.path }}/values.json"
+              - "$values/clusters/{{ .cluster }}/platform-values.json"
+        - repoURL: https://github.com/CoolEngOrg/cool-charts.git
+          targetRevision: "{{ .chart }}"
+          path: charts/cool-app
+          helm:
+            releaseName: "{{ .app }}"
+            valueFiles:
+              - "$values/teams/{{ .team }}/team.json"
+              - "$values/{{ .path.path }}/values.json"
+              - "$values/clusters/{{ .cluster }}/platform-values.json"
+      destination:
+        name: "{{ .cluster }}"
+        namespace: "{{ .team }}-{{ .app }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff: {duration: 10s, factor: 2, maxDuration: 3m}

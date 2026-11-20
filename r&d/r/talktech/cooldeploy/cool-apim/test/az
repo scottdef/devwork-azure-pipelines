@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# A stand-in for the Azure CLI, for testing the scripts without Azure.
+#
+# It appends each call to $AZ_LOG, one line per call, and answers the few
+# reads the scripts make. Whether an object "exists" is decided by
+# $AZ_EXISTING, a space-separated list of names: a `show` of a name on the
+# list succeeds, any other fails the way the real CLI does for a missing
+# resource.
+set -euo pipefail
+
+: "${AZ_LOG:?AZ_LOG is not set}"
+
+# Record the call. A body passed as @file is recorded by content, because
+# the temporary file is gone by the time the test reads the log.
+line=()
+for arg in "$@"; do
+	case $arg in
+	@*) line+=("@$(tr -d '\n' <"${arg#@}" | cut -c1-4000)") ;;
+	*) line+=("$arg") ;;
+	esac
+done
+printf '%s\n' "${line[*]}" >>"$AZ_LOG"
+
+named() { # the value that follows a flag
+	local flag=$1
+	shift
+	while [ $# -gt 0 ]; do
+		if [ "$1" = "$flag" ]; then
+			echo "${2:-}"
+			return
+		fi
+		shift
+	done
+}
+
+case "$1 ${2:-} ${3:-}" in
+"account show "*) echo 00000000-0000-0000-0000-000000000000 ;;
+"apim nv show" | "apim product show")
+	id=$(named --named-value-id "$@")$(named --product-id "$@")
+	case " ${AZ_EXISTING:-} " in
+	*" $id "*) echo '{}' ;;
+	*) echo "ERROR: (ResourceNotFound) $id was not found." >&2; exit 3 ;;
+	esac
+	;;
+"apim api list") tr ' ' '\n' <<<"${AZ_APIS:-}" ;;
+*) echo '{}' ;;
+esac

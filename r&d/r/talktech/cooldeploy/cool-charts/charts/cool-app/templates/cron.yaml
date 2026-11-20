@@ -1,0 +1,56 @@
+{{- /*
+One CronJob per entry in crons. The pod stays outside the mesh and calls the
+app the way any internal client would, with CRON_SECRET as a bearer token.
+Staying outside means the Job finishes when the call does, with no sidecar
+to wait for. Previews run no crons.
+*/ -}}
+{{- if and (eq (int .Values.preview) 0) (include "cool-app.live" .) }}
+{{- range $i, $c := .Values.crons }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $.Values.app }}-cron-{{ $i }}
+  labels: {{ include "cool-app.labels" $ }}
+spec:
+  schedule: {{ $c.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            cool/team: {{ $.Values.team | quote }}
+            cool/cron: {{ printf "%s-cron-%d" $.Values.app $i | quote }}
+            sidecar.istio.io/inject: "false"
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext: {{ include "cool-app.podSecurity" $ }}
+          containers:
+            - name: call
+              image: {{ $.Values.platform.cronImage | quote }}
+              args:
+                - call
+                - -url
+                {{- if $.Values.platform.mesh.enabled }}
+                - {{ printf "https://%s%s" (include "cool-app.host" $) $c.path | quote }}
+                {{- else }}
+                - {{ printf "http://%s%s" (include "cool-app.service" $) $c.path | quote }}
+                {{- end }}
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef: {"name": {{ printf "%s-secrets" $.Values.app | quote }}, "key": "CRON_SECRET"}
+              resources:
+                requests: {"cpu": "10m", "memory": "16Mi"}
+                limits: {"memory": "64Mi"}
+              securityContext: {{ include "cool-app.containerSecurity" $ }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,42 @@
+{{- /*
+Pods in app namespaces run images from the platform registry and nowhere
+else. The policy sees a pod after the mesh has injected its sidecar, so the
+registries the sidecar comes from are allowed too.
+
+ValidatingAdmissionPolicy is built into the API server from Kubernetes 1.30:
+no webhook, nothing to keep running.
+*/ -}}
+{{- define "cool-platform.allowed" -}}
+[{{ printf "%s/" .Values.platform.registry | quote }}{{ range .Values.platform.extraRegistries }}, {{ . | quote }}{{ end }}]
+{{- end -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: cool-image-registry
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - {"apiGroups": [""], "apiVersions": ["v1"], "operations": ["CREATE", "UPDATE"], "resources": ["pods"]}
+  variables:
+    - name: allowed
+      expression: {{ include "cool-platform.allowed" . | quote }}
+  validations:
+    - expression: "object.spec.containers.all(c, variables.allowed.exists(p, c.image.startsWith(p)))"
+      message: "containers in app namespaces must use images from the platform registry"
+    - expression: "!has(object.spec.initContainers) || object.spec.initContainers.all(c, variables.allowed.exists(p, c.image.startsWith(p)))"
+      message: "init containers in app namespaces must use images from the platform registry"
+    - expression: "!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, variables.allowed.exists(p, c.image.startsWith(p)))"
+      message: "debug containers in app namespaces must use images from the platform registry"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: cool-image-registry
+spec:
+  policyName: cool-image-registry
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - {"key": "cool/team", "operator": "Exists"}

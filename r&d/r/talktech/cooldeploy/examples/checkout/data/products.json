@@ -1,0 +1,14 @@
+[
+  {"sku": "CB-1001", "name": "Cool Beans Coffee", "description": "Medium roast, whole bean, 340 g. For the first deploy of the day.", "category": "Pantry", "price_cents": 1450, "stock": 120},
+  {"sku": "CB-1002", "name": "Cold Brew Concentrate", "description": "One litre, makes eight glasses. Keeps for two weeks in the fridge.", "category": "Pantry", "price_cents": 1895, "stock": 64},
+  {"sku": "CM-2001", "name": "Chill Pill Mints", "description": "Peppermint, sugar free, 50 to a tin.", "category": "Pantry", "price_cents": 395, "stock": 400},
+  {"sku": "IP-3001", "name": "Ice Pack Backpack", "description": "Insulated 18 litre daypack with a padded laptop sleeve.", "category": "Gear", "price_cents": 7900, "stock": 35},
+  {"sku": "IP-3002", "name": "Frost Line Water Bottle", "description": "Double wall steel, 750 ml. Cold for 24 hours.", "category": "Gear", "price_cents": 2800, "stock": 150},
+  {"sku": "IP-3003", "name": "Glacier Lunch Box", "description": "Two tiers, leakproof, fits the Ice Pack Backpack.", "category": "Gear", "price_cents": 2250, "stock": 0},
+  {"sku": "SN-4001", "name": "Snow Day Beanie", "description": "Merino blend, one size, in slate grey.", "category": "Apparel", "price_cents": 2400, "stock": 80},
+  {"sku": "SN-4002", "name": "Polar Fleece Hoodie", "description": "Mid-weight fleece with a kangaroo pocket. Sizes S to XXL.", "category": "Apparel", "price_cents": 6400, "stock": 48},
+  {"sku": "SN-4003", "name": "Cool Runnings Socks", "description": "Three pairs, cushioned sole, sizes 39 to 46.", "category": "Apparel", "price_cents": 1600, "stock": 220},
+  {"sku": "DK-5001", "name": "Breeze Desk Fan", "description": "USB powered, three speeds, quiet enough for calls.", "category": "Desk", "price_cents": 3200, "stock": 55},
+  {"sku": "DK-5002", "name": "Permafrost Mouse Mat", "description": "Extended 90 by 40 cm mat with a stitched edge.", "category": "Desk", "price_cents": 1900, "stock": 90},
+  {"sku": "DK-5003", "name": "Aurora Desk Lamp", "description": "Dimmable LED with a warm to cool colour dial.", "category": "Desk", "price_cents": 5400, "stock": 22}
+]

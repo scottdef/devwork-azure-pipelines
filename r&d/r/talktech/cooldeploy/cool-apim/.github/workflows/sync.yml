@@ -1,0 +1,52 @@
+# Pull request: check the files and show what a sync would apply to each
+# instance. Main: apply, one environment after another, each behind its own
+# GitHub environment (cool-apim-<env>).
+name: sync
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sync-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sbx:
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-apim-sync.yml@v1
+    with:
+      environment: sbx
+      apply: ${{ github.event_name != 'pull_request' }}
+  dev:
+    needs: sbx
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-apim-sync.yml@v1
+    with:
+      environment: dev
+      apply: ${{ github.event_name != 'pull_request' }}
+  tst:
+    needs: dev
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-apim-sync.yml@v1
+    with:
+      environment: tst
+      apply: ${{ github.event_name != 'pull_request' }}
+  prd:
+    needs: tst
+    permissions:
+      contents: read
+      id-token: write
+    uses: CoolEngOrg/cool-actions/.github/workflows/cool-apim-sync.yml@v1
+    with:
+      environment: prd
+      apply: ${{ github.event_name != 'pull_request' }}

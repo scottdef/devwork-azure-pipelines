@@ -1,0 +1,27 @@
+<!--
+  Outline. The caller is known by its subscription key. The gateway removes
+  the caller's own credentials and signs the request with the platform's
+  Foundry token, which API Management reads from Key Vault.
+-->
+<policies>
+  <inbound>
+    <base />
+    <include-fragment fragment-id="cool-rate-limit" />
+    <set-backend-service backend-id="cool-palantir" />
+    <set-header name="Authorization" exists-action="override">
+      <value>Bearer {{cool-palantir-token}}</value>
+    </set-header>
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <set-header name="Cookie" exists-action="delete" />
+  </inbound>
+  <backend>
+    <forward-request timeout="60" />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="Set-Cookie" exists-action="delete" />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

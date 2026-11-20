@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule for runbook %i
+
+[Timer]
+# Enable one per runbook:  systemctl enable --now cos-runbook@nightly-check.timer
+# Override the time with:  systemctl edit cos-runbook@nightly-check.timer
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=120
+Persistent=false
+
+[Install]
+WantedBy=timers.target

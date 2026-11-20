@@ -1,0 +1,31 @@
+# Defaults of the cool-api chart. README.md documents every key.
+#
+# YAML in JSON syntax, like every values file on the platform.
+{
+  "image": "registry.invalid/platform/cool-api:1",
+  "replicas": 2,
+  "identity": "",
+  "tenantId": "",
+  "keyVault": "",
+  "github": {
+    "clientId": "",
+    "installation": "",
+    "keySecret": "cool-deploy-app-private-key",
+    "repo": "CoolEngOrg/cool-gitops",
+    "branch": "main"
+  },
+  "oidc": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "audience": "cool-api",
+    "actionsRepo": "CoolEngOrg/cool-actions",
+    "actionsRef": "refs/tags/v1",
+    "issueopsRepo": "CoolEngOrg/issueops",
+    "issueopsRef": "refs/heads/main"
+  },
+  "domain": "coolapps.example",
+  "chart": "cool-app-1.0.0",
+  "portalOrigin": "https://coolengorg.github.io",
+  "argo": {"enabled": true, "namespace": "argocd"},
+  "internalLoadBalancer": true,
+  "resources": {"cpu": "100m", "memory": "128Mi"}
+}

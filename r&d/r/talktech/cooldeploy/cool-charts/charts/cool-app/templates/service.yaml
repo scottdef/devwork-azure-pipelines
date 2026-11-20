@@ -1,0 +1,30 @@
+{{- /*
+One Service for all releases. With the mesh, Istio splits traffic between
+release subsets. Without it (a local cluster), the Service selects only the
+active release, which gives blue-green switching and no weights.
+*/ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.app }}
+  labels: {{ include "cool-app.labels" . }}
+spec:
+  type: ClusterIP
+  selector:
+    cool/app: {{ .Values.app | quote }}
+    {{- if not .Values.platform.mesh.enabled }}
+    cool/release: {{ include "cool-app.active" . | quote }}
+    {{- end }}
+  ports:
+    - {"name": "http", "port": 80, "targetPort": "http", "protocol": "TCP", "appProtocol": "http"}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.app }}
+  labels: {{ include "cool-app.labels" . }}
+  {{- if .Values.identity }}
+  annotations:
+    azure.workload.identity/client-id: {{ .Values.identity | quote }}
+  {{- end }}
+automountServiceAccountToken: false

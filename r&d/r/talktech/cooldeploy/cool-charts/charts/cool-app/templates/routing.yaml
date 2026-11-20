@@ -1,0 +1,75 @@
+{{- /*
+Routing. The release list becomes Istio subsets and weights: a deploy, a
+rollback and each stage of a rolling release all change nothing here but the
+numbers.
+*/ -}}
+{{- if and .Values.platform.mesh.enabled (include "cool-app.live" .) }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: {{ .Values.app }}
+  labels: {{ include "cool-app.labels" . }}
+spec:
+  host: {{ include "cool-app.service" . | quote }}
+  subsets:
+    {{- range .Values.releases }}
+    {{- if or (gt (int .weight) 0) .standby }}
+    - {"name": {{ .id | quote }}, "labels": {"cool/release": {{ .id | quote }}}}
+    {{- end }}
+    {{- end }}
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ .Values.app }}
+  labels: {{ include "cool-app.labels" . }}
+spec:
+  hosts:
+    - {{ include "cool-app.host" . | quote }}
+    - {{ include "cool-app.service" . | quote }}
+    {{- if eq (int .Values.preview) 0 }}
+    {{- range .Values.domains }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+  gateways: {{ include "cool-app.gateways" . }}
+  http:
+    {{- range .Values.routes }}
+    {{- if .redirect }}
+    - match: [{"uri": {"exact": {{ .redirect.from | quote }}}}]
+      redirect: {"uri": {{ .redirect.to | quote }}, "redirectCode": {{ int .redirect.code }}}
+    {{- end }}
+    {{- end }}
+    {{- range .Values.routes }}
+    {{- if .prefix }}
+    - match: [{"uri": {"prefix": {{ .prefix | quote }}}}]
+      {{- if .timeout }}
+      timeout: {{ .timeout | quote }}
+      {{- end }}
+      {{- if .headers }}
+      headers: {"response": {"set": {{ toJson .headers }}}}
+      {{- end }}
+      route: {{ include "cool-app.destinations" $ }}
+    {{- end }}
+    {{- end }}
+    - route: {{ include "cool-app.destinations" . }}
+{{- if eq (int .Values.preview) 0 }}
+{{- range .Values.releases }}
+{{- if or (gt (int .weight) 0) .standby }}
+---
+{{- /* Each retained release also answers on its own host, inside the network. */}}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ $.Values.app }}-{{ .id }}
+  labels: {{ include "cool-app.releaseLabels" (dict "root" $ "release" .) }}
+spec:
+  hosts:
+    - {{ printf "%s-%s.%s.%s" $.Values.app .id $.Values.environment $.Values.platform.domain | quote }}
+  gateways: [{{ $.Values.platform.mesh.internalGateway | quote }}]
+  http:
+    - route: [{"destination": {"host": {{ include "cool-app.service" $ | quote }}, "subset": {{ .id | quote }}, "port": {"number": 80}}}]
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

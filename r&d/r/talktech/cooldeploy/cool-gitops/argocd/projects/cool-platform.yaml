@@ -1,0 +1,20 @@
+# The platform's own project: what the platform team installs on clusters.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: cool-platform
+  namespace: argocd
+spec:
+  description: CoolDeploy platform components
+  sourceRepos:
+    - https://github.com/CoolEngOrg/cool-charts.git
+    - https://github.com/CoolEngOrg/cool-gitops.git
+  destinations:
+    - {name: in-cluster, namespace: argocd}
+    - {name: in-cluster, namespace: cool-system}
+    - {name: sbx-eus2-appsim-aks-001, namespace: "*"}
+    - {name: dev-eus2-appdev-aks-001, namespace: "*"}
+    - {name: tst-eus2-appdev-aks-001, namespace: "*"}
+    - {name: prd-eus2-appdev-aks-001, namespace: "*"}
+  clusterResourceWhitelist:
+    - {group: "*", kind: "*"}

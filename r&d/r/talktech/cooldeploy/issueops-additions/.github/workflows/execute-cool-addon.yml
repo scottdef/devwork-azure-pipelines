@@ -1,0 +1,24 @@
+# Carries out an approved cool-addon request.
+#
+# The comment router calls this workflow when a request of this type is
+# approved. The work is in execute-cool-request.yml and scripts/cool/addon.sh.
+name: execute-cool-addon
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        type: number
+        required: true
+permissions: {}
+jobs:
+  request:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/execute-cool-request.yml
+    with:
+      type: addon
+      issue-number: ${{ inputs.issue-number }}
+      repositories: cool-infra
+      azure: none
+    secrets: inherit

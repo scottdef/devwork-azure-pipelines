@@ -1,0 +1,117 @@
+# Plan or apply one Terraform stack of cool-infra.
+#
+#   pull request   plan, and show the plan in the job summary
+#   main           plan, then apply after the environment's reviewers approve
+#
+# API Management is not Terraform's to manage on this platform: cool-apim
+# owns it with scripts. The guard below fails the run if a stack tries.
+name: cool-terraform
+on:
+  workflow_call:
+    inputs:
+      stack:
+        description: Stack directory, such as stacks/20-clusters.
+        type: string
+        required: true
+      apply:
+        description: Apply after planning.
+        type: boolean
+        default: false
+      environment:
+        description: GitHub environment whose reviewers approve the apply.
+        type: string
+        default: cool-infra
+
+permissions: {}
+
+jobs:
+  plan:
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ vars.COOL_INFRA_PLAN_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.COOL_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      STACK: ${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Terraform does not manage API Management here
+        run: |
+          set -euo pipefail
+          if grep -rnE --include='*.tf' 'azurerm_api_management|"Microsoft\.ApiManagement/' . ; then
+            echo "::error::API Management is managed by cool-apim, with scripts. Remove it from Terraform."
+            exit 1
+          fi
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - name: Format and validate
+        run: |
+          set -euo pipefail
+          terraform fmt -check -recursive
+          terraform -chdir="$STACK" init -lockfile=readonly
+          terraform -chdir="$STACK" validate
+      - name: Plan
+        id: plan
+        run: |
+          set -euo pipefail
+          status=0
+          terraform -chdir="$STACK" plan -lock-timeout=5m -out=tfplan -detailed-exitcode || status=$?
+          case $status in
+            0) echo "changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$status" ;;
+          esac
+          {
+            echo "### Plan for \`$STACK\`"
+            echo '```'
+            terraform -chdir="$STACK" show -no-color tfplan | tail -n 200
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    needs: plan
+    if: inputs.apply && needs.plan.outputs.changes == 'true'
+    runs-on: ${{ fromJSON(vars.COOL_RUNS_ON || '["self-hosted","linux","cool-linux"]') }}
+    timeout-minutes: 90
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: cool-terraform-${{ inputs.stack }}
+      cancel-in-progress: false
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ vars.COOL_INFRA_APPLY_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.COOL_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.COOL_SUBSCRIPTION_ID }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      STACK: ${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      # Plan again with the apply identity. A saved plan from another
+      # identity is not something to trust across an approval.
+      - name: Apply
+        run: |
+          set -euo pipefail
+          terraform -chdir="$STACK" init -lockfile=readonly
+          terraform -chdir="$STACK" apply -lock-timeout=5m -auto-approve

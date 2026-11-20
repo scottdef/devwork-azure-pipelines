@@ -1,0 +1,75 @@
+/* The CoolDeploy portal. One stylesheet, no build step. */
+:root {
+  --ink: #16202a;
+  --muted: #5b6b7a;
+  --line: #d9e1e8;
+  --paper: #ffffff;
+  --wash: #f3f7fa;
+  --cool: #0b6bcb;
+  --good: #17794a;
+  --warn: #9a5b00;
+  --bad: #b3261e;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e7eef5;
+    --muted: #9db0c2;
+    --line: #2c3a47;
+    --paper: #151d25;
+    --wash: #0e141a;
+    --cool: #6db3ff;
+    --good: #58c990;
+    --warn: #e7b25c;
+    --bad: #ff8a80;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--wash);
+}
+header, main, footer { max-width: 64rem; margin: 0 auto; padding: 1rem 1.25rem; }
+header { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+h1 { margin: 0; font-size: 1.4rem; letter-spacing: -0.01em; }
+h1 a { color: inherit; text-decoration: none; }
+h2 { font-size: 1.15rem; margin: 0 0 0.25rem; }
+h3 { font-size: 1rem; margin: 0 0 0.25rem; display: flex; gap: 0.5rem; align-items: center; }
+a { color: var(--cool); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--cool); outline-offset: 2px; }
+nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+main > section, .app article {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 0.75rem;
+  padding: 1rem 1.25rem; margin-bottom: 1rem;
+}
+#detail:empty { display: none; }
+.lead, .meta, .none, .note { color: var(--muted); }
+.meta, .note { font-size: 0.9rem; }
+.button {
+  display: inline-block; font: inherit; font-size: 0.9rem; cursor: pointer; text-decoration: none;
+  color: var(--paper); background: var(--cool); border: 1px solid var(--cool);
+  border-radius: 0.5rem; padding: 0.3rem 0.75rem;
+}
+.button.quiet { color: var(--cool); background: transparent; border-color: var(--line); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; }
+.apps td:last-child { text-align: right; white-space: nowrap; }
+tr.standby { color: var(--muted); }
+code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
+meter { width: 6rem; height: 0.6rem; vertical-align: middle; }
+.app { padding: 0; border: 0; background: none; }
+.app article { margin: 0.75rem 0 0; }
+.badge { font-size: 0.72rem; font-weight: 500; padding: 0.05rem 0.5rem; border-radius: 1rem; border: 1px solid currentColor; color: var(--muted); }
+.badge.health-Healthy, .badge.sync-Synced { color: var(--good); }
+.badge.health-Progressing, .badge.sync-OutOfSync { color: var(--warn); }
+.badge.health-Degraded, .badge.health-Missing { color: var(--bad); }
+.how ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.how li { margin: 0.3rem 0; }
+footer { color: var(--muted); font-size: 0.9rem; }
+@media (max-width: 40rem) {
+  .apps th:nth-child(3), .apps td:nth-child(3), .apps th:nth-child(4), .apps td:nth-child(4) { display: none; }
+}

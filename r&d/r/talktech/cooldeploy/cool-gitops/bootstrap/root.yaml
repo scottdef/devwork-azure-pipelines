@@ -1,0 +1,22 @@
+# The one object applied by hand. It points Argo CD at argocd/ in this
+# repository; projects, ApplicationSets and cool-api follow from there.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cool-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CoolEngOrg/cool-gitops.git
+    targetRevision: main
+    path: argocd
+    directory:
+      recurse: true
+  destination:
+    name: in-cluster
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

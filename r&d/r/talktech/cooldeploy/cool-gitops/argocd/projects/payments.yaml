@@ -1,0 +1,30 @@
+# The payments team's project. Copy this file to onboard a team: change the
+# name, the description and the three namespace patterns.
+#
+# The project is a second lock, not the first. Teams never write manifests;
+# everything here comes from the platform's charts. The project makes sure
+# that even a mistake in those charts cannot reach another team's namespaces
+# or create cluster-wide objects other than a Namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: payments
+  namespace: argocd
+spec:
+  description: Apps of the payments team
+  sourceRepos:
+    - https://github.com/CoolEngOrg/cool-charts.git
+    - https://github.com/CoolEngOrg/cool-gitops.git
+  destinations:
+    - {name: dev-eus2-appdev-aks-001, namespace: "payments-*"}
+    - {name: tst-eus2-appdev-aks-001, namespace: "payments-*"}
+    - {name: prd-eus2-appdev-aks-001, namespace: "payments-*"}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+  roles:
+    - name: read
+      description: The team may look at its Applications in the Argo CD UI.
+      policies:
+        - p, proj:payments:read, applications, get, payments/*, allow
+      groups:
+        - 11111111-2222-4333-8444-555555555555

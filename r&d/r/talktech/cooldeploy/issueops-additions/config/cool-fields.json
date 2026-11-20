@@ -1,0 +1,59 @@
+{
+  "cool-app-create": [
+    "team",
+    "app",
+    "preset",
+    "expose",
+    "description"
+  ],
+  "cool-deploy-promote": [
+    "app",
+    "from",
+    "environment",
+    "release"
+  ],
+  "cool-deploy-rollback": [
+    "app",
+    "environment",
+    "reason"
+  ],
+  "cool-rolling-release": [
+    "app",
+    "from",
+    "environment",
+    "stages",
+    "settle",
+    "error_budget",
+    "release"
+  ],
+  "cool-env-var": [
+    "app",
+    "environment",
+    "set",
+    "unset"
+  ],
+  "cool-domain": [
+    "app",
+    "environment",
+    "action",
+    "domain"
+  ],
+  "cool-addon": [
+    "app",
+    "environment",
+    "addon",
+    "size"
+  ],
+  "cool-api-publish": [
+    "app",
+    "environment",
+    "product",
+    "path",
+    "auth"
+  ],
+  "cool-app-retire": [
+    "app",
+    "confirm",
+    "reason"
+  ]
+}

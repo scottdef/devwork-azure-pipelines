@@ -1,0 +1,33 @@
+name: "CoolDeploy: Retire an app"
+description: "Remove an app from every environment. Its repository and its images are kept."
+title: "[cool-app-retire] "
+labels: ["issueops", "issueops:cool-app-retire"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove an app from every environment. Its repository and its images are kept.
+
+        After opening the issue, comment `.submit` to ask for approval. `.status` shows where the request stands.
+  - type: input
+    id: app
+    attributes:
+      label: "App"
+      description: "The app, as team/app."
+      placeholder: "payments/checkout"
+    validations:
+      required: true
+  - type: input
+    id: confirm
+    attributes:
+      label: "Confirm"
+      description: "Type the app again, as team/app."
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: "Reason"
+      description: "Why the app is going away."
+    validations:
+      required: true

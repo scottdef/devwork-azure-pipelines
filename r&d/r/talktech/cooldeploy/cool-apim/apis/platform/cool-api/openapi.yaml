@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: CoolDeploy API
+  version: 1.0.0
+  description: >-
+    What is deployed where. These are the read routes of cool-api, for the
+    portal and for tools that sign in with Entra ID. Changes do not go
+    through here: they are requests in CoolEngOrg/issueops.
+paths:
+  /v1/apps:
+    get:
+      operationId: listApps
+      summary: List registered apps
+      responses:
+        "200":
+          description: Every app registered on the platform.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/App"}
+  /v1/apps/{team}/{app}:
+    get:
+      operationId: getApp
+      summary: Releases of an app in every environment
+      parameters:
+        - {name: team, in: path, required: true, schema: {type: string}}
+        - {name: app, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The app, its releases per environment and its previews.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AppStatus"}
+        "404":
+          description: No such app.
+  /v1/apps/{team}/{app}/status:
+    get:
+      operationId: getAppStatusFragment
+      summary: The same, as an HTML fragment for the portal
+      parameters:
+        - {name: team, in: path, required: true, schema: {type: string}}
+        - {name: app, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: An HTML fragment.
+          content:
+            text/html:
+              schema: {type: string}
+        "404":
+          description: No such app.
+components:
+  schemas:
+    App:
+      type: object
+      properties:
+        team: {type: string}
+        app: {type: string}
+        repo: {type: string}
+        chart: {type: string}
+        created: {type: string, format: date-time}
+    Release:
+      type: object
+      properties:
+        id: {type: string, example: r1a2b3c4}
+        digest: {type: string}
+        weight: {type: integer, minimum: 0, maximum: 100}
+        standby: {type: boolean}
+        sha: {type: string}
+        at: {type: string, format: date-time}
+    AppStatus:
+      allOf:
+        - {$ref: "#/components/schemas/App"}
+        - type: object
+          properties:
+            environments:
+              type: array
+              items:
+                type: object
+                properties:
+                  environment: {type: string, enum: [sbx, dev, tst, prd]}
+                  application: {type: string}
+                  url: {type: string}
+                  sync: {type: string}
+                  health: {type: string}
+                  releases:
+                    type: array
+                    items: {$ref: "#/components/schemas/Release"}
+            previews:
+              type: array
+              items:
+                type: object
+                properties:
+                  pr: {type: integer}
+                  url: {type: string}
+                  release: {type: string}
