@@ -1,0 +1,13 @@
+{
+  "brain": [
+    {"url": "http://127.0.0.1:8080", "model": "", "key_env": "STRATA_API_KEY"},
+    {"url": "http://127.0.0.1:8081", "model": "", "key_env": "LLAMA_API_KEY"}
+  ],
+  "fast": [
+    {"url": "http://127.0.0.1:8080", "model": "", "key_env": "STRATA_API_KEY"},
+    {"url": "http://127.0.0.1:8081", "model": "", "key_env": "LLAMA_API_KEY"}
+  ],
+  "embed": [
+    {"url": "http://127.0.0.1:8083", "model": "", "key_env": ""}
+  ]
+}

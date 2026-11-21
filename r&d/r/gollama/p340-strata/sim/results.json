@@ -1,0 +1,400 @@
+{
+  "GPUBW": 41.53428575742222,
+  "TokOvhMs": 3.2825609487782015,
+  "CPUBW2933": 25.8104,
+  "CPUBW2133": 18.770400000000002,
+  "Rows": [
+    {
+      "id": "A",
+      "pattern": "Strata, Qwen3.6-35B-A3B, dense on GPU, no drafts",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 25,
+      "ram_cap_gb": 32,
+      "vram_gb": 3.59864,
+      "vram_cap_gb": 4,
+      "decode_tps": 16.52037658652663,
+      "prefill_tps": 104.3871774042367,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 4.78986032991162,
+          "total_s": 13.86955649872257
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 14.36958098973486,
+          "total_s": 32.528973327356766
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 57.47832395893944,
+          "total_s": 87.74397785497595
+        }
+      },
+      "fit": "tight",
+      "note": "engine start on a 4 GB card is unreported"
+    },
+    {
+      "id": "A+",
+      "pattern": "Strata, same, drafts on",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 25,
+      "ram_cap_gb": 32,
+      "vram_gb": 4.59864,
+      "vram_cap_gb": 4,
+      "decode_tps": 23.458934752867815,
+      "prefill_tps": 104.3871774042367,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 4.78986032991162,
+          "total_s": 11.184012561468627
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 14.36958098973486,
+          "total_s": 27.157885452848877
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 57.47832395893944,
+          "total_s": 78.79216473079613
+        }
+      },
+      "fit": "no: VRAM",
+      "note": "draft layer needs about 1 GB more VRAM"
+    },
+    {
+      "id": "B",
+      "pattern": "llama-server, same file, dense on GPU, experts on CPU",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 25,
+      "ram_cap_gb": 32,
+      "vram_gb": 3.06864,
+      "vram_cap_gb": 4,
+      "decode_tps": 13.766980488772193,
+      "prefill_tps": 86.98931450353058,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 5.747832395893944,
+          "total_s": 16.643467798467086
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 17.243497187681832,
+          "total_s": 39.034767992828115
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 68.97398875072733,
+          "total_s": 105.29277342597113
+        }
+      },
+      "fit": "fits",
+      "note": "documented path (--n-cpu-moe)"
+    },
+    {
+      "id": "B-cpu",
+      "pattern": "llama-server, same file, CPU only",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 26.9,
+      "ram_cap_gb": 32,
+      "vram_gb": 0.5,
+      "vram_cap_gb": 4,
+      "decode_tps": 9.94965801208989,
+      "prefill_tps": 60.49382716049382,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 8.26530612244898,
+          "total_s": 23.34120117509643
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 24.795918367346943,
+          "total_s": 54.947708472641835
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 99.18367346938777,
+          "total_s": 149.4366569782126
+        }
+      },
+      "fit": "fits",
+      "note": "GPU left free"
+    },
+    {
+      "id": "C",
+      "pattern": "Qwen3.5-4B router on GPU + MoE on CPU, 70/30 split",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 26.9,
+      "ram_cap_gb": 32,
+      "vram_gb": 3.5871999999999997,
+      "vram_cap_gb": 4,
+      "decode_tps": 12.954246570575014,
+      "prefill_tps": 101.01064814814816,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 5.436297222162359,
+          "total_s": 17.33166336385566
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 16.30889166648708,
+          "total_s": 40.099623949873674
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 99.18367346938777,
+          "total_s": 149.4366569782126
+        }
+      },
+      "fit": "tight",
+      "note": "rates are the 70/30 blend"
+    },
+    {
+      "id": "D",
+      "pattern": "Council: 4B + 9B + gpt-oss-20b on CPU, 4B aggregator on GPU",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 24.52,
+      "ram_cap_gb": 32,
+      "vram_gb": 3.5871999999999997,
+      "vram_cap_gb": 4,
+      "decode_tps": 14.241927381354355,
+      "prefill_tps": 118.37500000000001,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 112.90468639030348,
+          "total_s": 123.43696871301643
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 272.21010836523146,
+          "total_s": 293.27467301065735
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 0,
+          "total_s": 0,
+          "over_context": true
+        }
+      },
+      "fit": "tight",
+      "note": "rates shown are the aggregator's"
+    },
+    {
+      "id": "D-self",
+      "pattern": "Self-consistency: 3 samples of the MoE in 3 slots, vote",
+      "machine": "P340 stock (32 GB DDR4-2933, P1000 4 GB)",
+      "ram_gb": 25,
+      "ram_cap_gb": 32,
+      "vram_gb": 3.25296,
+      "vram_cap_gb": 4,
+      "decode_tps": 19.96212170871968,
+      "prefill_tps": 86.98931450353058,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 17.243497187681832,
+          "total_s": 39.78619112404006
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 51.7304915630455,
+          "total_s": 96.81587943576196
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 0,
+          "total_s": 0,
+          "over_context": true
+        }
+      },
+      "fit": "fits",
+      "note": "decode is the 3-slot aggregate"
+    },
+    {
+      "id": "E",
+      "pattern": "Strata, Flash-Next Q2_0, dense on GPU, no drafts",
+      "machine": "P340 + 16 GB stick (48 GB at DDR4-2133)",
+      "ram_gb": 38.300000000000004,
+      "ram_cap_gb": 48,
+      "vram_gb": 3.9064959999999997,
+      "vram_cap_gb": 4,
+      "decode_tps": 10.178398778938941,
+      "prefill_tps": 38.17431444241316,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 13.097812162527806,
+          "total_s": 27.83490423936594
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 39.29343648758342,
+          "total_s": 68.76762064125968
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 157.17374595033368,
+          "total_s": 206.2973862064608
+        }
+      },
+      "fit": "tight",
+      "note": "far below Strata's documented card sizes"
+    },
+    {
+      "id": "E-B",
+      "pattern": "Pattern B again on the 48 GB machine",
+      "machine": "P340 + 16 GB stick (48 GB at DDR4-2133)",
+      "ram_gb": 25,
+      "ram_cap_gb": 48,
+      "vram_gb": 3.06864,
+      "vram_cap_gb": 4,
+      "decode_tps": 12.27105602259905,
+      "prefill_tps": 86.98931450353058,
+      "turns": {
+        "agent step (500 new in, 150 out)": {
+          "ttft_s": 5.747832395893944,
+          "total_s": 17.971719217350206
+        },
+        "chat turn (1,500 in, 300 out)": {
+          "ttft_s": 17.243497187681832,
+          "total_s": 41.691270830594355
+        },
+        "cold document (6,000 in, 500 out)": {
+          "ttft_s": 68.97398875072733,
+          "total_s": 109.72027815558152
+        }
+      },
+      "fit": "fits",
+      "note": "shows the cost of the downclock"
+    }
+  ],
+  "Upgrades": [
+    {
+      "ID": "U1",
+      "What": "P340, 64 GB, RTX A2000 12 GB in the slot",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.32284307692307695,
+      "Decode": 51.18226721573318,
+      "Prefill": 193.7132201383653,
+      "Chat": 13.604810485685615,
+      "Doc": 40.74263013792535,
+      "Published": ""
+    },
+    {
+      "ID": "U1-F",
+      "What": "P340, 64 GB, RTX A2000 12 GB in the slot",
+      "Model": "Qwen3.8-Flash-Next Q2_0",
+      "ExpGPU": 0.2051181176470588,
+      "Decode": 41.2158049337304,
+      "Prefill": 0,
+      "Chat": 0,
+      "Doc": 0,
+      "Published": ""
+    },
+    {
+      "ID": "U2",
+      "What": "P340, 64 GB, RTX 5060 Ti 16 GB on a dock",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.527971282051282,
+      "Decode": 71.0619966044328,
+      "Prefill": 303.7295885846046,
+      "Chat": 9.160269259107594,
+      "Doc": 26.790523527547755,
+      "Published": ""
+    },
+    {
+      "ID": "U2-L",
+      "What": "P340, 64 GB, RTX 5060 Ti 16 GB on a dock, llama-server",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.6064328205128205,
+      "Decode": 44.778442760885994,
+      "Prefill": 296.00491202208156,
+      "Chat": 11.767135840606555,
+      "Doc": 31.43602117450747,
+      "Published": "about 42 estimated by Llama Builds"
+    },
+    {
+      "ID": "U2-F",
+      "What": "P340, 64 GB, RTX 5060 Ti 16 GB on a dock",
+      "Model": "Qwen3.8-Flash-Next Q2_0",
+      "ExpGPU": 0.3227651764705882,
+      "Decode": 53.77548673243743,
+      "Prefill": 0,
+      "Chat": 0,
+      "Doc": 0,
+      "Published": ""
+    },
+    {
+      "ID": "U2-A",
+      "What": "P340, 64 GB, RTX 2000 Ada 16 GB in the slot (256 GB/s assumed)",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.527971282051282,
+      "Decode": 54.715159278408315,
+      "Prefill": 275.2855205430424,
+      "Chat": 10.931829291341616,
+      "Doc": 30.933787744421622,
+      "Published": ""
+    },
+    {
+      "ID": "U3",
+      "What": "P340, 64 GB, RTX 3090 24 GB on a dock",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.9382276923076923,
+      "Decode": 173.3933703719517,
+      "Prefill": 1515.753165189808,
+      "Chat": 2.7197769939801306,
+      "Doc": 6.842044745080685,
+      "Published": ""
+    },
+    {
+      "ID": "U3-F",
+      "What": "P340, 64 GB, RTX 3090 24 GB on a dock",
+      "Model": "Qwen3.8-Flash-Next Q2_0",
+      "ExpGPU": 0.558059294117647,
+      "Decode": 86.7514062073103,
+      "Prefill": 0,
+      "Chat": 0,
+      "Doc": 0,
+      "Published": ""
+    }
+  ],
+  "Checks": [
+    {
+      "ID": "V1",
+      "What": "Radeon AI PRO R9700 32 GB, Strata, no drafts",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 1,
+      "Decode": 110.75546196660345,
+      "Prefill": 4800,
+      "Chat": 3.0211700255962115,
+      "Doc": 5.764450042660353,
+      "Published": "83.9 measured by Strata"
+    },
+    {
+      "ID": "V2",
+      "What": "Radeon AI PRO R9700 32 GB, llama.cpp",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 1,
+      "Decode": 92.29621830550288,
+      "Prefill": 4000,
+      "Chat": 3.625404030715454,
+      "Doc": 6.917340051192423,
+      "Published": "73.8 measured by Strata"
+    },
+    {
+      "ID": "V3",
+      "What": "RTX 3060 12 GB, DDR5-5600 assumed, Strata, no drafts",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.4308389743589744,
+      "Decode": 54.81735195706643,
+      "Prefill": 239.67785732733512,
+      "Chat": 11.731120071936035,
+      "Doc": 34.154801071056546,
+      "Published": "59.7 measured by Strata"
+    },
+    {
+      "ID": "V4",
+      "What": "RTX 3060 12 GB, DDR5-5600 assumed, llama.cpp",
+      "Model": "Qwen3.6-35B-A3B UD-Q4_K_XL",
+      "ExpGPU": 0.45801846153846154,
+      "Decode": 46.2034533637715,
+      "Prefill": 207.781287727932,
+      "Chat": 13.712150537824154,
+      "Doc": 39.69821946261051,
+      "Published": "48 to 52 measured by Strata"
+    },
+    {
+      "ID": "V5",
+      "What": "RTX 5070 12 GB, 64 GB DDR5-6000 assumed, Strata, drafts",
+      "Model": "Qwen3.8-Flash-Next Q2_0",
+      "ExpGPU": 0.21451482352941179,
+      "Decode": 83.60347914312598,
+      "Prefill": 0,
+      "Chat": 0,
+      "Doc": 0,
+      "Published": "87.3 measured by Strata"
+    }
+  ]
+}

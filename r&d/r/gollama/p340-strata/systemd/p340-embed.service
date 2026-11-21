@@ -1,0 +1,11 @@
+[Unit]
+Description=p340 embed: embedding model on the CPU for retrieval
+
+[Service]
+EnvironmentFile=%h/.config/p340/env
+ExecStart=/bin/sh -c 'exec "$LLAMA_SERVER" -m "$EMBED_GGUF" --alias embed --embeddings \
+  -ngl 0 -t 4 -c 2048 --host 127.0.0.1 --port 8083'
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

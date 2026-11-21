@@ -1,0 +1,20 @@
+[Unit]
+Description=p340 brain, llama-server lane: Qwen3.6-35B-A3B, dense layers on the P1000, experts on the CPU
+Conflicts=p340-brain-strata.service
+
+[Service]
+EnvironmentFile=%h/.config/p340/env
+# -ngl 99 --cpu-moe : every layer on the card except the routed expert tensors
+# -t 10             : physical cores of the i9-10900
+# -c 8192 -np 1     : one conversation; each extra slot costs VRAM the card lacks
+# -ctk/-ctv q8_0    : 8-bit KV cache (needs -fa on)
+ExecStart=/bin/sh -c 'exec "$LLAMA_SERVER" -m "$BRAIN_GGUF" --alias brain \
+  -ngl 99 --cpu-moe -t 10 -c 8192 -np 1 -fa on -ctk q8_0 -ctv q8_0 --jinja \
+  --host 127.0.0.1 --port 8081 --api-key "$LLAMA_API_KEY"'
+Restart=on-failure
+RestartSec=5
+# Loading 23 GB from a SATA SSD takes about a minute.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

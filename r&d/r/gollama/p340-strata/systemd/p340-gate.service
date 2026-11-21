@@ -1,0 +1,12 @@
+[Unit]
+Description=p340 gate: alias gateway in front of Strata and llama-server
+After=network-online.target
+
+[Service]
+EnvironmentFile=%h/.config/p340/env
+ExecStart=%h/p340-strata/bin/gate -listen 127.0.0.1:4000 -routes %h/p340-strata/etc/routes.json
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

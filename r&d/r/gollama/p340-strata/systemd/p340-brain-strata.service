@@ -1,0 +1,24 @@
+[Unit]
+Description=p340 brain, Strata lane: starts the saved preset "p340" and leaves it serving on 127.0.0.1:8080
+Conflicts=p340-brain-llama.service
+
+# A sketch, not run on the target machine. Strata documents its own startup
+# recipe under "Running it at startup" in docs/DETAILS.md; prefer that if the
+# two disagree. Create the preset once by hand:
+#   strata launch --family qwen36 --model UD-Q4_K_XL --model-path "$BRAIN_GGUF" \
+#     --context 8192 --parallel 1 --mtp off --vision off --access local \
+#     --api-key-env STRATA_API_KEY --save-preset p340 --no-tui
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=%h/.config/p340/env
+ExecStart=%h/.local/bin/strata launch --preset p340 --yes --no-tui
+# strata launch exits 0 even when it found no engine and started nothing, so
+# the unit only counts as started once the endpoint answers with the key.
+ExecStartPost=/usr/bin/curl -fsS -o /dev/null --retry 60 --retry-delay 5 --retry-connrefused \
+  -H "Authorization: Bearer ${STRATA_API_KEY}" http://127.0.0.1:8080/v1/models
+ExecStop=%h/.local/bin/strata launch --stop
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
